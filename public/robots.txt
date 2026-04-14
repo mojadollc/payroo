@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /setup
+Disallow: /management
+Disallow: /payment/
+
+Sitemap: https://payroo.xyz/sitemap.xml

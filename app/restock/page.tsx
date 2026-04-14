@@ -1,0 +1,308 @@
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { Brain, RefreshCw, TrendingUp, TrendingDown, Minus, PackagePlus, MapPin, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
+import { getSales, getProducts, updateProduct } from "@/lib/firebase/services"
+import { generateRestockReport, type RestockReport, type RestockSuggestion } from "@/lib/ai-restock-engine"
+
+// ── Urgency helpers ───────────────────────────────────────────────────────────
+const URGENCY_CONFIG = {
+  critical: { label: "Critical", color: "bg-red-100 text-red-700 border-red-300", bar: "bg-red-500", dot: "bg-red-500" },
+  high:     { label: "High",     color: "bg-orange-100 text-orange-700 border-orange-300", bar: "bg-orange-500", dot: "bg-orange-500" },
+  medium:   { label: "Medium",   color: "bg-yellow-100 text-yellow-700 border-yellow-300", bar: "bg-yellow-500", dot: "bg-yellow-500" },
+  low:      { label: "Low",      color: "bg-blue-100 text-blue-700 border-blue-300", bar: "bg-blue-400", dot: "bg-blue-400" },
+}
+
+// ── Quick Restock Dialog ──────────────────────────────────────────────────────
+function RestockDialog({ suggestion, onClose, onDone }: {
+  suggestion: RestockSuggestion; onClose: () => void; onDone: () => void
+}) {
+  const [qty, setQty] = useState(String(suggestion.suggestedRestock || suggestion.predictedDemand * 3))
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
+
+  const handleRestock = async () => {
+    const add = parseInt(qty)
+    if (isNaN(add) || add <= 0) return
+    setSaving(true)
+    try {
+      await updateProduct(suggestion.productId, { stock: suggestion.currentStock + add })
+      toast({ title: `✅ Restocked ${suggestion.productName}`, description: `+${add} units added` })
+      onDone()
+      onClose()
+    } catch {
+      toast({ title: "Error restocking", variant: "destructive" })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Restock — {suggestion.productName}</DialogTitle><DialogDescription>Confirm restock quantity</DialogDescription></DialogHeader>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
+            <div className="flex justify-between"><span className="text-muted-foreground">Current stock</span><span className="font-bold">{suggestion.currentStock} units</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Predicted demand</span><span className="font-bold text-orange-600">~{suggestion.predictedDemand} units</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Days until stockout</span><span className={`font-bold ${suggestion.daysUntilStockout <= 1 ? "text-red-600" : "text-green-600"}`}>{suggestion.daysUntilStockout === 999 ? "∞" : `${suggestion.daysUntilStockout}d`}</span></div>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Units to add</label>
+            <Input type="number" value={qty} onChange={e => setQty(e.target.value)} min="1" className="mt-1" autoFocus />
+          </div>
+          {qty && !isNaN(parseInt(qty)) && (
+            <p className="text-sm text-muted-foreground">New stock: <span className="font-bold">{suggestion.currentStock + parseInt(qty)}</span></p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleRestock} disabled={saving || !qty || isNaN(parseInt(qty)) || parseInt(qty) <= 0}>
+            {saving ? "Saving..." : "Confirm Restock"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Suggestion Card ───────────────────────────────────────────────────────────
+function SuggestionCard({ s, onRestock }: { s: RestockSuggestion; onRestock: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const cfg = URGENCY_CONFIG[s.urgency]
+  const stockPct = s.predictedDemand > 0 ? Math.min(100, (s.currentStock / (s.predictedDemand * 3)) * 100) : 100
+
+  return (
+    <div className={`border rounded-lg p-3 space-y-2 ${s.urgency === "critical" ? "border-red-300 bg-red-50/30" : ""}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold truncate">{s.productName}</span>
+            <Badge className={`text-xs border ${cfg.color}`}>{cfg.label}</Badge>
+            {s.boostFactors.map(f => (
+              <span key={f} className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full border border-yellow-200">{f}</span>
+            ))}
+          </div>
+          {/* Stock bar */}
+          <div className="mt-1.5 h-1.5 w-full bg-muted rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${cfg.bar}`} style={{ width: `${stockPct}%` }} />
+          </div>
+          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+            <span>Stock: <strong>{s.currentStock}</strong></span>
+            <span>Demand: <strong className="text-orange-600">~{s.predictedDemand}</strong>/day</span>
+            <span>Stockout: <strong className={s.daysUntilStockout <= 1 ? "text-red-600" : ""}>{s.daysUntilStockout === 999 ? "∞" : `${s.daysUntilStockout}d`}</strong></span>
+          </div>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          <Button size="sm" className="h-8 text-xs gap-1" onClick={onRestock}>
+            <PackagePlus className="h-3 w-3" /> +{s.suggestedRestock > 0 ? s.suggestedRestock : "Restock"}
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setExpanded(e => !e)}>
+            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </Button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="pt-1 border-t space-y-1">
+          {s.reasons.map((r, i) => (
+            <p key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+              <span className="mt-0.5">•</span><span>{r}</span>
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+export default function RestockPage() {
+  const [report, setReport] = useState<RestockReport | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [restockTarget, setRestockTarget] = useState<RestockSuggestion | null>(null)
+  const [locationStatus, setLocationStatus] = useState<"idle" | "fetching" | "done" | "denied">("idle")
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null)
+  const [filter, setFilter] = useState<"all" | "critical" | "high" | "medium" | "low">("all")
+  const { toast } = useToast()
+
+  const runAnalysis = useCallback(async (lat?: number, lon?: number) => {
+    setLoading(true)
+    try {
+      const today = new Date()
+      const ninetyDaysAgo = new Date(today); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+      const [sales, products] = await Promise.all([
+        getSales(ninetyDaysAgo, today),
+        getProducts(),
+      ])
+      const r = await generateRestockReport(sales, products, lat, lon)
+      setReport(r)
+    } catch (e) {
+      toast({ title: "Analysis failed", description: "Could not generate restock report", variant: "destructive" })
+    } finally { setLoading(false) }
+  }, [toast])
+
+  useEffect(() => { runAnalysis() }, [runAnalysis])
+
+  const handleUseLocation = () => {
+    if (!navigator.geolocation) { toast({ title: "Geolocation not supported", variant: "destructive" }); return }
+    setLocationStatus("fetching")
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: c }) => {
+        setCoords({ lat: c.latitude, lon: c.longitude })
+        setLocationStatus("done")
+        runAnalysis(c.latitude, c.longitude)
+      },
+      () => { setLocationStatus("denied"); toast({ title: "Location denied — using Metro Manila weather", variant: "destructive" }) }
+    )
+  }
+
+  const filtered = report?.suggestions.filter(s => filter === "all" || s.urgency === filter) ?? []
+  const counts = {
+    critical: report?.suggestions.filter(s => s.urgency === "critical").length ?? 0,
+    high: report?.suggestions.filter(s => s.urgency === "high").length ?? 0,
+    medium: report?.suggestions.filter(s => s.urgency === "medium").length ?? 0,
+    low: report?.suggestions.filter(s => s.urgency === "low").length ?? 0,
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Brain className="h-8 w-8 text-purple-600" /> AI Restocking
+          </h1>
+          <p className="text-muted-foreground">Predicts what to restock based on sales, weather & PH events</p>
+        </div>
+        <div className="flex gap-2">
+          {locationStatus !== "done" && (
+            <Button variant="outline" size="sm" onClick={handleUseLocation} disabled={locationStatus === "fetching"} className="gap-1">
+              <MapPin className="h-3 w-3" />
+              {locationStatus === "fetching" ? "Getting location..." : "Use My Location"}
+            </Button>
+          )}
+          {locationStatus === "done" && (
+            <span className="text-xs text-green-600 flex items-center gap-1 border border-green-200 bg-green-50 px-2 py-1 rounded-md">
+              <MapPin className="h-3 w-3" /> Local weather active
+            </span>
+          )}
+          <Button size="sm" onClick={() => runAnalysis(coords?.lat, coords?.lon)} disabled={loading} className="gap-1">
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Analyzing..." : "Refresh"}
+          </Button>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {!loading && report && (
+        <>
+          {/* Headline Banner */}
+          <div className="rounded-xl border bg-gradient-to-r from-purple-50 to-blue-50 p-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold">{report.headline}</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">{report.summary}</p>
+                <p className="text-xs text-muted-foreground mt-1">{report.date}</p>
+              </div>
+              <div className="flex items-center gap-2 text-sm shrink-0">
+                <span className="text-2xl">{report.weather.emoji}</span>
+                <div>
+                  <p className="font-semibold">{report.weather.description}</p>
+                  <p className="text-xs text-muted-foreground">{report.weather.temp}°C tomorrow</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PH Events */}
+          {report.events.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-4">
+              {report.events.map((e, i) => (
+                <div key={i} className="flex items-center gap-1.5 border rounded-full px-3 py-1 text-xs bg-card">
+                  <span>{e.emoji}</span>
+                  <span className="font-medium">{e.label}</span>
+                  <span className="text-muted-foreground">+{Math.round((e.boostMultiplier - 1) * 100)}% demand</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Summary Cards */}
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 mb-4">
+            {(["critical", "high", "medium", "low"] as const).map(u => {
+              const cfg = URGENCY_CONFIG[u]
+              return (
+                <button
+                  key={u}
+                  onClick={() => setFilter(filter === u ? "all" : u)}
+                  className={`rounded-lg border p-3 text-left transition-all hover:border-primary ${filter === u ? "ring-1 ring-primary border-primary" : ""}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+                    <span className="text-xs font-medium capitalize">{u}</span>
+                  </div>
+                  <div className="text-2xl font-bold mt-1">{counts[u]}</div>
+                  <div className="text-xs text-muted-foreground">items</div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Suggestions */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500 opacity-60" />
+              <p className="font-medium">
+                {filter === "all" ? "No restock needed — stock looks good for tomorrow! 👍" : `No ${filter} urgency items`}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  {filter === "all" ? "All Suggestions" : `${filter.charAt(0).toUpperCase() + filter.slice(1)} Priority`} ({filtered.length})
+                </p>
+                {filter !== "all" && (
+                  <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setFilter("all")}>Show all</Button>
+                )}
+              </div>
+              {filtered.map(s => (
+                <SuggestionCard key={s.productId} s={s} onRestock={() => setRestockTarget(s)} />
+              ))}
+            </div>
+          )}
+
+          {/* How it works */}
+          <div className="mt-8 rounded-lg border bg-muted/30 p-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">How AI Restocking Works</p>
+            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 text-xs text-muted-foreground">
+              <div className="flex items-start gap-1.5"><TrendingUp className="h-3 w-3 mt-0.5 text-green-500 shrink-0" /><span>Analyzes your last 90 days of sales by day-of-week</span></div>
+              <div className="flex items-start gap-1.5"><span className="text-base leading-none shrink-0">🇵🇭</span><span>Detects PH holidays, paydays (15th & last day), and seasons</span></div>
+              <div className="flex items-start gap-1.5"><span className="text-base leading-none shrink-0">🌤️</span><span>Fetches tomorrow's weather via Open-Meteo (free, no API key)</span></div>
+              <div className="flex items-start gap-1.5"><AlertTriangle className="h-3 w-3 mt-0.5 text-yellow-500 shrink-0" /><span>Flags items that will run out before demand is met</span></div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {restockTarget && (
+        <RestockDialog
+          suggestion={restockTarget}
+          onClose={() => setRestockTarget(null)}
+          onDone={() => runAnalysis(coords?.lat, coords?.lon)}
+        />
+      )}
+    </div>
+  )
+}

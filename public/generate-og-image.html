@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Payroo POS - OG Image Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 1200px; height: 630px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .card {
+      width: 1200px; height: 630px;
+      background: linear-gradient(135deg, #EFBF04 0%, #F5D020 30%, #FFF8E1 70%, #FFFFFF 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 60px; text-align: center; position: relative;
+    }
+    .logo { width: 80px; height: 80px; border-radius: 20px; margin-bottom: 20px; }
+    h1 { font-size: 52px; font-weight: 800; color: #1a1a1a; line-height: 1.2; margin-bottom: 16px; }
+    h1 span { color: #B8860B; }
+    p { font-size: 24px; color: #555; max-width: 800px; line-height: 1.5; margin-bottom: 30px; }
+    .features {
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+    }
+    .feature {
+      background: rgba(255,255,255,0.85); border: 1px solid #E5C100;
+      border-radius: 12px; padding: 8px 18px; font-size: 16px; font-weight: 600; color: #333;
+    }
+    .bottom {
+      position: absolute; bottom: 30px; left: 60px; right: 60px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { font-size: 20px; font-weight: 700; color: #1a1a1a; }
+    .brand small { font-size: 14px; color: #888; font-weight: 400; }
+    .url { font-size: 18px; color: #B8860B; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="logo.svg" alt="Logo" class="logo">
+    <h1>The #1 <span>POS & Inventory</span> System<br>for Filipino Stores</h1>
+    <p>Point of Sale • Inventory • Barcode Scanner • GCash/Maya • Loyalty Program • AI Restock • Works Offline</p>
+    <div class="features">
+      <div class="feature">📱 Phone as Scanner</div>
+      <div class="feature">📦 Smart Inventory</div>
+      <div class="feature">💳 GCash & Maya</div>
+      <div class="feature">⭐ Loyalty Program</div>
+      <div class="feature">📊 Sales Reports</div>
+      <div class="feature">🔌 Works Offline</div>
+    </div>
+    <div class="bottom">
+      <div class="brand">Payroo POS <small>by MOJADOO</small></div>
+      <div class="url">payroo.xyz</div>
+    </div>
+  </div>
+  <script>
+    // Instructions: Open this file in Chrome, then:
+    // 1. Right-click > Inspect > Device toolbar > Set to 1200x630
+    // 2. Screenshot the page
+    // 3. Save as public/og-image.png
+    // Or use a tool like html2canvas or puppeteer to auto-generate
+    
+    // Auto-generate using canvas
+    window.onload = function() {
+      if (typeof html2canvas !== 'undefined') {
+        html2canvas(document.querySelector('.card')).then(canvas => {
+          const link = document.createElement('a');
+          link.download = 'og-image.png';
+          link.href = canvas.toDataURL();
+          link.click();
+        });
+      }
+    }
+  </script>
+</body>
+</html>

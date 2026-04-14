@@ -1,0 +1,59 @@
+{
+  "firestore": {
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": ["node_modules", ".git"]
+    }
+  ],
+  "hosting": {
+    "public": "out",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Access-Control-Allow-Origin", "value": "*" }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/api/xendit/cashin",
+        "function": "xenditCashin"
+      },
+      {
+        "source": "/api/send-welcome",
+        "function": "sendWelcome"
+      },
+      {
+        "source": "/api/send-expiry-notice",
+        "function": "sendExpiryNotice"
+      },
+      {
+        "source": "/api/send-payment-followup",
+        "function": "sendPaymentFollowup"
+      },
+      {
+        "source": "/api/xendit/create-invoice",
+        "function": "createInvoice"
+      },
+      {
+        "source": "/api/xendit/webhook",
+        "function": "xenditWebhook"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

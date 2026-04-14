@@ -1,0 +1,51 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'xyz.payroo.twa'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "xyz.payroo.twa"
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        // Digital Asset Links verification
+        manifestPlaceholders = [
+            hostName    : "payroo.xyz",
+            defaultUrl  : "https://payroo.xyz/pos",
+            launcherName: "Payroo POS",
+            assetStatements: '[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": { "namespace": "web", "site": "https://payroo.xyz" } }]'
+        ]
+    }
+
+    signingConfigs {
+        release {
+            // You will create this keystore — see README
+            storeFile file('../keystore/payroo-upload.keystore')
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "payroo2024"
+            keyAlias "payroo-upload"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "payroo2024"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

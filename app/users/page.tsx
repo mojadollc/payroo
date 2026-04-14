@@ -1,0 +1,430 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Users, Plus, Pencil, Trash2, Eye, EyeOff, ShieldCheck, UserCog, User, RefreshCw } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+import { getStoreUsers, addStoreUser, updateStoreUser, deleteStoreUser } from "@/lib/firebase/services"
+import { useAuth } from "@/hooks/use-auth"
+import { useSubscription } from "@/hooks/use-subscription"
+import type { StoreUser, UserRole, SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
+
+const ROLE_CONFIG: Record<UserRole, { label: string; color: string; icon: React.ReactNode; desc: string }> = {
+  owner: {
+    label: "Owner", color: "bg-purple-100 text-purple-700",
+    icon: <ShieldCheck className="h-3.5 w-3.5" />,
+    desc: "Full access to all features",
+  },
+  subadmin: {
+    label: "Sub-Admin", color: "bg-blue-100 text-blue-700",
+    icon: <UserCog className="h-3.5 w-3.5" />,
+    desc: "Access to owner-assigned features",
+  },
+  cashier: {
+    label: "Cashier", color: "bg-green-100 text-green-700",
+    icon: <User className="h-3.5 w-3.5" />,
+    desc: "POS only — process sales",
+  },
+}
+
+const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
+  pos: "POS",
+  inventory: "Inventory",
+  ewallet: "E-Wallet",
+  reports: "Reports",
+  loyalty: "Loyalty",
+  utang: "Utang",
+  aiRestock: "AI Restock",
+  multiUser: "Multi-User",
+  exportData: "Export Data",
+  marketIntelligence: "Market Intel",
+}
+
+const DEFAULT_ALLOWED: Partial<SubscriptionFeatures> = {
+  pos: true, inventory: true, ewallet: false, reports: false,
+  loyalty: false, utang: false, aiRestock: false, multiUser: false,
+  exportData: false, marketIntelligence: false,
+}
+
+const DEFAULT_PERMISSIONS: SubadminPermissions = {
+  manageUsers: false,
+  manageSettings: false,
+}
+
+const PERMISSION_LABELS: Record<keyof SubadminPermissions, string> = {
+  manageUsers: "User Management",
+  manageSettings: "Settings",
+}
+
+const EMPTY_FORM = { name: "", username: "", pin: "", role: "cashier" as UserRole, isActive: true, allowedFeatures: DEFAULT_ALLOWED, permissions: DEFAULT_PERMISSIONS }
+
+export default function UsersPage() {
+  const { toast } = useToast()
+  const { user: currentUser, can } = useAuth()
+  const { features: planFeatures } = useSubscription()
+
+  const [users, setUsers] = useState<StoreUser[]>([])
+  const [loading, setLoading] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editing, setEditing] = useState<StoreUser | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [showPin, setShowPin] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const externalId = typeof window !== "undefined" ? (localStorage.getItem("pos_ext_id") ?? "") : ""
+
+  const load = async () => {
+    if (!externalId) return
+    setLoading(true)
+    try {
+      setUsers(await getStoreUsers(externalId))
+    } catch {
+      toast({ title: "Failed to load users", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  // Only owner and subadmin can access this page
+  if (!can("subadmin")) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <ShieldCheck className="h-12 w-12 text-muted-foreground mx-auto" />
+          <p className="font-semibold">Access Denied</p>
+          <p className="text-sm text-muted-foreground">You don't have permission to manage users.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const openNew = () => {
+    setEditing(null)
+    setForm(EMPTY_FORM)
+    setShowPin(false)
+    setDialogOpen(true)
+  }
+
+  const openEdit = (u: StoreUser) => {
+    setEditing(u)
+    setForm({
+      name: u.name,
+      username: u.username,
+      pin: u.pin,
+      role: u.role,
+      isActive: u.isActive,
+      allowedFeatures: u.allowedFeatures ?? DEFAULT_ALLOWED,
+      permissions: { ...DEFAULT_PERMISSIONS, ...u.permissions },
+    })
+    setShowPin(false)
+    setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.username.trim() || !form.pin.trim()) {
+      toast({ title: "Please fill in all fields", variant: "destructive" })
+      return
+    }
+    if (form.pin.length !== 6) {
+      toast({ title: "PIN must be exactly 6 digits", variant: "destructive" })
+      return
+    }
+    // Cashiers can only be added by owner/subadmin; only owner can add subadmin
+    if (form.role === "subadmin" && !can("owner")) {
+      toast({ title: "Only the owner can add Sub-Admins", variant: "destructive" })
+      return
+    }
+    if (form.role === "owner") {
+      toast({ title: "Cannot create another owner account", variant: "destructive" })
+      return
+    }
+
+    setSaving(true)
+    try {
+      const payload: any = { ...form, username: form.username.toLowerCase().trim() }
+      // Only save allowedFeatures and permissions for subadmin
+      if (form.role !== "subadmin") {
+        delete payload.allowedFeatures
+        delete payload.permissions
+      }
+      
+      if (editing?.id) {
+        await updateStoreUser(editing.id, payload)
+        toast({ title: "User updated" })
+      } else {
+        await addStoreUser({ ...payload, externalId })
+        toast({ title: "User created", description: `${form.name} can now log in as ${form.role}` })
+      }
+      setDialogOpen(false)
+      load()
+    } catch (err: any) {
+      toast({ title: "Failed to save", description: err.message, variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (u: StoreUser) => {
+    if (u.role === "owner") { toast({ title: "Cannot delete the owner account", variant: "destructive" }); return }
+    if (!confirm(`Remove ${u.name}?`)) return
+    await deleteStoreUser(u.id!)
+    toast({ title: "User removed" })
+    load()
+  }
+
+  const handleToggleActive = async (u: StoreUser) => {
+    if (u.role === "owner") return
+    // Subadmins can only toggle cashiers
+    if (!can("owner") && u.role === "subadmin") return
+    await updateStoreUser(u.id!, { isActive: !u.isActive })
+    toast({ title: u.isActive ? `${u.name} disabled` : `${u.name} enabled` })
+    load()
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-3xl">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="h-7 w-7 text-primary" /> User Management
+          </h1>
+          <p className="text-muted-foreground">Manage cashiers and sub-admins for your store</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button size="sm" onClick={openNew}>
+            <Plus className="h-4 w-4 mr-1" /> Add User
+          </Button>
+        </div>
+      </div>
+
+      {/* Role legend */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {(Object.entries(ROLE_CONFIG) as [UserRole, typeof ROLE_CONFIG[UserRole]][]).map(([role, cfg]) => (
+          <Card key={role} className="border-dashed">
+            <CardContent className="p-3 space-y-1">
+              <div className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
+                {cfg.icon} {cfg.label}
+              </div>
+              <p className="text-xs text-muted-foreground">{cfg.desc}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* User list */}
+      <div className="space-y-3">
+        {users.length === 0 && !loading && (
+          <div className="text-center py-16 text-muted-foreground">
+            <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">No users yet</p>
+            <p className="text-sm">Add a cashier or sub-admin to get started</p>
+          </div>
+        )}
+        {users.map(u => {
+          const cfg = ROLE_CONFIG[u.role]
+          const isCurrentUser = u.id === currentUser?.id
+          return (
+            <Card key={u.id} className={!u.isActive ? "opacity-60" : ""}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-bold">
+                      {u.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold">{u.name}</p>
+                        {isCurrentUser && <span className="text-xs text-muted-foreground">(you)</span>}
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
+                          {cfg.icon} {cfg.label}
+                        </span>
+                        {!u.isActive && <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Inactive</span>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">@{u.username}</p>
+                      {u.role === "subadmin" && u.allowedFeatures && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(Object.entries(u.allowedFeatures) as [keyof SubscriptionFeatures, boolean][]).filter(([, v]) => v).map(([k]) => (
+                            <span key={k} className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">{FEATURE_LABELS[k]}</span>
+                          ))}
+                          {u.permissions && (Object.entries(u.permissions) as [keyof SubadminPermissions, boolean][]).filter(([, v]) => v).map(([k]) => (
+                            <span key={k} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-600">{PERMISSION_LABELS[k]}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {u.role !== "owner" && (can("owner") || (can("subadmin") && u.role === "cashier")) && (
+                      <Switch
+                        checked={u.isActive}
+                        onCheckedChange={() => handleToggleActive(u)}
+                        title={u.isActive ? "Disable user" : "Enable user"}
+                      />
+                    )}
+                    {u.role !== "owner" && (can("owner") || (can("subadmin") && u.role === "cashier")) && (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(u)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(u)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={v => { if (!saving) setDialogOpen(v) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit User" : "Add New User"}</DialogTitle>
+            <DialogDescription>Set user role, username, and PIN</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label>Full Name *</Label>
+              <Input
+                placeholder="e.g. Maria Santos"
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Username *</Label>
+              <Input
+                placeholder="e.g. maria"
+                value={form.username}
+                onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, "") }))}
+                disabled={saving || (!!editing && editing.role === "owner")}
+              />
+              <p className="text-xs text-muted-foreground">Lowercase, no spaces. Used to log in.</p>
+            </div>
+            <div className="space-y-1">
+              <Label>PIN * <span className="text-muted-foreground text-xs">(6 digits)</span></Label>
+              <div className="relative">
+                <Input
+                  type={showPin ? "text" : "password"}
+                  placeholder="e.g. 123456"
+                  value={form.pin}
+                  onChange={e => setForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                  disabled={saving}
+                  maxLength={6}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  onClick={() => setShowPin(v => !v)}
+                  tabIndex={-1}
+                >
+                  {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Role *</Label>
+              <Select
+                value={form.role}
+                onValueChange={v => setForm(f => ({ ...f, role: v as UserRole }))}
+                disabled={saving || editing?.role === "owner"}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {can("owner") && <SelectItem value="subadmin">Sub-Admin — manage inventory & features</SelectItem>}
+                  <SelectItem value="cashier">Cashier — POS only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.isActive}
+                onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))}
+                disabled={saving}
+              />
+              <Label>Active (can log in)</Label>
+            </div>
+
+            {/* Feature permissions for subadmin */}
+            {form.role === "subadmin" && (
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                <Label className="text-sm font-medium">Allowed Features</Label>
+                <p className="text-xs text-muted-foreground">Select which features this sub-admin can access (based on your plan)</p>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {(Object.keys(FEATURE_LABELS) as (keyof SubscriptionFeatures)[]).map(feat => {
+                    const planHas = planFeatures[feat]
+                    const isAllowed = form.allowedFeatures?.[feat] ?? false
+                    // POS is always allowed
+                    if (feat === "pos") return null
+                    // Skip features not in plan
+                    if (!planHas) return null
+                    return (
+                      <div key={feat} className="flex items-center gap-2">
+                        <Switch
+                          checked={isAllowed}
+                          onCheckedChange={v => setForm(f => ({
+                            ...f,
+                            allowedFeatures: { ...f.allowedFeatures, [feat]: v }
+                          }))}
+                          disabled={saving}
+                        />
+                        <span className="text-xs">{FEATURE_LABELS[feat]}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">POS is always enabled. Only features in your plan are shown.</p>
+              </div>
+            )}
+
+            {/* Management permissions for subadmin */}
+            {form.role === "subadmin" && (
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                <Label className="text-sm font-medium">Management Access</Label>
+                <p className="text-xs text-muted-foreground">Allow this sub-admin to access management pages</p>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {(Object.keys(PERMISSION_LABELS) as (keyof SubadminPermissions)[]).map(perm => (
+                    <div key={perm} className="flex items-center gap-2">
+                      <Switch
+                        checked={form.permissions?.[perm] ?? false}
+                        onCheckedChange={v => setForm(f => ({
+                          ...f,
+                          permissions: { ...f.permissions, [perm]: v }
+                        }))}
+                        disabled={saving}
+                      />
+                      <span className="text-xs">{PERMISSION_LABELS[perm]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving || !form.name || !form.username || !form.pin}>
+              {saving ? "Saving..." : editing ? "Save Changes" : "Create User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

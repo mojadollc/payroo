@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner"
 import { CheckoutDialog } from "@/components/pos/checkout-dialog"
-import { getProductByBarcode, getProducts } from "@/lib/firebase/services"
+import { getProductByBarcode, getProducts, onProductsSnapshot } from "@/lib/firebase/services"
 import type { Product } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
 import { isFirebaseConfigured } from "@/lib/firebase/config"
@@ -105,18 +105,58 @@ export default function POSPage() {
     )
   }
 
+  // Real-time product listener — stock updates from desktop push to mobile instantly
+  const productsRef = useRef<Product[]>([])
   useEffect(() => {
-    loadProducts()
+    // Start with cached products immediately (fast first paint / offline)
+    const cached = getCachedProducts()
+    if (cached.length > 0) {
+      setProducts(cached as Product[])
+      productsRef.current = cached as Product[]
+    }
+
+    // Subscribe to real-time Firestore updates
+    const unsubscribe = onProductsSnapshot((data) => {
+      setProducts(data)
+      productsRef.current = data
+      cacheProducts(data)
+    })
+
+    return () => unsubscribe()
   }, [])
+
+  // Auto-sync cart stock when products update in real-time
+  // If desktop sold items and stock dropped, clamp cart quantities & warn user
+  useEffect(() => {
+    if (products.length === 0 || cart.length === 0) return
+    let changed = false
+    const updated = cart.reduce<CartItem[]>((acc, item) => {
+      const liveProduct = products.find(p => p.id === item.id)
+      if (!liveProduct || liveProduct.stock <= 0) {
+        changed = true
+        toast({ title: "Removed from cart", description: `${item.name} is now out of stock`, variant: "destructive" })
+        return acc
+      }
+      if (item.quantity > liveProduct.stock) {
+        changed = true
+        toast({ title: "Quantity adjusted", description: `${item.name} reduced to ${liveProduct.stock} (stock updated)`, variant: "destructive" })
+        acc.push({ ...item, stock: liveProduct.stock, quantity: liveProduct.stock, subtotal: liveProduct.stock * item.price })
+      } else {
+        acc.push({ ...item, stock: liveProduct.stock })
+      }
+      return acc
+    }, [])
+    if (changed) setCart(updated)
+  }, [products])
 
   const loadProducts = async () => {
     try {
       const data = await getProducts()
       setProducts(data)
+      productsRef.current = data
       cacheProducts(data)
     } catch (error) {
       console.error("[v0] Error loading products:", error)
-      // Fallback to cached products when offline
       const cached = getCachedProducts()
       if (cached.length > 0) setProducts(cached as Product[])
     }
@@ -176,21 +216,29 @@ export default function POSPage() {
     product.onSale && product.salePrice ? product.salePrice : product.price
 
   const addToCart = (product: Product) => {
-    const price = effectivePrice(product)
+    // Use latest real-time stock from productsRef
+    const liveProduct = productsRef.current.find(p => p.id === product.id) || product
+    const price = effectivePrice(liveProduct)
     stockBlockedRef.current = false
 
+    if (liveProduct.stock <= 0) {
+      toast({ title: "Out of stock", description: `${liveProduct.name} is currently out of stock`, variant: "destructive" })
+      return
+    }
+
     setCart(prev => {
-      const existingItem = prev.find((item) => item.id === product.id)
+      const existingItem = prev.find((item) => item.id === liveProduct.id)
 
       if (existingItem) {
-        if (existingItem.quantity >= product.stock) {
+        if (existingItem.quantity >= liveProduct.stock) {
           stockBlockedRef.current = true
           return prev
         }
         return prev.map((item) =>
-          item.id === product.id
+          item.id === liveProduct.id
             ? {
                 ...item,
+                stock: liveProduct.stock,
                 quantity: item.quantity + 1,
                 subtotal: (item.quantity + 1) * price,
               }
@@ -201,7 +249,7 @@ export default function POSPage() {
       return [
         ...prev,
         {
-          ...product,
+          ...liveProduct,
           price,
           quantity: 1,
           subtotal: price,
@@ -213,13 +261,13 @@ export default function POSPage() {
       if (stockBlockedRef.current) {
         toast({
           title: "Stock limit reached",
-          description: `Only ${product.stock} units available`,
+          description: `Only ${liveProduct.stock} units available`,
           variant: "destructive",
         })
       } else {
         toast({
           title: "Added to cart",
-          description: `${product.name} added`,
+          description: `${liveProduct.name} added`,
         })
       }
     }, 0)
@@ -234,10 +282,12 @@ export default function POSPage() {
       return
     }
 
-    if (newQuantity > product.stock) {
+    // Use real-time stock
+    const liveStock = productsRef.current.find(p => p.id === productId)?.stock ?? product.stock
+    if (newQuantity > liveStock) {
       toast({
         title: "Stock limit reached",
-        description: `Only ${product.stock} units available`,
+        description: `Only ${liveStock} units available`,
         variant: "destructive",
       })
       return
@@ -248,6 +298,7 @@ export default function POSPage() {
         item.id === productId
           ? {
               ...item,
+              stock: liveStock,
               quantity: newQuantity,
               subtotal: newQuantity * item.price,
             }
@@ -275,7 +326,7 @@ export default function POSPage() {
 
   const handleCheckoutSuccess = () => {
     clearCart()
-    loadProducts()
+    // No need to manually reload — onSnapshot listener auto-updates stock
   }
 
   return (
@@ -467,7 +518,14 @@ export default function POSPage() {
                                 <Input
                                   type="number"
                                   value={item.quantity}
-                                  onChange={(e) => updateQuantity(item.id!, Number.parseInt(e.target.value) || 0)}
+                                  onChange={(e) => {
+                                    const val = Number.parseInt(e.target.value)
+                                    if (!isNaN(val) && val > 0) updateQuantity(item.id!, val)
+                                  }}
+                                  onBlur={(e) => {
+                                    const val = Number.parseInt(e.target.value)
+                                    if (isNaN(val) || val <= 0) updateQuantity(item.id!, 1)
+                                  }}
                                   className="h-9 w-14 text-center p-0 text-base font-semibold"
                                   min="1"
                                   max={item.stock}
@@ -572,7 +630,21 @@ export default function POSPage() {
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
                               <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg border-red-300 text-red-600 text-lg font-bold" onClick={() => updateQuantity(item.id!, item.quantity - 1)}>−</Button>
-                              <Input type="number" value={item.quantity} onChange={(e) => updateQuantity(item.id!, Number.parseInt(e.target.value) || 0)} className="h-9 w-14 text-center p-0 text-base font-semibold" min="1" max={item.stock} />
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const val = Number.parseInt(e.target.value)
+                                  if (!isNaN(val) && val > 0) updateQuantity(item.id!, val)
+                                }}
+                                onBlur={(e) => {
+                                  const val = Number.parseInt(e.target.value)
+                                  if (isNaN(val) || val <= 0) updateQuantity(item.id!, 1)
+                                }}
+                                className="h-9 w-14 text-center p-0 text-base font-semibold"
+                                min="1"
+                                max={item.stock}
+                              />
                               <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg border-green-300 text-green-600 text-lg font-bold" onClick={() => updateQuantity(item.id!, item.quantity + 1)}>+</Button>
                             </div>
                             <div className="ml-auto font-semibold text-sm">₱{item.subtotal.toFixed(2)}</div>

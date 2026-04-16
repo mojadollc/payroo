@@ -10,6 +10,7 @@ import {
   query,
   where,
   orderBy,
+  onSnapshot,
   Timestamp,
   serverTimestamp,
   writeBatch,
@@ -67,6 +68,19 @@ export const getProductByBarcode = async (barcode: string) => {
   return { id: doc.id, ...doc.data() } as Product
 }
 
+/** Real-time listener for products — calls `onChange` whenever any product is added/updated/deleted */
+export const onProductsSnapshot = (onChange: (products: Product[]) => void): (() => void) => {
+  const db = getFirebaseDb()
+  if (!db) return () => {}
+  const sid = getStoreId()
+  const q = query(collection(db, "products"), where("storeId", "==", sid), orderBy("name"))
+  return onSnapshot(q, (snapshot) => {
+    onChange(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product))
+  }, (error) => {
+    console.error("[onProductsSnapshot] error:", error)
+  })
+}
+
 export const bulkAddProducts = async (products: Omit<Product, "id" | "createdAt" | "updatedAt">[]) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured.")
@@ -117,34 +131,38 @@ export const addSale = async (sale: Omit<Sale, "id" | "createdAt">, storeLocatio
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")
   const batch = writeBatch(db)
+  const sid = getStoreId()
 
   const saleRef = doc(collection(db, "sales"))
-  batch.set(saleRef, { ...sale, storeId: getStoreId(), createdAt: serverTimestamp() })
+  batch.set(saleRef, { ...sale, storeId: sid, createdAt: serverTimestamp() })
 
   const now = new Date()
   const dateStr = now.toISOString().split("T")[0]
   const monthStr = dateStr.slice(0, 7)
 
-  for (const item of sale.items) {
-    const productRef = doc(db, "products", item.productId)
-    const productSnap = await getDoc(productRef)
+  // Fetch ALL product docs in parallel instead of one-by-one
+  const productRefs = sale.items.map(item => doc(db, "products", item.productId))
+  const productSnaps = await Promise.all(productRefs.map(r => getDoc(r)))
+
+  for (let i = 0; i < sale.items.length; i++) {
+    const item = sale.items[i]
+    const productSnap = productSnaps[i]
 
     if (productSnap.exists()) {
       const currentStock = productSnap.data().stock
       const newStock = currentStock - item.quantity
-      batch.update(productRef, { stock: newStock, updatedAt: serverTimestamp() })
+      batch.update(productRefs[i], { stock: newStock, updatedAt: serverTimestamp() })
 
       const invTransRef = doc(collection(db, "inventoryTransactions"))
       batch.set(invTransRef, {
         productId: item.productId, productName: item.productName,
         type: "sale", quantity: -item.quantity,
         previousStock: currentStock, newStock,
-        storeId: getStoreId(),
+        storeId: sid,
         notes: "Sale transaction", createdAt: serverTimestamp(),
       })
     }
 
-    // Write anonymized market data point if store location provided
     if (storeLocation) {
       const mdRef = doc(collection(db, "marketData"))
       batch.set(mdRef, {

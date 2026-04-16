@@ -5,7 +5,8 @@
 functions/node_modules
 
 # firebase admin sdk key
-*.firebase-adminsdk*.json
+*firebase-adminsdk*.json
+sari-pos-*.json
 
 # next.js
 /.next/
@@ -31,4 +32,5 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts88sevenstore/
+next-env.d.ts
+88sevenstore/

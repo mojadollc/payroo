@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getFirebaseDb } from "@/lib/firebase/config"
 import { collection, query, where, getDocs, updateDoc } from "firebase/firestore"
 
-const WEBHOOK_TOKEN = "0pygWxyrioQnbhYPT33NUz4786sfjMpD6ViXpIheptpsT20f"
+const WEBHOOK_TOKEN = process.env.XENDIT_WEBHOOK_TOKEN || ""
 
 export async function POST(req: NextRequest) {
   try {

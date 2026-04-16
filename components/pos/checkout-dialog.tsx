@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { CreditCard, Wallet, Banknote, Check, Printer, HandCoins, AlertTriangle, QrCode, Star, X } from "lucide-react"
 import {
   Dialog,
@@ -49,6 +49,11 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
   const [loyaltyLookingUp, setLoyaltyLookingUp] = useState(false)
   const [loyaltyDone, setLoyaltyDone] = useState(false)
   const { toast } = useToast()
+  // Pre-fetch store settings when dialog opens so checkout doesn't wait
+  const storeSettingsRef = useRef<{ name: string; address: string; phone?: string; businessType?: string; region?: string; province?: string; city?: string; barangay?: string } | null>(null)
+  useEffect(() => {
+    getStoreSettings().then(s => { storeSettingsRef.current = s }).catch(() => {})
+  }, [])
 
   const checkUtangNetwork = async (name: string) => {
     if (name.trim().length < 2) { setUtangWarnings([]); setUtangChecked(false); return }
@@ -98,10 +103,12 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           return
         }
 
-        const storeSettings = await getStoreSettings()
+        const storeSettings = storeSettingsRef.current
         const storeName = storeSettings?.name || "My Store"
         const storeId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "unknown-store"
-        await addUtang({
+
+        // Optimistic UI — show success immediately
+        const utangPayload = {
           customerName: utangCustomer.trim(),
           storeId,
           storeName,
@@ -109,11 +116,18 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           totalAmount: total,
           amountPaid: 0,
           balance: total,
-          status: "active",
-        })
+          status: "active" as const,
+        }
         setSaleSnapshot({ cart: [...cart], total, change: 0, paymentMethod: "utang" })
         onSuccess()
         setSaleComplete(true)
+        setIsProcessing(false)
+
+        // Fire-and-forget
+        addUtang(utangPayload).catch((error) => {
+          console.error("[checkout] Background utang write failed:", error)
+          toast({ title: "⚠️ Utang may not have saved", description: "Check your connection", variant: "destructive" })
+        })
         return
       }
 
@@ -141,8 +155,8 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         return
       }
 
-      // Fetch store location for market intelligence tagging
-      const storeSettings = await getStoreSettings()
+      // Use pre-fetched store settings (already loaded when dialog opened)
+      const storeSettings = storeSettingsRef.current
       const storeLocation = storeSettings?.city && storeSettings?.region
         ? {
             region: storeSettings.region,
@@ -153,7 +167,9 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           }
         : undefined
 
-      await addSale({
+      // Optimistic UI — show success immediately, write to Firestore in background
+      const snap = { cart: [...cart], total, change, paymentMethod }
+      const salePayload = {
         items: cart.map((item) => ({
           productId: item.id!,
           productName: item.name,
@@ -165,13 +181,21 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         total,
         profit,
         paymentMethod: paymentMethod as "cash" | "gcash" | "maya",
-        status: "completed",
-      }, storeLocation)
+        status: "completed" as const,
+      }
 
-      setSaleSnapshot({ cart: [...cart], total, change, paymentMethod })
+      setSaleSnapshot(snap)
       onSuccess()
       setSaleComplete(true)
       setLoyaltyStep(true)
+      setIsProcessing(false)
+
+      // Fire-and-forget Firestore write in background
+      addSale(salePayload, storeLocation).catch((error) => {
+        console.error("[checkout] Background sale write failed:", error)
+        toast({ title: "⚠️ Sale may not have saved", description: "Check your connection and verify in reports", variant: "destructive" })
+      })
+      return
     } catch (error) {
       console.error("[v0] Error processing sale:", error)
       toast({

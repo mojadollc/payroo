@@ -219,48 +219,32 @@ export default function RootLayout({
         `}</Script>
         <Script id="sw-register" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {
-            var swReloading = false;
-
-            function doReload() {
-              if (swReloading) return;
-              swReloading = true;
-              window.location.reload();
-            }
-
-            // Listen for SW_UPDATED message from new service worker
-            navigator.serviceWorker.addEventListener('message', function(e) {
-              if (e.data && e.data.type === 'SW_UPDATED') doReload();
-            });
+            var swReloaded = false;
 
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
-              // If a SW is already waiting, activate it now
-              if (reg.waiting) {
-                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-              }
-
-              // When a new SW is found installing
+              // When a new SW is found, tell it to activate immediately
               reg.addEventListener('updatefound', function() {
                 var newSW = reg.installing;
                 if (!newSW) return;
                 newSW.addEventListener('statechange', function() {
-                  // New SW installed and waiting — tell it to take over
                   if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
                     newSW.postMessage({ type: 'SKIP_WAITING' });
                   }
                 });
               });
 
-              // Check for updates: immediately, every 30s, and on tab focus
-              reg.update();
-              setInterval(function() { reg.update(); }, 30000);
+              // Check for updates every 60s and on tab focus
+              setInterval(function() { reg.update(); }, 60000);
               document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') reg.update();
               });
             });
 
-            // Detect when a new SW takes control — reload once
+            // Reload ONCE when a new SW takes control (new deploy)
             navigator.serviceWorker.addEventListener('controllerchange', function() {
-              doReload();
+              if (swReloaded) return;
+              swReloaded = true;
+              window.location.reload();
             });
           }
         `}</Script>

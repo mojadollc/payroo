@@ -48,6 +48,7 @@ export default function POSPage() {
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
   const stockBlockedRef = useRef(false)
+  const productsRef = useRef<Product[]>([])
 
   // Hardware barcode scanner support (USB OTG)
   const handleHardwareScan = useCallback((barcode: string) => {
@@ -61,6 +62,50 @@ export default function POSPage() {
     onScan: handleHardwareScan,
     enabled: !showScanner && !showCheckout,
   })
+
+  // Real-time product listener — stock updates from desktop push to mobile instantly
+  useEffect(() => {
+    if (!isFirebaseConfigured) return
+
+    // Start with cached products immediately (fast first paint / offline)
+    const cached = getCachedProducts()
+    if (cached.length > 0) {
+      setProducts(cached as Product[])
+      productsRef.current = cached as Product[]
+    }
+
+    // Subscribe to real-time Firestore updates
+    const unsubscribe = onProductsSnapshot((data) => {
+      setProducts(data)
+      productsRef.current = data
+      cacheProducts(data)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  // Auto-sync cart stock when products update in real-time
+  useEffect(() => {
+    if (products.length === 0 || cart.length === 0) return
+    let changed = false
+    const updated = cart.reduce<CartItem[]>((acc, item) => {
+      const liveProduct = products.find(p => p.id === item.id)
+      if (!liveProduct || liveProduct.stock <= 0) {
+        changed = true
+        toast({ title: "Removed from cart", description: `${item.name} is now out of stock`, variant: "destructive" })
+        return acc
+      }
+      if (item.quantity > liveProduct.stock) {
+        changed = true
+        toast({ title: "Quantity adjusted", description: `${item.name} reduced to ${liveProduct.stock} (stock updated)`, variant: "destructive" })
+        acc.push({ ...item, stock: liveProduct.stock, quantity: liveProduct.stock, subtotal: liveProduct.stock * item.price })
+      } else {
+        acc.push({ ...item, stock: liveProduct.stock })
+      }
+      return acc
+    }, [])
+    if (changed) setCart(updated)
+  }, [products])
 
   // Check Firebase configuration synchronously on mount
   if (!isFirebaseConfigured) {
@@ -105,49 +150,7 @@ export default function POSPage() {
     )
   }
 
-  // Real-time product listener — stock updates from desktop push to mobile instantly
-  const productsRef = useRef<Product[]>([])
-  useEffect(() => {
-    // Start with cached products immediately (fast first paint / offline)
-    const cached = getCachedProducts()
-    if (cached.length > 0) {
-      setProducts(cached as Product[])
-      productsRef.current = cached as Product[]
-    }
-
-    // Subscribe to real-time Firestore updates
-    const unsubscribe = onProductsSnapshot((data) => {
-      setProducts(data)
-      productsRef.current = data
-      cacheProducts(data)
-    })
-
-    return () => unsubscribe()
-  }, [])
-
-  // Auto-sync cart stock when products update in real-time
-  // If desktop sold items and stock dropped, clamp cart quantities & warn user
-  useEffect(() => {
-    if (products.length === 0 || cart.length === 0) return
-    let changed = false
-    const updated = cart.reduce<CartItem[]>((acc, item) => {
-      const liveProduct = products.find(p => p.id === item.id)
-      if (!liveProduct || liveProduct.stock <= 0) {
-        changed = true
-        toast({ title: "Removed from cart", description: `${item.name} is now out of stock`, variant: "destructive" })
-        return acc
-      }
-      if (item.quantity > liveProduct.stock) {
-        changed = true
-        toast({ title: "Quantity adjusted", description: `${item.name} reduced to ${liveProduct.stock} (stock updated)`, variant: "destructive" })
-        acc.push({ ...item, stock: liveProduct.stock, quantity: liveProduct.stock, subtotal: liveProduct.stock * item.price })
-      } else {
-        acc.push({ ...item, stock: liveProduct.stock })
-      }
-      return acc
-    }, [])
-    if (changed) setCart(updated)
-  }, [products])
+  // Real-time product listener is in the useEffect above (before conditional returns)
 
   const loadProducts = async () => {
     try {

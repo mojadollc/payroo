@@ -2,7 +2,7 @@
   "name": "Payroo POS - Point of Sale & Inventory System for Filipino Stores",
   "short_name": "Payroo POS",
   "description": "Best POS system for sari-sari stores, salons, carinderia & Filipino SMEs. Inventory management, barcode scanning, GCash/Maya e-wallet, loyalty program, AI restock, sales reports. Works offline.",
-  "start_url": "/pos",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

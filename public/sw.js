@@ -1,10 +1,8 @@
-// ── Version: change this date string on EVERY deploy ──────────────────────────
-const APP_VERSION = "20250615"
+// ── Version: bump on EVERY deploy ─────────────────────────────────────────────
+const APP_VERSION = "20250616"
 const SHELL_CACHE = "payroo-shell-" + APP_VERSION
 const RUNTIME_CACHE = "payroo-runtime-" + APP_VERSION
 
-// Only cache truly static assets on install — NOT HTML pages
-// HTML will be cached on first visit via network-first
 const PRECACHE = [
   "/icon-192.png",
   "/icon-512.png",
@@ -17,7 +15,6 @@ self.addEventListener("install", (e) => {
   e.waitUntil(
     caches.open(SHELL_CACHE).then((c) => c.addAll(PRECACHE))
   )
-  // Activate immediately — don't wait for old tabs to close
   self.skipWaiting()
 })
 
@@ -32,12 +29,6 @@ self.addEventListener("activate", (e) => {
       )
     )
     .then(() => self.clients.claim())
-    .then(() => {
-      // Tell all open tabs a new version is ready
-      self.clients.matchAll({ type: "window" }).then((clients) => {
-        clients.forEach((c) => c.postMessage({ type: "SW_UPDATED", version: APP_VERSION }))
-      })
-    })
   )
 })
 
@@ -55,25 +46,25 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || url.origin !== location.origin) return
   if (url.pathname.startsWith("/api/")) return
 
-  // ── Next.js JS/CSS bundles: STALE-WHILE-REVALIDATE ─────────────────────
-  // Serve from cache instantly (fast load), fetch fresh in background
+  // ── Next.js JS/CSS bundles: NETWORK-FIRST ──────────────────────────────
+  // After a deploy, chunk hashes change. Old cached chunks break the app.
+  // Always try network first; only fall back to cache when offline.
   if (url.pathname.startsWith("/_next/")) {
     e.respondWith(
-      caches.open(RUNTIME_CACHE).then((cache) =>
-        cache.match(e.request).then((cached) => {
-          const fetchPromise = fetch(e.request).then((res) => {
-            if (res.ok) cache.put(e.request, res.clone())
-            return res
-          }).catch(() => cached)
-
-          return cached || fetchPromise
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(RUNTIME_CACHE).then((c) => c.put(e.request, clone))
+          }
+          return res
         })
-      )
+        .catch(() => caches.match(e.request).then((r) => r || Promise.reject("offline")))
     )
     return
   }
 
-  // ── HTML pages: NETWORK-FIRST (fast on good connection, offline fallback)
+  // ── HTML pages: NETWORK-FIRST ──────────────────────────────────────────
   if (e.request.headers.get("accept")?.includes("text/html")) {
     e.respondWith(
       fetch(e.request)
@@ -83,7 +74,7 @@ self.addEventListener("fetch", (e) => {
           return res
         })
         .catch(() =>
-          caches.match(e.request).then((r) => r || caches.match("/pos") || caches.match("/"))
+          caches.match(e.request).then((r) => r || caches.match("/") || new Response("Offline", { status: 503 }))
         )
     )
     return

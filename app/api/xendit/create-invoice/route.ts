@@ -4,16 +4,24 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs
 
 export async function POST(req: NextRequest) {
   try {
-    const { planId, planName, planPrice, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = await req.json()
+    console.log("[create-invoice] Starting request processing")
+    const body = await req.json()
+    console.log("[create-invoice] Request body:", JSON.stringify(body, null, 2))
+    
+    const { planId, planName, planPrice, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = body
 
     if (!planId || !planName || planPrice === undefined || planPrice === null || !ownerName || !ownerEmail || !storeName) {
+      console.log("[create-invoice] Missing required fields validation failed")
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     const secretKey = process.env.XENDIT_SECRET_KEY
     if (!secretKey) {
+      console.log("[create-invoice] XENDIT_SECRET_KEY not found")
       return NextResponse.json({ error: "Payment gateway not configured" }, { status: 500 })
     }
+    
+    console.log("[create-invoice] Environment check passed, proceeding with Xendit API call")
 
     const db = getFirebaseDb()
 
@@ -71,6 +79,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create Xendit invoice
+    console.log("[create-invoice] Creating Xendit invoice with amount:", planPrice)
     const xenditRes = await fetch("https://api.xendit.co/v2/invoices", {
       method: "POST",
       headers: {
@@ -106,16 +115,19 @@ export async function POST(req: NextRequest) {
       }),
     })
 
+    console.log("[create-invoice] Xendit response status:", xenditRes.status)
     if (!xenditRes.ok) {
       const err = await xenditRes.json()
-      console.error("Xendit error:", err)
+      console.error("[create-invoice] Xendit error:", err)
       return NextResponse.json({ error: err.message || "Failed to create invoice" }, { status: 502 })
     }
 
     const invoice = await xenditRes.json()
+    console.log("[create-invoice] Xendit invoice created successfully:", invoice.id)
 
     // Save pending subscription to Firestore
     if (db) {
+      console.log("[create-invoice] Saving subscription to Firestore")
       await addDoc(collection(db, "customerSubscriptions"), {
         ownerName,
         ownerEmail,
@@ -139,11 +151,13 @@ export async function POST(req: NextRequest) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      console.log("[create-invoice] Subscription saved to Firestore")
     }
 
+    console.log("[create-invoice] Returning success response")
     return NextResponse.json({ invoiceUrl: invoice.invoice_url, invoiceId: invoice.id, externalId })
   } catch (err) {
-    console.error("create-invoice error:", err)
+    console.error("[create-invoice] Unexpected error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

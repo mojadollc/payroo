@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   try {
     const { planId, planName, planPrice, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = await req.json()
 
-    if (!planId || !planName || !planPrice || !ownerName || !ownerEmail || !storeName) {
+    if (!planId || !planName || planPrice === undefined || planPrice === null || !ownerName || !ownerEmail || !storeName) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 

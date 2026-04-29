@@ -1,5 +1,5 @@
 // ── Version: bump on EVERY deploy ─────────────────────────────────────────────
-const APP_VERSION = "20260429T172426"
+const APP_VERSION = "20260429T173135"
 const SHELL_CACHE = "payroo-shell-" + APP_VERSION
 const RUNTIME_CACHE = "payroo-runtime-" + APP_VERSION
 

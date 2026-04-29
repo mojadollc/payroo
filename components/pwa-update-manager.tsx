@@ -13,50 +13,27 @@ export function PWAUpdateManager() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
 
-    let refreshing = false
-
-    const registerSW = async () => {
+    // Don't re-register — layout.tsx handles registration.
+    // Just grab the existing registration for update UI.
+    const init = async () => {
       try {
-        const reg = await navigator.serviceWorker.register("/sw.js")
+        const reg = await navigator.serviceWorker.getRegistration()
+        if (!reg) return
         setRegistration(reg)
 
-        // Check for updates every 30 seconds
-        const checkForUpdates = () => {
-          reg.update().catch(() => {}) // Silent fail
-        }
-        
-        const updateInterval = setInterval(checkForUpdates, 30000)
-
-        // Listen for new service worker
         reg.addEventListener("updatefound", () => {
           const newWorker = reg.installing
           if (!newWorker) return
-
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              // New version available
               setUpdateAvailable(true)
             }
           })
         })
-
-        // Listen for controlling service worker change
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (refreshing) return
-          refreshing = true
-          window.location.reload()
-        })
-
-        // Check for update immediately
-        checkForUpdates()
-
-        return () => clearInterval(updateInterval)
-      } catch (error) {
-        console.error("SW registration failed:", error)
-      }
+      } catch {}
     }
 
-    registerSW()
+    init()
   }, [])
 
   const handleUpdate = async () => {

@@ -66,6 +66,10 @@
         "function": "createInvoice"
       },
       {
+        "source": "/api/create-free-subscription",
+        "function": "createFreeSubscription"
+      },
+      {
         "source": "/api/xendit/webhook",
         "function": "xenditWebhook"
       },

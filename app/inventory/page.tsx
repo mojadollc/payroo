@@ -319,68 +319,61 @@ export default function InventoryPage() {
       </div>
 
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {list.map((product) => (
-            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-0 shadow-md bg-white">
-              <div className="aspect-[4/3] relative bg-gradient-to-br from-gray-50 to-gray-100">
+            <div key={product.id} className="rounded-lg border overflow-hidden bg-card hover:shadow-md transition-shadow">
+              <div className="relative w-full aspect-square bg-muted">
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <Package className="h-12 w-12" />
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    <span className="text-2xl">📦</span>
                   </div>
                 )}
                 {product.stock === 0 && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <span className="text-sm font-bold text-white bg-red-500 px-3 py-1.5 rounded-full">Out of Stock</span>
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                    <span className="text-xs font-bold text-destructive">Out of Stock</span>
                   </div>
                 )}
-                {product.onSale && product.salePrice && (
-                  <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                {product.onSale && product.salePrice && product.stock > 0 && (
+                  <div className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5 rounded">
                     SALE
                   </div>
                 )}
               </div>
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-base truncate text-gray-900">{product.name}</h3>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-sm text-gray-500">Stock: {product.stock}</span>
-                      {getStockLabel(product.stock)}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
+              <div className="p-2">
+                <div className="font-semibold text-xs truncate" title={product.name}>{product.name}</div>
+                <div className="flex items-center justify-between mt-1">
+                  {product.onSale && product.salePrice ? (
                     <div className="flex flex-col">
-                      {getPriceDisplay(product)}
-                      <span className="text-xs text-gray-500 mt-0.5">Cost: ₱{product.cost}</span>
+                      <div className="text-sm font-bold text-red-500">₱{product.salePrice}</div>
+                      <div className="text-[10px] line-through text-muted-foreground">₱{product.price}</div>
                     </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" onClick={() => setEditProduct(product)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => { setRestockProduct(product); setRestockQty("") }}>
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 hover:bg-gray-50" onClick={() => setSelectedProductForBarcode(product)}>
-                        <Barcode className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full text-red-600 border-red-200 hover:bg-red-50" 
-                    onClick={() => handleDeleteProduct(product.id!)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                  ) : (
+                    <div className="text-sm font-bold text-primary">₱{product.price}</div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-0.5">
+                  <div className="text-[10px] text-muted-foreground">Stock: {product.stock}</div>
+                  {getStockLabel(product.stock)}
+                </div>
+                <div className="text-[10px] text-muted-foreground">Cost: ₱{product.cost}</div>
+                <div className="flex gap-1 mt-2">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-50" onClick={() => setEditProduct(product)}>
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:bg-green-50" onClick={() => { setRestockProduct(product); setRestockQty("") }}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-600 hover:bg-gray-50" onClick={() => setSelectedProductForBarcode(product)}>
+                    <Barcode className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 hover:bg-red-50 ml-auto" onClick={() => handleDeleteProduct(product.id!)}>
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       ) : (

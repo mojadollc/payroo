@@ -25,6 +25,43 @@ interface CartItem extends Product {
   subtotal: number
 }
 
+function CartQuantityInput({ item, onUpdate }: { item: CartItem; onUpdate: (id: string, qty: number) => void }) {
+  const [localVal, setLocalVal] = useState(String(item.quantity))
+
+  useEffect(() => {
+    setLocalVal(String(item.quantity))
+  }, [item.quantity])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value
+    setLocalVal(raw)
+    const val = parseInt(raw)
+    if (!isNaN(val) && val > 0) {
+      onUpdate(item.id!, val)
+    }
+  }
+
+  const handleBlur = () => {
+    const val = parseInt(localVal)
+    if (isNaN(val) || val <= 0) {
+      setLocalVal(String(item.quantity))
+      onUpdate(item.id!, 1)
+    }
+  }
+
+  return (
+    <Input
+      type="number"
+      value={localVal}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className="h-9 w-14 text-center p-0 text-base font-semibold"
+      min="1"
+      max={item.stock}
+    />
+  )
+}
+
 export default function POSPage() {
   const router = useRouter()
   const cfg = useBusinessConfig()
@@ -449,10 +486,10 @@ export default function POSPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Sticky Scan Product Bar */}
               <div className="sticky top-0 z-30 bg-background pb-2 -mx-4 px-4 pt-2">
-                <Card className="border-2 border-blue-300 bg-blue-100 shadow-lg">
+                <Card className="border-2 border-yellow-300 bg-gradient-to-r from-yellow-50 to-amber-50 shadow-lg">
                   <CardHeader className="p-3 pb-2">
-                    <CardTitle className="text-sm text-blue-900 font-semibold flex items-center gap-2">
-                      <Barcode className="h-4 w-4 text-blue-700" />
+                    <CardTitle className="text-sm text-yellow-900 font-semibold flex items-center gap-2">
+                      <Barcode className="h-4 w-4 text-yellow-700" />
                       Scan Product
                     </CardTitle>
                   </CardHeader>
@@ -539,7 +576,7 @@ export default function POSPage() {
                           </div>
                         )}
                       </div>
-                      <Button type="button" variant="outline" className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500" onClick={() => setShowScanner(true)}>
+                      <Button type="button" variant="outline" className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500" onClick={() => setShowScanner(true)}>
                         <Barcode className="h-4 w-4" />
                       </Button>
                       <Button type="submit">Add</Button>
@@ -662,21 +699,7 @@ export default function POSPage() {
                                 >
                                   −
                                 </Button>
-                                <Input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) => {
-                                    const val = Number.parseInt(e.target.value)
-                                    if (!isNaN(val) && val > 0) updateQuantity(item.id!, val)
-                                  }}
-                                  onBlur={(e) => {
-                                    const val = Number.parseInt(e.target.value)
-                                    if (isNaN(val) || val <= 0) updateQuantity(item.id!, 1)
-                                  }}
-                                  className="h-9 w-14 text-center p-0 text-base font-semibold"
-                                  min="1"
-                                  max={item.stock}
-                                />
+                                <CartQuantityInput item={item} onUpdate={updateQuantity} />
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -777,21 +800,7 @@ export default function POSPage() {
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
                               <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg border-red-300 text-red-600 text-lg font-bold" onClick={() => updateQuantity(item.id!, item.quantity - 1)}>−</Button>
-                              <Input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const val = Number.parseInt(e.target.value)
-                                  if (!isNaN(val) && val > 0) updateQuantity(item.id!, val)
-                                }}
-                                onBlur={(e) => {
-                                  const val = Number.parseInt(e.target.value)
-                                  if (isNaN(val) || val <= 0) updateQuantity(item.id!, 1)
-                                }}
-                                className="h-9 w-14 text-center p-0 text-base font-semibold"
-                                min="1"
-                                max={item.stock}
-                              />
+                              <CartQuantityInput item={item} onUpdate={updateQuantity} />
                               <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg border-green-300 text-green-600 text-lg font-bold" onClick={() => updateQuantity(item.id!, item.quantity + 1)}>+</Button>
                             </div>
                             <div className="ml-auto font-semibold text-sm">₱{item.subtotal.toFixed(2)}</div>

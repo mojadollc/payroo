@@ -122,36 +122,176 @@ exports.sendPaymentFollowup = onRequest(fnOpts, (req, res) => {
   });
 });
 
-// ── 5. createInvoice ─────────────────────────────────────────────────────
+// ── 5. createInvoice (subscription payment) ─────────────────────────────
 exports.createInvoice = onRequest(fnOpts, (req, res) => {
   corsHandler(req, res, async () => {
     if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
     try {
-      const { amount, email, description, items } = req.body;
-      if (!amount || !email) return res.status(400).json({ error: "Missing required fields" });
-      const { appUrl } = getConfig();
+      const { planId, planName, planPrice, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = req.body;
+
+      if (!planId || !planName || planPrice === undefined || planPrice === null || !ownerName || !ownerEmail || !storeName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const { xenditSecretKey, appUrl } = getConfig();
+      if (!xenditSecretKey) return res.status(500).json({ error: "Payment gateway not configured" });
+
+      const db = admin.firestore();
+
+      // Deduplication
+      const existingSnap = await db.collection("customerSubscriptions")
+        .where("ownerEmail", "==", ownerEmail).get();
+
+      for (const d of existingSnap.docs) {
+        const data = d.data();
+        if (data.status === "active") {
+          const endDate = data.endDate?.toDate?.();
+          if (endDate && endDate > new Date()) {
+            return res.status(409).json({ error: "You already have an active subscription." });
+          }
+        }
+        if (data.status === "pending" && data.planId === planId && data.xenditPaymentUrl) {
+          return res.json({ invoiceUrl: data.xenditPaymentUrl, invoiceId: data.xenditInvoiceId, externalId: data.externalId });
+        }
+        if (data.status === "pending") {
+          await d.ref.delete();
+        }
+      }
+
+      const externalId = String(Math.floor(100000 + Math.random() * 900000));
+
+      // Fetch plan tier + features
+      let planTier = "basic";
+      let planFeatures = {};
+      const planSnap = await db.collection("subscriptionPlans").doc(planId).get();
+      if (planSnap.exists) {
+        planTier = planSnap.data().tier || "basic";
+        planFeatures = planSnap.data().features || {};
+      }
+
+      // Create Xendit invoice
       const response = await axios.post(
         "https://api.xendit.co/v2/invoices",
         {
-          external_id: `inv-${Date.now()}`,
-          amount: parseInt(amount),
-          payer_email: email,
-          description: description || "Invoice",
-          items: items || [],
-          success_redirect_url: `${appUrl}/success`,
-          failure_redirect_url: `${appUrl}/failed`,
+          external_id: externalId,
+          amount: planPrice,
+          description: `POS Subscription — ${planName} Plan (1 month)`,
+          invoice_duration: 86400,
+          customer: {
+            given_names: ownerName,
+            email: ownerEmail,
+            mobile_number: phone || undefined,
+          },
+          customer_notification_preference: {
+            invoice_created: ["email"],
+            invoice_reminder: ["email"],
+            invoice_paid: ["email"],
+          },
+          success_redirect_url: `${appUrl}/payment/success?ext=${externalId}`,
+          failure_redirect_url: `${appUrl}/payment/failed?ext=${externalId}`,
+          currency: "PHP",
+          items: [{ name: `${planName} Plan — Monthly Subscription`, quantity: 1, price: planPrice, category: "Software Subscription" }],
         },
         { headers: getXenditHeaders() }
       );
-      res.json({ success: true, invoiceId: response.data.id, invoiceUrl: response.data.invoice_url });
+
+      const invoice = response.data;
+
+      // Save pending subscription
+      await db.collection("customerSubscriptions").add({
+        ownerName, ownerEmail, storeName,
+        businessType: businessType || "retail",
+        phone: phone || "",
+        planId, tier: planTier, features: planFeatures,
+        status: "pending",
+        xenditInvoiceId: invoice.id,
+        xenditPaymentStatus: "PENDING",
+        xenditPaymentUrl: invoice.invoice_url,
+        externalId,
+        referralCode: referralCode || "",
+        startDate: null, endDate: null,
+        expiryReminderDate: null, expiryReminderSent: false,
+        notes: `Awaiting payment. Invoice: ${invoice.id}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.json({ invoiceUrl: invoice.invoice_url, invoiceId: invoice.id, externalId });
     } catch (error) {
-      console.error("createInvoice error:", error.message);
+      console.error("createInvoice error:", error.response?.data || error.message);
+      res.status(500).json({ error: error.response?.data?.message || error.message });
+    }
+  });
+});
+
+// ── 6. createFreeSubscription ────────────────────────────────────────────
+exports.createFreeSubscription = onRequest(fnOpts, (req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+    try {
+      const { planId, planName, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = req.body;
+      if (!planId || !planName || !ownerName || !ownerEmail || !storeName) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const db = admin.firestore();
+
+      // Deduplication
+      const existingSnap = await db.collection("customerSubscriptions")
+        .where("ownerEmail", "==", ownerEmail).get();
+
+      for (const d of existingSnap.docs) {
+        const data = d.data();
+        if (data.status === "active") {
+          const endDate = data.endDate?.toDate?.();
+          if (endDate && endDate > new Date()) {
+            return res.status(409).json({ error: "You already have an active subscription." });
+          }
+        }
+        if (data.status === "pending") await d.ref.delete();
+      }
+
+      const externalId = String(Math.floor(100000 + Math.random() * 900000));
+
+      let planTier = "basic";
+      let planFeatures = {};
+      const planSnap = await db.collection("subscriptionPlans").doc(planId).get();
+      if (planSnap.exists) {
+        planTier = planSnap.data().tier || "basic";
+        planFeatures = planSnap.data().features || {};
+      }
+
+      await db.collection("customerSubscriptions").add({
+        ownerName, ownerEmail, storeName,
+        businessType: businessType || "retail",
+        phone: phone || "",
+        planId, tier: planTier, features: planFeatures,
+        status: "active",
+        xenditInvoiceId: null,
+        xenditPaymentStatus: "PAID",
+        xenditPaymentUrl: null,
+        externalId,
+        referralCode: referralCode || "",
+        startDate: admin.firestore.FieldValue.serverTimestamp(),
+        endDate: admin.firestore.Timestamp.fromDate(
+          new Date(Date.now() + 10 * 365.25 * 24 * 60 * 60 * 1000)
+        ),
+        expiryReminderDate: null,
+        expiryReminderSent: false,
+        notes: "FREE plan subscription - no payment required",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.json({ success: true, externalId, message: "FREE subscription created successfully" });
+    } catch (error) {
+      console.error("createFreeSubscription error:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
 });
 
-// ── 6. xenditWebhook ─────────────────────────────────────────────────────
+// ── 7. xenditWebhook ─────────────────────────────────────────────────────
 exports.xenditWebhook = onRequest(fnOpts, (req, res) => {
   corsHandler(req, res, async () => {
     if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -159,13 +299,37 @@ exports.xenditWebhook = onRequest(fnOpts, (req, res) => {
       const token = req.headers["x-callback-token"];
       if (token !== getConfig().xenditWebhookToken) return res.status(401).json({ error: "Unauthorized" });
       const { id, status, external_id } = req.body;
-      await admin.firestore().collection("webhook_events").add({
+      const db = admin.firestore();
+
+      // Log webhook event
+      await db.collection("webhook_events").add({
         invoiceId: id,
         externalId: external_id,
         status,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         payload: req.body,
       });
+
+      // Activate subscription on successful payment
+      if (status === "PAID" || status === "SETTLED") {
+        const subSnap = await db.collection("customerSubscriptions")
+          .where("externalId", "==", external_id).limit(1).get();
+
+        if (!subSnap.empty) {
+          const subDoc = subSnap.docs[0];
+          const now = new Date();
+          const endDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+          await subDoc.ref.update({
+            status: "active",
+            xenditPaymentStatus: status,
+            startDate: admin.firestore.FieldValue.serverTimestamp(),
+            endDate: admin.firestore.Timestamp.fromDate(endDate),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            notes: `Payment confirmed. Invoice: ${id}`,
+          });
+        }
+      }
+
       res.json({ success: true, message: "Webhook processed" });
     } catch (error) {
       console.error("xenditWebhook error:", error.message);

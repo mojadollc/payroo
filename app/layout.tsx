@@ -220,10 +220,7 @@ export default function RootLayout({
         `}</Script>
         <Script id="sw-register" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {
-            var swReloaded = false;
-
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
-              // When a new SW is found, tell it to activate immediately
               reg.addEventListener('updatefound', function() {
                 var newSW = reg.installing;
                 if (!newSW) return;
@@ -234,17 +231,19 @@ export default function RootLayout({
                 });
               });
 
-              // Check for updates every 60s and on tab focus
-              setInterval(function() { reg.update(); }, 60000);
+              setInterval(function() { reg.update().catch(function(){}); }, 60000);
               document.addEventListener('visibilitychange', function() {
-                if (document.visibilityState === 'visible') reg.update();
+                if (document.visibilityState === 'visible') reg.update().catch(function(){});
               });
             });
 
-            // Reload ONCE when a new SW takes control (new deploy)
+            var swReloaded = false;
             navigator.serviceWorker.addEventListener('controllerchange', function() {
               if (swReloaded) return;
+              var lastReload = sessionStorage.getItem('sw_reload_ts');
+              if (lastReload && (Date.now() - Number(lastReload)) < 10000) return;
               swReloaded = true;
+              sessionStorage.setItem('sw_reload_ts', String(Date.now()));
               window.location.reload();
             });
           }

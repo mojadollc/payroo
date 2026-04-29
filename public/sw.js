@@ -1,5 +1,5 @@
 // ── Version: bump on EVERY deploy ─────────────────────────────────────────────
-const APP_VERSION = "20260429T174959"
+const APP_VERSION = "20260429T212959"
 const SHELL_CACHE = "payroo-shell-" + APP_VERSION
 const RUNTIME_CACHE = "payroo-runtime-" + APP_VERSION
 
@@ -15,12 +15,8 @@ self.addEventListener("install", (e) => {
   console.log("[SW] Installing version:", APP_VERSION)
   e.waitUntil(
     caches.open(SHELL_CACHE)
-      .then((c) => c.addAll(PRECACHE))
-      .then(() => {
-        console.log("[SW] Precache complete")
-        // Don't wait for existing tabs, take control immediately
-        return self.skipWaiting()
-      })
+      .then(c => c.addAll(PRECACHE))
+      .then(() => self.skipWaiting())
   )
 })
 
@@ -28,27 +24,14 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   console.log("[SW] Activating version:", APP_VERSION)
   e.waitUntil(
-    caches.keys()
-      .then((keys) => {
-        console.log("[SW] Cleaning old caches:", keys.filter(k => k !== SHELL_CACHE && k !== RUNTIME_CACHE))
-        return Promise.all(
-          keys
-            .filter((k) => k !== SHELL_CACHE && k !== RUNTIME_CACHE)
-            .map((k) => caches.delete(k))
-        )
-      })
-      .then(() => {
-        console.log("[SW] Taking control of all clients")
-        return self.clients.claim()
-      })
-      .then(() => {
-        // Notify all clients about the update
-        return self.clients.matchAll().then(clients => {
-          clients.forEach(client => {
-            client.postMessage({ type: "SW_UPDATED", version: APP_VERSION })
-          })
-        })
-      })
+    caches.keys().then(keys => {
+      // Only delete OLD caches, keep current ones
+      return Promise.all(
+        keys
+          .filter(key => key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+          .map(key => { console.log("[SW] Deleting old cache:", key); return caches.delete(key) })
+      )
+    }).then(() => self.clients.claim())
   )
 })
 
@@ -76,7 +59,7 @@ self.addEventListener("fetch", (e) => {
   // Skip API calls
   if (url.pathname.startsWith("/api/")) return
 
-  // ── Next.js JS/CSS bundles: NETWORK-FIRST with better error handling ──────
+  // ── Next.js JS/CSS bundles: NETWORK-FIRST, no HTML fallback ───────────
   if (url.pathname.startsWith("/_next/")) {
     e.respondWith(
       fetch(e.request, { cache: "no-cache" })
@@ -85,22 +68,18 @@ self.addEventListener("fetch", (e) => {
             const clone = res.clone()
             caches.open(RUNTIME_CACHE)
               .then((c) => c.put(e.request, clone))
-              .catch(() => {}) // Silent fail for cache errors
+              .catch(() => {})
           }
           return res
         })
-        .catch(() => {
-          // Try cache as fallback
-          return caches.match(e.request)
-            .then((cached) => {
-              if (cached) return cached
-              // If no cache, return a basic error response
-              return new Response("Network error", { 
-                status: 503, 
-                statusText: "Service Unavailable" 
-              })
+        .catch(() =>
+          caches.match(e.request).then((cached) =>
+            cached || new Response("// offline", {
+              status: 503,
+              headers: { "Content-Type": "application/javascript" },
             })
-        })
+          )
+        )
     )
     return
   }

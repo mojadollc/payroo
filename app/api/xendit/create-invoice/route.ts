@@ -5,9 +5,26 @@ import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    console.log("[create-invoice] Received request body:", JSON.stringify(body, null, 2))
+    
     const { planId, planName, planPrice, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = body
 
+    console.log("[create-invoice] Extracted fields:")
+    console.log("- planId:", planId, typeof planId)
+    console.log("- planName:", planName, typeof planName)
+    console.log("- planPrice:", planPrice, typeof planPrice)
+    console.log("- ownerName:", ownerName, typeof ownerName)
+    console.log("- ownerEmail:", ownerEmail, typeof ownerEmail)
+    console.log("- storeName:", storeName, typeof storeName)
+
     if (!planId || !planName || planPrice === undefined || planPrice === null || !ownerName || !ownerEmail || !storeName) {
+      console.log("[create-invoice] Validation failed - missing fields")
+      console.log("- planId valid:", !!planId)
+      console.log("- planName valid:", !!planName)
+      console.log("- planPrice valid:", planPrice !== undefined && planPrice !== null)
+      console.log("- ownerName valid:", !!ownerName)
+      console.log("- ownerEmail valid:", !!ownerEmail)
+      console.log("- storeName valid:", !!storeName)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 

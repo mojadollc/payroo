@@ -1,5 +1,6 @@
 "use client"
 
+import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect, useCallback } from "react"
 import { AlertTriangle, Plus, Search, PhilippinePeso, QrCode, Clock, CheckCircle2, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -279,6 +280,14 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UtangPage() {
+  return (
+    <FeatureGate feature="utang">
+      <UtangPageContent />
+    </FeatureGate>
+  )
+}
+
+function UtangPageContent() {
   const [records, setRecords] = useState<UtangRecord[]>([])
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<"all" | "active" | "partial" | "settled">("all")
@@ -335,12 +344,16 @@ export default function UtangPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Utang Network</h1>
-          <p className="text-muted-foreground">Shared credit ledger across stores</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Utang</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Credit network</p>
+          </div>
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+          </Button>
         </div>
-        <Button onClick={() => setShowAdd(true)}><Plus className="mr-2 h-4 w-4" /> Add Utang</Button>
       </div>
 
       {/* Summary Cards */}

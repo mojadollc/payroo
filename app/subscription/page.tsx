@@ -30,13 +30,13 @@ const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
 }
 
 const TIER_ICONS: Record<SubscriptionTier, React.ReactNode> = {
-  basic: <Zap className="h-5 w-5 text-slate-500" />,
+  basic: <Zap className="h-5 w-5 text-green-500" />,
   gold: <Star className="h-5 w-5 text-yellow-500" />,
   enterprise: <Building2 className="h-5 w-5 text-purple-500" />,
 }
 
 const TIER_GRADIENT: Record<SubscriptionTier, string> = {
-  basic: "from-slate-50 to-slate-100 border-slate-200",
+  basic: "from-green-50 to-green-100 border-green-200",
   gold: "from-yellow-50 to-amber-100 border-yellow-300",
   enterprise: "from-purple-50 to-purple-100 border-purple-300",
 }
@@ -94,6 +94,36 @@ function SubscriptionContent() {
 
     setSubmitting(true)
     try {
+      // Handle FREE plan differently
+      if (selectedPlan.price === 0) {
+        const res = await fetch("/api/create-free-subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planId: selectedPlan.id,
+            planName: selectedPlan.name,
+            ownerName: form.ownerName.trim(),
+            ownerEmail: form.ownerEmail.trim(),
+            storeName: form.storeName.trim(),
+            phone: form.phone.trim(),
+            businessType: form.businessType,
+            referralCode: form.referralCode.trim() || undefined,
+          }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to create free subscription")
+        }
+
+        // Store the external ID and redirect to success
+        localStorage.setItem("pos_ext_id", data.externalId)
+        window.location.href = `/payment/success?ext=${data.externalId}`
+        return
+      }
+
+      // Handle paid plans with Xendit
       const res = await fetch("/api/xendit/create-invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,7 +149,7 @@ function SubscriptionContent() {
       // Redirect to Xendit hosted payment page
       window.location.href = data.invoiceUrl
     } catch (err: any) {
-      toast({ title: "Payment Error", description: err.message, variant: "destructive" })
+      toast({ title: "Error", description: err.message, variant: "destructive" })
       setSubmitting(false)
     }
   }
@@ -185,8 +215,14 @@ function SubscriptionContent() {
                     </div>
                     <CardDescription className="text-sm">{plan.description}</CardDescription>
                     <div className="mt-3">
-                      <span className="text-4xl font-extrabold">₱{plan.price.toLocaleString()}</span>
-                      <span className="text-muted-foreground text-sm ml-1">/month</span>
+                      {plan.price === 0 ? (
+                        <span className="text-4xl font-extrabold text-green-600">FREE</span>
+                      ) : (
+                        <>
+                          <span className="text-4xl font-extrabold">₱{plan.price.toLocaleString()}</span>
+                          <span className="text-muted-foreground text-sm ml-1">/month</span>
+                        </>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="flex flex-col flex-1 space-y-4">
@@ -207,7 +243,7 @@ function SubscriptionContent() {
                       variant={isPopular ? "default" : "outline"}
                       onClick={() => openCheckout(plan)}
                     >
-                      Subscribe Now <ArrowRight className="h-4 w-4 ml-1" />
+                      {plan.price === 0 ? "Get Started Free" : "Subscribe Now"} <ArrowRight className="h-4 w-4 ml-1" />
                     </Button>
                   </CardContent>
                 </Card>
@@ -250,7 +286,7 @@ function SubscriptionContent() {
               Subscribe to {selectedPlan?.name} Plan
             </DialogTitle>
             <DialogDescription>
-              ₱{selectedPlan?.price.toLocaleString()}/month · Fill in your details to proceed to payment.
+              {selectedPlan?.price === 0 ? "Free forever • No credit card required" : `₱${selectedPlan?.price.toLocaleString()}/month`} • Fill in your details to proceed{selectedPlan?.price === 0 ? "" : " to payment"}.
             </DialogDescription>
           </DialogHeader>
 
@@ -328,19 +364,25 @@ function SubscriptionContent() {
             {/* Order summary */}
             <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{selectedPlan?.name} Plan (1 month)</span>
-                <span className="font-medium">₱{selectedPlan?.price.toLocaleString()}</span>
+                <span className="text-muted-foreground">{selectedPlan?.name} Plan{selectedPlan?.price === 0 ? "" : " (1 month)"}</span>
+                <span className="font-medium">{selectedPlan?.price === 0 ? "FREE" : `₱${selectedPlan?.price.toLocaleString()}`}</span>
               </div>
               <div className="flex justify-between font-semibold border-t pt-1 mt-1">
                 <span>Total</span>
-                <span className="text-primary">₱{selectedPlan?.price.toLocaleString()}</span>
+                <span className="text-primary">{selectedPlan?.price === 0 ? "FREE" : `₱${selectedPlan?.price.toLocaleString()}`}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
-              You'll be redirected to Xendit's secure payment page. Accepts GCash, Maya, cards & more.
-            </div>
+            {selectedPlan?.price === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                🎉 No payment required! You'll get instant access to all FREE plan features.
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                You'll be redirected to Xendit's secure payment page. Accepts GCash, Maya, cards & more.
+              </div>
+            )}
 
             <div className="flex gap-2 pt-1">
               <Button
@@ -355,6 +397,8 @@ function SubscriptionContent() {
               <Button type="submit" className="flex-1" disabled={submitting}>
                 {submitting
                   ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
+                  : selectedPlan?.price === 0
+                  ? <><ArrowRight className="h-4 w-4 mr-2" /> Get Started Free</>
                   : <><ArrowRight className="h-4 w-4 mr-2" /> Pay ₱{selectedPlan?.price.toLocaleString()}</>
                 }
               </Button>

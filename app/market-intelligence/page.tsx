@@ -1,5 +1,6 @@
 "use client"
 
+import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect, useCallback } from "react"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -37,6 +38,14 @@ function getCurrentMonth() {
 }
 
 export default function MarketIntelligencePage() {
+  return (
+    <FeatureGate feature="marketIntelligence">
+      <MarketIntelligencePageContent />
+    </FeatureGate>
+  )
+}
+
+function MarketIntelligencePageContent() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect, useCallback } from "react"
 import { QrCode, Plus, Coins, Gift, Settings2, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -317,6 +318,14 @@ function SettingsTab() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LoyaltyPage() {
+  return (
+    <FeatureGate feature="loyalty">
+      <LoyaltyPageContent />
+    </FeatureGate>
+  )
+}
+
+function LoyaltyPageContent() {
   const [customers, setCustomers] = useState<LoyaltyCustomer[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [settings, setSettings] = useState<LoyaltySettings>({ minRedeemCoins: 100, coinValuePeso: 1 } as LoyaltySettings)
@@ -341,12 +350,16 @@ export default function LoyaltyPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Loyalty Wallet</h1>
-          <p className="text-muted-foreground">QR-based rewards for every purchase</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Loyalty</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">QR rewards program</p>
+          </div>
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> Enroll
+          </Button>
         </div>
-        <Button onClick={() => setShowAdd(true)}><Plus className="mr-2 h-4 w-4" /> Enroll Customer</Button>
       </div>
 
       {/* Summary */}

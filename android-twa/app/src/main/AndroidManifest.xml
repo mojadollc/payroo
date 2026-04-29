@@ -14,13 +14,28 @@
 
         <!-- TWA Launcher Activity -->
         <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:name=".PayrooTWALauncher"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.PayrooPOS.Splash">
 
             <meta-data
                 android:name="android.support.customtabs.trusted.DEFAULT_URL"
                 android:value="${defaultUrl}" />
+
+            <!-- TWA Update Handling -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.CACHE_STRATEGY"
+                android:value="no-cache" />
+
+            <meta-data
+                android:name="android.support.customtabs.trusted.ADDITIONAL_TRUSTED_ORIGINS"
+                android:value="https://${hostName}" />
+
+            <!-- Force refresh on app launch -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.LAUNCH_EXTERNAL_INTENT"
+                android:value="false" />
 
             <meta-data
                 android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
@@ -92,7 +107,7 @@
         <!-- Shortcuts -->
         <activity-alias
             android:name=".PosShortcut"
-            android:targetActivity="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:targetActivity=".PayrooTWALauncher"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

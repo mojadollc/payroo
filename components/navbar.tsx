@@ -5,13 +5,14 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Store, Package, Smartphone, TrendingUp, Menu, Settings, Download,
-  HandCoins, Star, Brain, Users, LogOut, BarChart2,
+  HandCoins, Star, Brain, Users, LogOut, BarChart2, RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { getStoreSettings } from "@/lib/firebase/services"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
+import { useAppRefresh } from "@/components/pwa-update-manager"
 import type { SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
 
 export const STORE_NAME_KEY = "storeName"
@@ -46,6 +47,7 @@ export function Navbar() {
   const router = useRouter()
   const { user, logout, isCashier, hasFeature, hasPermission, loading: authLoading } = useAuth()
   const { features, isActive, tier } = useSubscription()
+  const { refresh, isRefreshing } = useAppRefresh()
   const [storeName, setStoreName] = useState(DEFAULT_STORE_NAME)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -159,6 +161,16 @@ export function Navbar() {
           {/* Desktop */}
           <div className="hidden items-center gap-1 md:flex flex-1 justify-end flex-wrap">
             <NavLinks />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-primary" 
+              onClick={refresh}
+              disabled={isRefreshing}
+              title="Refresh app"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
             {installPrompt && (
               <Button variant="outline" className="gap-2 border-primary text-primary" onClick={handleInstall}>
                 <Download className="h-4 w-4" /> Install
@@ -206,6 +218,15 @@ export function Navbar() {
               </SheetHeader>
               <div className="mt-6 flex flex-col gap-2">
                 <NavLinks mobile />
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start gap-2" 
+                  onClick={refresh}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} /> 
+                  {isRefreshing ? 'Refreshing...' : 'Refresh App'}
+                </Button>
                 {installPrompt && (
                   <Button variant="outline" className="w-full justify-start gap-2 border-primary text-primary" onClick={handleInstall}>
                     <Download className="h-4 w-4" /> Install App

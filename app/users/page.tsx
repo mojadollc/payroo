@@ -1,5 +1,6 @@
 "use client"
 
+import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect } from "react"
 import { Users, Plus, Pencil, Trash2, Eye, EyeOff, ShieldCheck, UserCog, User, RefreshCw } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -66,6 +67,14 @@ const PERMISSION_LABELS: Record<keyof SubadminPermissions, string> = {
 const EMPTY_FORM = { name: "", username: "", pin: "", role: "cashier" as UserRole, isActive: true, allowedFeatures: DEFAULT_ALLOWED, permissions: DEFAULT_PERMISSIONS }
 
 export default function UsersPage() {
+  return (
+    <FeatureGate feature="multiUser">
+      <UsersPageContent />
+    </FeatureGate>
+  )
+}
+
+function UsersPageContent() {
   const { toast } = useToast()
   const { user: currentUser, can } = useAuth()
   const { features: planFeatures } = useSubscription()

@@ -31,6 +31,7 @@ export default function POSPage() {
   const { isActive, loading: subLoading, endDate } = useSubscription()
   const CART_KEY = "pos_cart"
   const [products, setProducts] = useState<Product[]>([])
+  const [shuffledProducts, setShuffledProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return []
     try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") } catch { return [] }
@@ -63,6 +64,16 @@ export default function POSPage() {
     enabled: !showScanner && !showCheckout,
   })
 
+  // Shuffle array function
+  const shuffleArray = (array: Product[]) => {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
+  }
+
   // Real-time product listener — stock updates from desktop push to mobile instantly
   useEffect(() => {
     if (!isFirebaseConfigured) return
@@ -71,12 +82,14 @@ export default function POSPage() {
     const cached = getCachedProducts()
     if (cached.length > 0) {
       setProducts(cached as Product[])
+      setShuffledProducts(shuffleArray(cached as Product[]))
       productsRef.current = cached as Product[]
     }
 
     // Subscribe to real-time Firestore updates
     const unsubscribe = onProductsSnapshot((data) => {
       setProducts(data)
+      setShuffledProducts(shuffleArray(data))
       productsRef.current = data
       cacheProducts(data)
     })
@@ -156,12 +169,16 @@ export default function POSPage() {
     try {
       const data = await getProducts()
       setProducts(data)
+      setShuffledProducts(shuffleArray(data))
       productsRef.current = data
       cacheProducts(data)
     } catch (error) {
       console.error("[v0] Error loading products:", error)
       const cached = getCachedProducts()
-      if (cached.length > 0) setProducts(cached as Product[])
+      if (cached.length > 0) {
+        setProducts(cached as Product[])
+        setShuffledProducts(shuffleArray(cached as Product[]))
+      }
     }
   }
 
@@ -169,7 +186,79 @@ export default function POSPage() {
     setBarcodeInput(value)
     if (value.trim().length >= 2) {
       const q = value.toLowerCase()
-      setSearchSuggestions(products.filter(p => p.name.toLowerCase().includes(q) || p.barcode.includes(q)).slice(0, 6))
+      
+      // Enhanced search with related products and fuzzy matching
+      const matches = products.filter(p => {
+        const name = p.name.toLowerCase()
+        const barcode = p.barcode.toLowerCase()
+        const category = p.category.toLowerCase()
+        const description = (p.description || '').toLowerCase()
+        
+        return name.includes(q) || barcode.includes(q) || category.includes(q) || description.includes(q)
+      })
+      
+      // Find related products by keywords
+      const relatedMatches = products.filter(p => {
+        const name = p.name.toLowerCase()
+        const category = p.category.toLowerCase()
+        
+        // Skip if already in main matches
+        if (matches.some(m => m.id === p.id)) return false
+        
+        // Related product logic based on search term
+        const searchWords = q.split(' ').filter(word => word.length > 2)
+        
+        return searchWords.some(word => {
+          // Find products with similar keywords
+          if (word === 'ice' && (name.includes('cold') || name.includes('frozen') || name.includes('drink') || category.includes('beverage'))) return true
+          if (word === 'juice' && (name.includes('drink') || name.includes('beverage') || category.includes('drink'))) return true
+          if (word === 'water' && (name.includes('drink') || name.includes('beverage') || name.includes('liquid'))) return true
+          if (word === 'milk' && (name.includes('dairy') || category.includes('dairy') || name.includes('cream'))) return true
+          if (word === 'bread' && (name.includes('loaf') || category.includes('bakery') || name.includes('bun'))) return true
+          if (word === 'rice' && (name.includes('grain') || category.includes('grain') || name.includes('bigas'))) return true
+          if (word === 'soap' && (name.includes('detergent') || category.includes('cleaning') || name.includes('wash'))) return true
+          if (word === 'candy' && (name.includes('sweet') || category.includes('snack') || name.includes('chocolate'))) return true
+          if (word === 'noodle' && (name.includes('pasta') || name.includes('instant') || category.includes('noodle'))) return true
+          if (word === 'coffee' && (name.includes('caffeine') || name.includes('instant') || category.includes('beverage'))) return true
+          
+          return false
+        })
+      })
+      
+      // Combine main matches with related matches
+      const allMatches = [...matches, ...relatedMatches]
+      
+      // Sort by relevance: exact matches first, then starts-with, then contains, then related
+      const sortedMatches = allMatches.sort((a, b) => {
+        const aName = a.name.toLowerCase()
+        const bName = b.name.toLowerCase()
+        const aIsMainMatch = matches.some(m => m.id === a.id)
+        const bIsMainMatch = matches.some(m => m.id === b.id)
+        
+        // Main matches always come before related matches
+        if (aIsMainMatch && !bIsMainMatch) return -1
+        if (bIsMainMatch && !aIsMainMatch) return 1
+        
+        // Within main matches, prioritize by relevance
+        if (aIsMainMatch && bIsMainMatch) {
+          // Exact name match gets highest priority
+          if (aName === q) return -1
+          if (bName === q) return 1
+          
+          // Name starts with query gets second priority
+          if (aName.startsWith(q) && !bName.startsWith(q)) return -1
+          if (bName.startsWith(q) && !aName.startsWith(q)) return 1
+          
+          // Barcode exact match gets third priority
+          if (a.barcode === q) return -1
+          if (b.barcode === q) return 1
+        }
+        
+        // Alphabetical order for remaining matches
+        return aName.localeCompare(bName)
+      })
+      
+      setSearchSuggestions(sortedMatches.slice(0, 12)) // Increased to 12 to show more related products
     } else {
       setSearchSuggestions([])
     }
@@ -336,13 +425,17 @@ export default function POSPage() {
     <div className="min-h-screen bg-background">
         <PWAInstallPrompt />
         <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">Point of Sale</h1>
-            <div className="flex items-center gap-3">
-              <p className="text-muted-foreground">{cfg.emoji} {cfg.label}</p>
-              <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-                <Usb className="h-3.5 w-3.5" /> Scanner Ready
-              </span>
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-semibold">POS</h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-sm text-muted-foreground">{cfg.emoji} {cfg.label}</p>
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">
+                    <Usb className="h-3 w-3" /> Ready
+                  </span>
+                </div>
+              </div>
             </div>
             {lastHwScan && (
               <div className="mt-2 text-sm text-green-600 font-medium animate-pulse">
@@ -356,9 +449,12 @@ export default function POSPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Sticky Scan Product Bar */}
               <div className="sticky top-0 z-30 bg-background pb-2 -mx-4 px-4 pt-2">
-                <Card>
+                <Card className="border-2 border-blue-300 bg-blue-100 shadow-lg">
                   <CardHeader className="p-3 pb-2">
-                    <CardTitle className="text-sm">Scan Product</CardTitle>
+                    <CardTitle className="text-sm text-blue-900 font-semibold flex items-center gap-2">
+                      <Barcode className="h-4 w-4 text-blue-700" />
+                      Scan Product
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 pt-0 space-y-3">
                     <form
@@ -382,18 +478,64 @@ export default function POSPage() {
                           onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
                         />
                         {searchSuggestions.length > 0 && (
-                          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg">
-                            {searchSuggestions.map(p => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex justify-between items-center"
-                                onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
-                              >
-                                <span>{p.name}</span>
-                                <span className="text-muted-foreground text-xs">₱{effectivePrice(p).toFixed(2)}</span>
-                              </button>
-                            ))}
+                          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-64 overflow-y-auto">
+                            {searchSuggestions.map(p => {
+                              const q = barcodeInput.toLowerCase()
+                              const name = p.name.toLowerCase()
+                              const category = p.category.toLowerCase()
+                              const description = (p.description || '').toLowerCase()
+                              
+                              // Determine match reason for display
+                              let matchReason = ''
+                              if (name.includes(q)) {
+                                matchReason = 'Name match'
+                              } else if (p.barcode.includes(q)) {
+                                matchReason = 'Barcode match'
+                              } else if (category.includes(q)) {
+                                matchReason = `Category: ${p.category}`
+                              } else if (description.includes(q)) {
+                                matchReason = 'Description match'
+                              } else {
+                                // Related product logic
+                                const searchWords = q.split(' ').filter(word => word.length > 2)
+                                const relatedWord = searchWords.find(word => {
+                                  if (word === 'ice' && (name.includes('cold') || name.includes('frozen') || name.includes('drink'))) return true
+                                  if (word === 'juice' && (name.includes('drink') || name.includes('beverage'))) return true
+                                  if (word === 'water' && (name.includes('drink') || name.includes('beverage'))) return true
+                                  if (word === 'milk' && (name.includes('dairy') || name.includes('cream'))) return true
+                                  if (word === 'bread' && (name.includes('loaf') || name.includes('bun'))) return true
+                                  if (word === 'rice' && (name.includes('grain') || name.includes('bigas'))) return true
+                                  if (word === 'soap' && (name.includes('detergent') || name.includes('wash'))) return true
+                                  if (word === 'candy' && (name.includes('sweet') || name.includes('chocolate'))) return true
+                                  if (word === 'noodle' && (name.includes('pasta') || name.includes('instant'))) return true
+                                  if (word === 'coffee' && (name.includes('caffeine') || name.includes('instant'))) return true
+                                  return false
+                                })
+                                matchReason = relatedWord ? `Related to "${relatedWord}"` : 'Related item'
+                              }
+                              
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-muted flex justify-between items-start border-b last:border-b-0"
+                                  onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{p.name}</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      {matchReason} • Stock: {p.stock}
+                                    </div>
+                                  </div>
+                                  <div className="text-right ml-2 flex-shrink-0">
+                                    <div className="font-semibold text-sm">₱{effectivePrice(p).toFixed(2)}</div>
+                                    {p.onSale && p.salePrice && (
+                                      <div className="text-xs text-red-500 font-medium">ON SALE</div>
+                                    )}
+                                  </div>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
                       </div>
@@ -412,8 +554,9 @@ export default function POSPage() {
                   <CardTitle className="text-sm">Quick Select {cfg.itemLabelPlural}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {products.slice(0, 12).map((product) => (
+                  <div className="max-h-96 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                      {shuffledProducts.map((product) => (
                       <Button
                         key={product.id}
                         variant="outline"
@@ -461,7 +604,8 @@ export default function POSPage() {
                           <div className="text-[10px] text-muted-foreground">Stock: {product.stock}</div>
                         </div>
                       </Button>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

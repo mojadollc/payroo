@@ -319,43 +319,65 @@ export default function InventoryPage() {
       </div>
 
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {list.map((product) => (
-            <Card key={product.id} className="overflow-hidden">
-              <div className="aspect-square relative bg-muted">
+            <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-0 shadow-md bg-white">
+              <div className="aspect-[4/3] relative bg-gradient-to-br from-gray-50 to-gray-100">
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">No Image</div>
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <Package className="h-12 w-12" />
+                  </div>
                 )}
                 {product.stock === 0 && (
-                  <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
-                    <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">Out of Stock</span>
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-sm font-bold text-white bg-red-500 px-3 py-1.5 rounded-full">Out of Stock</span>
+                  </div>
+                )}
+                {product.onSale && product.salePrice && (
+                  <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    SALE
                   </div>
                 )}
               </div>
-              <CardContent className="p-3">
-                <div className="font-semibold text-sm truncate">{product.name}</div>
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="text-xs text-muted-foreground">Stock: {product.stock}</span>
-                  {getStockLabel(product.stock)}
-                </div>
-                <div className="flex items-center justify-between">
-                  {getPriceDisplay(product)}
-                  <div className="flex gap-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600" onClick={() => setEditProduct(product)}>
-                      <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600" onClick={() => { setRestockProduct(product); setRestockQty("") }}>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedProductForBarcode(product)}>
-                      <Barcode className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteProduct(product.id!)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-base truncate text-gray-900">{product.name}</h3>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm text-gray-500">Stock: {product.stock}</span>
+                      {getStockLabel(product.stock)}
+                    </div>
                   </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      {getPriceDisplay(product)}
+                      <span className="text-xs text-gray-500 mt-0.5">Cost: ₱{product.cost}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50" onClick={() => setEditProduct(product)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => { setRestockProduct(product); setRestockQty("") }}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 hover:bg-gray-50" onClick={() => setSelectedProductForBarcode(product)}>
+                        <Barcode className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full text-red-600 border-red-200 hover:bg-red-50" 
+                    onClick={() => handleDeleteProduct(product.id!)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -457,94 +479,99 @@ export default function InventoryPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-          <p className="text-muted-foreground">{cfg.emoji} {cfg.label} — Manage your {cfg.itemLabelPlural.toLowerCase()}</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => { setParsedRows([]); setBulkOpen(true) }}
-            disabled={!canExport}
-            title={!canExport ? "Upgrade to Gold or Enterprise to use Bulk Upload" : undefined}
-            className={!canExport ? "opacity-60 cursor-not-allowed" : ""}
-          >
-            <Upload className="mr-2 h-4 w-4" /> Bulk Upload
-            {!canExport && (
-              <span className="ml-1.5 text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-semibold">UPGRADE</span>
-            )}
-          </Button>
-          <Button onClick={() => setIsAddDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> Add {cfg.itemLabel}</Button>
-          <AddProductDialog
-            open={isAddDialogOpen}
-            onOpenChange={setIsAddDialogOpen}
-            onSuccess={loadProducts}
-            categories={categories}
-          />
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold">Inventory</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{cfg.emoji} {cfg.itemLabelPlural}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setParsedRows([]); setBulkOpen(true) }}
+              disabled={!canExport}
+              title={!canExport ? "Upgrade to Gold plan to use Bulk Upload" : undefined}
+              className={!canExport ? "opacity-60 cursor-not-allowed" : ""}
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5" /> Bulk
+              {!canExport && (
+                <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-full font-semibold">GOLD</span>
+              )}
+            </Button>
+            <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Stock Value Cards */}
-      <div className="grid gap-2 md:grid-cols-5 mb-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Total Stock Value</CardTitle>
-            <DollarSign className="h-3.5 w-3.5 text-blue-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold text-blue-600">₱{totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground">Based on {cfg.costLabel.toLowerCase()}</p>
+      {/* Stock Value Cards - Mobile Friendly 2 Rows */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {/* Row 1 */}
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <DollarSign className="h-8 w-8 text-blue-600" />
+              <div className="text-right">
+                <div className="text-lg font-bold text-blue-700">₱{totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
+                <div className="text-xs text-blue-600 font-medium">Stock Value</div>
+              </div>
+            </div>
+            <div className="text-xs text-blue-600/80">Based on {cfg.costLabel.toLowerCase()}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Total Items</CardTitle>
-            <Package className="h-3.5 w-3.5 text-green-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold text-green-600">{totalItems}</div>
-            <p className="text-xs text-muted-foreground">{cfg.trackStock ? "Units in stock" : "Active services"}</p>
+
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <Package className="h-8 w-8 text-green-600" />
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-700">{totalItems}</div>
+                <div className="text-xs text-green-600 font-medium">Total Items</div>
+              </div>
+            </div>
+            <div className="text-xs text-green-600/80">{cfg.trackStock ? "Units in stock" : "Active services"}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Unique Products</CardTitle>
-            <LayoutGrid className="h-3.5 w-3.5 text-purple-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold text-purple-600">{products.length}</div>
-            <p className="text-xs text-muted-foreground">{cfg.itemLabelPlural}</p>
+
+        {/* Row 2 */}
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <LayoutGrid className="h-8 w-8 text-purple-600" />
+              <div className="text-right">
+                <div className="text-lg font-bold text-purple-700">{products.length}</div>
+                <div className="text-xs text-purple-600 font-medium">Products</div>
+              </div>
+            </div>
+            <div className="text-xs text-purple-600/80">{cfg.itemLabelPlural}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Low Stock</CardTitle>
-            <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold text-yellow-600">{lowStockCount}</div>
-            <p className="text-xs text-muted-foreground">≤ 5 units left</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Out of Stock</CardTitle>
-            <XCircle className="h-3.5 w-3.5 text-red-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold text-red-600">{outOfStockCount}</div>
-            <p className="text-xs text-muted-foreground">No units available</p>
+
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-orange-600" />
+                <XCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-orange-700">{lowStockCount + outOfStockCount}</div>
+                <div className="text-xs text-orange-600 font-medium">Alerts</div>
+              </div>
+            </div>
+            <div className="text-xs text-orange-600/80">{lowStockCount} low • {outOfStockCount} out</div>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="products" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="products">All {cfg.itemLabelPlural}</TabsTrigger>
-          <TabsTrigger value="low-stock" className="text-yellow-600">Low Stock ({lowStockCount})</TabsTrigger>
-          <TabsTrigger value="out-of-stock" className="text-red-600">Out of Stock ({outOfStockCount})</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-gray-100 p-1 rounded-lg">
+          <TabsTrigger value="products" className="text-sm font-medium">All {cfg.itemLabelPlural}</TabsTrigger>
+          <TabsTrigger value="low-stock" className="text-sm font-medium text-yellow-700">Low Stock ({lowStockCount})</TabsTrigger>
+          <TabsTrigger value="out-of-stock" className="text-sm font-medium text-red-700 hidden lg:flex">Out of Stock ({outOfStockCount})</TabsTrigger>
+          <TabsTrigger value="categories" className="text-sm font-medium hidden lg:flex">Categories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-6">

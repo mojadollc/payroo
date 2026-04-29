@@ -41,7 +41,7 @@ const FAQS = [
   { q: "Do I need internet to use Payroo POS?", a: "No! Payroo POS works offline. Your data syncs automatically when you're back online." },
   { q: "Can I use it on my phone or tablet?", a: "Yes! Install it on any device — Android, iPhone, iPad, or desktop. Works like a native app." },
   { q: "What payment methods do you accept?", a: "GCash, Maya, credit/debit cards, bank transfers, and over-the-counter payments via Xendit." },
-  { q: "Can I try it for free?", a: "Yes! Start with our Basic plan. No credit card required for the first 7 days." },
+  { q: "Can I try it for free?", a: "Yes! Start with our FREE plan. No credit card required - get instant access to POS, inventory, e-wallet, and reports." },
   { q: "Is my data safe?", a: "100% secure. We use Firebase with end-to-end encryption. Your data is backed up automatically." },
 ]
 
@@ -59,13 +59,13 @@ const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
 }
 
 const TIER_ICONS: Record<SubscriptionTier, React.ReactNode> = {
-  basic: <Zap className="h-5 w-5 text-slate-500" />,
+  basic: <Zap className="h-5 w-5 text-green-500" />,
   gold: <Star className="h-5 w-5 text-yellow-500" />,
   enterprise: <Building2 className="h-5 w-5 text-purple-500" />,
 }
 
 const TIER_GRADIENT: Record<SubscriptionTier, string> = {
-  basic: "from-slate-50 to-slate-100 border-slate-200",
+  basic: "from-green-50 to-green-100 border-green-200",
   gold: "from-yellow-50 to-amber-100 border-yellow-300",
   enterprise: "from-purple-50 to-purple-100 border-purple-300",
 }
@@ -258,8 +258,14 @@ export default function HomePage() {
                         </div>
                         <CardDescription className="text-sm">{plan.description}</CardDescription>
                         <div className="mt-3">
-                          <span className="text-4xl font-extrabold">₱{plan.price.toLocaleString()}</span>
-                          <span className="text-muted-foreground text-sm ml-1">/month</span>
+                          {plan.price === 0 ? (
+                            <span className="text-4xl font-extrabold text-green-600">FREE</span>
+                          ) : (
+                            <>
+                              <span className="text-4xl font-extrabold">₱{plan.price.toLocaleString()}</span>
+                              <span className="text-muted-foreground text-sm ml-1">/month</span>
+                            </>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent className="flex flex-col flex-1 space-y-4">
@@ -277,7 +283,7 @@ export default function HomePage() {
                         </ul>
                         <Link href="/subscription">
                           <Button className="w-full" variant={isPopular ? "default" : "outline"}>
-                            Get Started <ArrowRight className="h-4 w-4 ml-1" />
+                            {plan.price === 0 ? "Get Started Free" : "Get Started"} <ArrowRight className="h-4 w-4 ml-1" />
                           </Button>
                         </Link>
                       </CardContent>
@@ -345,7 +351,7 @@ export default function HomePage() {
           <h2 className="text-4xl font-bold">Ready to Transform Your Store?</h2>
           <p className="text-lg opacity-90">Join hundreds of Filipino store owners already using Payroo POS.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/subscription"><Button size="lg" variant="secondary" className="gap-2">Start Free Trial <ArrowRight className="h-4 w-4" /></Button></Link>
+            <Link href="/subscription"><Button size="lg" variant="secondary" className="gap-2">Start Free <ArrowRight className="h-4 w-4" /></Button></Link>
             <Link href="/login"><Button size="lg" variant="outline" className="border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10">Staff Login</Button></Link>
           </div>
         </div>

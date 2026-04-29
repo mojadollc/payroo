@@ -84,20 +84,22 @@ export default function EWalletPage() {
   return (
     <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
-          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">E-Wallet Services</h1>
-              <p className="text-muted-foreground">GCash & Maya cash-in and cash-out transactions</p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button onClick={() => setShowSettings(true)} variant="outline" size="sm" className="gap-1.5">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Commission</span> Settings
-              </Button>
-              <Button onClick={() => router.push("/ewallet/cashin")} size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                <Wallet className="h-4 w-4" />
-                Kiosk Cash-In
-              </Button>
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-semibold">E-Wallet</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">GCash & Maya services</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => setShowSettings(true)} variant="outline" size="sm" className="gap-1.5">
+                  <Settings className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Settings</span>
+                </Button>
+                <Button onClick={() => router.push("/ewallet/cashin")} size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                  <Wallet className="h-3.5 w-3.5" />
+                  Kiosk
+                </Button>
+              </div>
             </div>
           </div>
 

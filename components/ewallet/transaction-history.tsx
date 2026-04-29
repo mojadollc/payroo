@@ -88,7 +88,7 @@ export function TransactionHistory({ transactions, cashinTransactions, isLoading
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant={t.type === "cashin" ? "default" : "outline"} className="capitalize">{t.type}</Badge>
-                      <Badge variant="outline" className="uppercase">{t.provider}</Badge>
+                      {t.type !== "load" && <Badge variant="outline" className="uppercase">{t.provider}</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">{fmtDate(t.createdAt)}</p>
                   </div>

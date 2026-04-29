@@ -282,85 +282,87 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight mb-2">Reports & Analytics</h1>
-            <p className="text-muted-foreground">Track sales, e-wallet transactions, and profits</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
-            {!isCashier && (
-              canExport ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2 bg-transparent">
-                    <Download className="h-4 w-4" />
-                    Export CSV
-                    <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Sales Reports</div>
-                  <DropdownMenuItem
-                    disabled={sales.length === 0}
-                    onClick={() => exportSalesSummary(sales, rangeLabel)}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-2" />
-                    Sales Summary
-                    <span className="ml-auto text-xs text-muted-foreground">{sales.length} tx</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={sales.length === 0}
-                    onClick={() => exportSalesLineItems(sales, rangeLabel)}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-2" />
-                    Sales Line Items
-                    <span className="ml-auto text-xs text-muted-foreground">per product</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={sales.length === 0}
-                    onClick={() => exportDailySummary(sales, rangeLabel)}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-2" />
-                    Daily Breakdown
-                    <span className="ml-auto text-xs text-muted-foreground">by day</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={sales.length === 0}
-                    onClick={() => exportProductPerformance(sales, rangeLabel)}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-2" />
-                    Product Performance
-                    <span className="ml-auto text-xs text-muted-foreground">top sellers</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">E-Wallet & Inventory</div>
-                  <DropdownMenuItem
-                    disabled={ewalletTransactions.length === 0}
-                    onClick={() => exportEWallet(ewalletTransactions, rangeLabel)}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-2" />
-                    E-Wallet Transactions
-                    <span className="ml-auto text-xs text-muted-foreground">{ewalletTransactions.length} tx</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={products.length === 0}
-                    onClick={() => exportInventorySnapshot(products, new Date().toLocaleDateString("en-CA"))}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-2" />
-                    Inventory Snapshot
-                    <span className="ml-auto text-xs text-muted-foreground">{products.length} items</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              ) : (
-              <Button variant="outline" disabled className="gap-2 bg-transparent opacity-60 cursor-not-allowed" title="Upgrade to Gold or Enterprise to export reports">
-                <Download className="h-4 w-4" />
-                Export CSV
-                <span className="ml-1 text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full font-semibold">UPGRADE</span>
-              </Button>
-              )
-            )}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold">Reports</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Sales & analytics</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
+              {!isCashier && (
+                canExport ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Download className="h-3.5 w-3.5" />
+                      Export
+                      <ChevronDown className="h-3 w-3 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Sales Reports</div>
+                    <DropdownMenuItem
+                      disabled={sales.length === 0}
+                      onClick={() => exportSalesSummary(sales, rangeLabel)}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      Sales Summary
+                      <span className="ml-auto text-xs text-muted-foreground">{sales.length} tx</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={sales.length === 0}
+                      onClick={() => exportSalesLineItems(sales, rangeLabel)}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      Sales Line Items
+                      <span className="ml-auto text-xs text-muted-foreground">per product</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={sales.length === 0}
+                      onClick={() => exportDailySummary(sales, rangeLabel)}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      Daily Breakdown
+                      <span className="ml-auto text-xs text-muted-foreground">by day</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={sales.length === 0}
+                      onClick={() => exportProductPerformance(sales, rangeLabel)}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      Product Performance
+                      <span className="ml-auto text-xs text-muted-foreground">top sellers</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">E-Wallet & Inventory</div>
+                    <DropdownMenuItem
+                      disabled={ewalletTransactions.length === 0}
+                      onClick={() => exportEWallet(ewalletTransactions, rangeLabel)}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      E-Wallet Transactions
+                      <span className="ml-auto text-xs text-muted-foreground">{ewalletTransactions.length} tx</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={products.length === 0}
+                      onClick={() => exportInventorySnapshot(products, new Date().toLocaleDateString("en-CA"))}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      Inventory Snapshot
+                      <span className="ml-auto text-xs text-muted-foreground">{products.length} items</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                ) : (
+                <Button variant="outline" size="sm" disabled className="gap-1.5 opacity-60 cursor-not-allowed" title="Upgrade to Gold or Enterprise to export reports">
+                  <Download className="h-3.5 w-3.5" />
+                  Export
+                  <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-full font-semibold">PRO</span>
+                </Button>
+                )
+              )}
+            </div>
           </div>
         </div>
 

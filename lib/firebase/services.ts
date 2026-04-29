@@ -635,12 +635,12 @@ export const clearAllData = async () => {
 const DEFAULT_PLANS: Omit<SubscriptionPlan, "id" | "updatedAt">[] = [
   {
     tier: "basic",
-    name: "Basic",
-    price: 299,
+    name: "FREE",
+    price: 0,
     description: "Perfect for small sari-sari stores",
     isActive: true,
     features: {
-      pos: true, inventory: true, ewallet: false, reports: false,
+      pos: true, inventory: true, ewallet: true, reports: true,
       loyalty: false, utang: false, aiRestock: false, multiUser: false,
       exportData: false, marketIntelligence: false,
     },
@@ -648,7 +648,7 @@ const DEFAULT_PLANS: Omit<SubscriptionPlan, "id" | "updatedAt">[] = [
   {
     tier: "gold",
     name: "Gold",
-    price: 899,
+    price: 499,
     description: "Full-featured for growing businesses",
     isActive: true,
     features: {

@@ -584,6 +584,13 @@ export default function InventoryPage() {
         </TabsContent>
       </Tabs>
 
+      <AddProductDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        categories={categories}
+        onSuccess={() => { setIsAddDialogOpen(false); loadProducts(); loadCategories() }}
+      />
+
       {editProduct && (
         <EditProductDialog
           product={editProduct}

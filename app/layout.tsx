@@ -221,30 +221,13 @@ export default function RootLayout({
         <Script id="sw-register" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
-              reg.addEventListener('updatefound', function() {
-                var newSW = reg.installing;
-                if (!newSW) return;
-                newSW.addEventListener('statechange', function() {
-                  if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-                    newSW.postMessage({ type: 'SKIP_WAITING' });
-                  }
-                });
-              });
-
-              setInterval(function() { reg.update().catch(function(){}); }, 60000);
+              // Check for updates on visibility change and every 5 min
+              setInterval(function() { reg.update().catch(function(){}); }, 300000);
               document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') reg.update().catch(function(){});
               });
-            });
-
-            var swReloaded = false;
-            navigator.serviceWorker.addEventListener('controllerchange', function() {
-              if (swReloaded) return;
-              var lastReload = sessionStorage.getItem('sw_reload_ts');
-              if (lastReload && (Date.now() - Number(lastReload)) < 10000) return;
-              swReloaded = true;
-              sessionStorage.setItem('sw_reload_ts', String(Date.now()));
-              window.location.reload();
+            }).catch(function(err) {
+              console.warn('SW registration failed:', err);
             });
           }
         `}</Script>

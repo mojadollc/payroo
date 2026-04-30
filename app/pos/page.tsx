@@ -115,23 +115,42 @@ export default function POSPage() {
   useEffect(() => {
     if (!isFirebaseConfigured) return
 
+    let gotData = false
+
     // Start with cached products immediately (fast first paint / offline)
     const cached = getCachedProducts()
     if (cached.length > 0) {
       setProducts(cached as Product[])
       setShuffledProducts(shuffleArray(cached as Product[]))
       productsRef.current = cached as Product[]
+      gotData = true
     }
 
     // Subscribe to real-time Firestore updates
     const unsubscribe = onProductsSnapshot((data) => {
+      gotData = true
       setProducts(data)
       setShuffledProducts(shuffleArray(data))
       productsRef.current = data
       cacheProducts(data)
     })
 
-    return () => unsubscribe()
+    // Fallback: if snapshot hasn't fired after 3s (fresh install, slow connection),
+    // do a one-time fetch to populate the page
+    const fallbackTimer = setTimeout(async () => {
+      if (gotData) return
+      try {
+        const data = await getProducts()
+        if (data.length > 0) {
+          setProducts(data)
+          setShuffledProducts(shuffleArray(data))
+          productsRef.current = data
+          cacheProducts(data)
+        }
+      } catch {}
+    }, 3000)
+
+    return () => { unsubscribe(); clearTimeout(fallbackTimer) }
   }, [])
 
   // Auto-sync cart stock when products update in real-time

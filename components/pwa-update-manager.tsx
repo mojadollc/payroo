@@ -2,171 +2,133 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { RefreshCw, Download } from "lucide-react"
 
 export function PWAUpdateManager() {
   const [updateAvailable, setUpdateAvailable] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
 
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
 
-    // Don't re-register — layout.tsx handles registration.
-    // Just grab the existing registration for update UI.
-    const init = async () => {
+    const checkForUpdate = async () => {
       try {
         const reg = await navigator.serviceWorker.getRegistration()
         if (!reg) return
-        setRegistration(reg)
 
+        // Listen for new SW installing
         reg.addEventListener("updatefound", () => {
           const newWorker = reg.installing
           if (!newWorker) return
           newWorker.addEventListener("statechange", () => {
+            // New SW is ready and waiting — show update banner
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
               setUpdateAvailable(true)
             }
           })
         })
+
+        // Also check if there's already a waiting worker (e.g. from a previous visit)
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          setUpdateAvailable(true)
+        }
       } catch {}
     }
 
-    init()
+    checkForUpdate()
   }, [])
 
-  const handleUpdate = async () => {
-    if (!registration) return
-
+  const handleUpdate = () => {
     setIsUpdating(true)
-    
-    try {
-      // Tell the waiting service worker to skip waiting
-      if (registration.waiting) {
-        registration.waiting.postMessage({ type: "SKIP_WAITING" })
-      }
-      
-      // Force update
-      await registration.update()
-      
-      // Clear all caches to prevent stale content
-      if ("caches" in window) {
-        const cacheNames = await caches.keys()
-        await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
-        )
+
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (!reg) return
+
+      // Tell waiting SW to activate
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" })
       }
 
-      // Reload the page
-      setTimeout(() => {
+      // Listen for the new SW to take control, then reload ONCE
+      let reloaded = false
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloaded) return
+        reloaded = true
         window.location.reload()
-      }, 500)
-    } catch (error) {
-      console.error("Update failed:", error)
-      setIsUpdating(false)
-    }
+      })
+
+      // Fallback: if controllerchange doesn't fire within 3s, just reload
+      setTimeout(() => {
+        if (!reloaded) {
+          reloaded = true
+          window.location.reload()
+        }
+      }, 3000)
+    })
   }
 
-  const handleRefresh = async () => {
-    setIsUpdating(true)
-    
-    try {
-      // Clear all caches
-      if ("caches" in window) {
-        const cacheNames = await caches.keys()
-        await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
-        )
-      }
+  if (!updateAvailable) return null
 
-      // Force reload from network
-      window.location.reload()
-    } catch (error) {
-      console.error("Refresh failed:", error)
-      setIsUpdating(false)
-    }
-  }
-
-  // Auto-update notification
-  if (updateAvailable) {
-    return (
-      <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
-        <Card className="border-green-200 bg-green-50 shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <Download className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-green-800">
-                  New version available!
-                </p>
-                <p className="text-xs text-green-700 mt-1">
-                  Update now to get the latest features and fixes.
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <Button 
-                    size="sm" 
-                    onClick={handleUpdate}
-                    disabled={isUpdating}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {isUpdating ? (
-                      <>
-                        <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      "Update Now"
-                    )}
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => setUpdateAvailable(false)}
-                    className="border-green-300 text-green-700 hover:bg-green-100"
-                  >
-                    Later
-                  </Button>
-                </div>
-              </div>
+  return (
+    <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
+      <div className="rounded-lg border border-green-200 bg-green-50 shadow-lg p-4">
+        <div className="flex items-start gap-3">
+          <Download className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-green-800">
+              New version available!
+            </p>
+            <p className="text-xs text-green-700 mt-1">
+              Tap update to get the latest features.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <Button
+                size="sm"
+                onClick={handleUpdate}
+                disabled={isUpdating}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isUpdating ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Now"
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setUpdateAvailable(false)}
+                className="border-green-300 text-green-700 hover:bg-green-100"
+              >
+                Later
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
-    )
-  }
-
-  return null
+    </div>
+  )
 }
 
-// Hook for manual refresh functionality
 export function useAppRefresh() {
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const refresh = async () => {
     setIsRefreshing(true)
-    
     try {
-      // Clear all caches
       if ("caches" in window) {
-        const cacheNames = await caches.keys()
-        await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
-        )
+        const keys = await caches.keys()
+        await Promise.all(keys.map(k => caches.delete(k)))
       }
-
-      // Update service worker
       if ("serviceWorker" in navigator) {
-        const registration = await navigator.serviceWorker.getRegistration()
-        if (registration) {
-          await registration.update()
-        }
+        const reg = await navigator.serviceWorker.getRegistration()
+        if (reg) await reg.update()
       }
-
-      // Force reload from network
       window.location.reload()
-    } catch (error) {
-      console.error("Refresh failed:", error)
+    } catch {
       setIsRefreshing(false)
     }
   }

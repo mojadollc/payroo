@@ -182,6 +182,7 @@ export interface SubscriptionFeatures {
   multiUser: boolean
   exportData: boolean
   marketIntelligence: boolean
+  delivery: boolean
 }
 
 export interface SubscriptionPlan {
@@ -297,6 +298,53 @@ export interface SiteVisit {
   userAgent: string
   isPWA?: boolean
   createdAt: Timestamp
+}
+
+// ─── Delivery ──────────────────────────────────────────────────────────────────
+export interface DeliverySettings {
+  id?: string
+  storeId: string
+  enabled: boolean
+  storeName: string
+  storeImage?: string
+  storeLogo?: string
+  description?: string
+  address?: string
+  phone?: string
+  openTime: string   // "08:00"
+  closeTime: string  // "22:00"
+  minOrder?: number  // minimum order amount
+  deliveryFee?: number
+  enabledProductIds: string[]  // product IDs visible on delivery
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export interface DeliveryBanner {
+  id?: string
+  imageUrl: string
+  title?: string
+  link?: string       // optional link when clicked (e.g. ?store=xxx)
+  order: number
+  active: boolean
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export interface DeliveryOrder {
+  id?: string
+  storeId: string
+  storeName: string
+  customerName: string
+  customerPhone: string
+  customerAddress: string
+  items: { productId: string; productName: string; price: number; quantity: number; subtotal: number }[]
+  total: number
+  deliveryFee: number
+  status: "pending" | "confirmed" | "preparing" | "delivering" | "delivered" | "cancelled"
+  notes?: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
 }
 
 // ─── Market Intelligence ───────────────────────────────────────────────────────

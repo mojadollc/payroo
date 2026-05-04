@@ -5,7 +5,7 @@ import {
   Shield, Plus, Pencil, Trash2, Users, CreditCard, Check, X,
   RefreshCw, Search, ExternalLink, Clock, BadgeCheck, AlertCircle,
   Package, Store, TrendingUp, Smartphone, HandCoins, Star, Eye, Loader2, Bell,
-  Calendar, Mail, Globe, Wallet, Receipt, Upload, Image as ImageIcon
+  Calendar, Mail, Globe, Wallet, Receipt, Upload, Image as ImageIcon, Truck
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -44,6 +44,7 @@ const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
   multiUser: "Multi-User",
   exportData: "Export Data",
   marketIntelligence: "Market Intelligence",
+  delivery: "Online Delivery",
 }
 
 const STATUS_COLORS: Record<CustomerSubscription["status"], string> = {
@@ -354,14 +355,28 @@ export default function ManagementPage() {
     setEditingPlan(null)
     setPlanForm({
       tier: "basic", name: "", price: 0, description: "", isActive: true,
-      features: { pos: true, inventory: true, ewallet: false, reports: false, loyalty: false, utang: false, aiRestock: false, multiUser: false, exportData: false, marketIntelligence: false },
+      features: { pos: true, inventory: true, ewallet: false, reports: false, loyalty: false, utang: false, aiRestock: false, multiUser: false, exportData: false, marketIntelligence: false, delivery: false },
     })
     setPlanDialog(true)
   }
 
+  // All features that Gold should have — used to fill missing keys in old Firestore docs
+  const GOLD_ALL_TRUE: SubscriptionFeatures = {
+    pos: true, inventory: true, ewallet: true, reports: true,
+    loyalty: true, utang: true, aiRestock: true, multiUser: true,
+    exportData: true, marketIntelligence: true, delivery: true,
+  }
+  const BASIC_FEATURES: SubscriptionFeatures = {
+    pos: true, inventory: true, ewallet: true, reports: true,
+    loyalty: false, utang: false, aiRestock: false, multiUser: false,
+    exportData: false, marketIntelligence: false, delivery: false,
+  }
+
   const openEditPlan = (plan: SubscriptionPlan) => {
     setEditingPlan(plan)
-    setPlanForm({ ...plan })
+    // Fill in any missing feature keys from the canonical set so toggles render for all features
+    const canonical = plan.tier === "gold" || plan.tier === "enterprise" ? GOLD_ALL_TRUE : BASIC_FEATURES
+    setPlanForm({ ...plan, features: { ...canonical, ...plan.features } })
     setPlanDialog(true)
   }
 
@@ -382,6 +397,7 @@ export default function ManagementPage() {
   }
 
   // Sync all customer features from their assigned plan
+  // Fills missing feature keys based on tier so old Firestore docs get updated
   const syncAllCustomerFeatures = async () => {
     if (!confirm("Sync features from plans to ALL customers? This will overwrite each customer's features with their plan's current features.")) return
     try {
@@ -389,12 +405,20 @@ export default function ManagementPage() {
       let synced = 0
       for (const c of customers) {
         const plan = planMap.get(c.planId)
-        if (plan?.features) {
-          await updateCustomerSubscription(c.id!, { features: plan.features })
-          synced++
+        if (!plan) continue
+        // Build complete features: start with tier defaults, overlay plan's stored features
+        const tierDefaults = (plan.tier === "gold" || plan.tier === "enterprise") ? GOLD_ALL_TRUE : BASIC_FEATURES
+        const completeFeatures: SubscriptionFeatures = { ...tierDefaults, ...(plan.features ?? {}) }
+        // Also update the plan doc itself if it's missing keys
+        const planKeys = Object.keys(plan.features ?? {})
+        const allKeys = Object.keys(tierDefaults)
+        if (allKeys.some(k => !planKeys.includes(k))) {
+          await updateSubscriptionPlan(plan.id!, { features: completeFeatures })
         }
+        await updateCustomerSubscription(c.id!, { features: completeFeatures })
+        synced++
       }
-      toast({ title: `Synced features for ${synced} customers` })
+      toast({ title: `Synced features for ${synced} customers (plans also updated)` })
       load()
     } catch {
       toast({ title: "Sync failed", variant: "destructive" })
@@ -582,6 +606,7 @@ export default function ManagementPage() {
           <TabsTrigger value="visitors"><Globe className="h-4 w-4 mr-1" /> Visitors</TabsTrigger>
           <TabsTrigger value="kiosk"><Wallet className="h-4 w-4 mr-1" /> Kiosk</TabsTrigger>
           <TabsTrigger value="expenses"><Receipt className="h-4 w-4 mr-1" /> Expenses</TabsTrigger>
+          <TabsTrigger value="delivery"><Truck className="h-4 w-4 mr-1" /> Delivery</TabsTrigger>
         </TabsList>
 
         {/* ── Plans Tab ── */}
@@ -1094,6 +1119,9 @@ export default function ManagementPage() {
 
         <TabsContent value="expenses">
           <ExpensesManagement />
+        </TabsContent>
+        <TabsContent value="delivery">
+          <DeliveryManagement />
         </TabsContent>
       </Tabs>
       <Dialog open={planDialog} onOpenChange={setPlanDialog}>
@@ -1979,6 +2007,104 @@ function KioskManagement() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  )
+}
+
+// ── Delivery Management Component (Superadmin) ─────────────────────────────
+
+function DeliveryManagement() {
+  const { toast } = useToast()
+  const [banners, setBanners] = useState<{ id: string; imageUrl: string; title: string; link: string; order: number; active: boolean; createdAt: any }[]>([])
+  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const { getAllDeliveryBanners } = await import("@/lib/firebase/services")
+      const b = await getAllDeliveryBanners()
+      setBanners(b as any[])
+    } catch { toast({ title: "Error loading banners", variant: "destructive" }) }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAdd = async (file: File) => {
+    setUploading(true)
+    try {
+      const { uploadDeliveryImage, addDeliveryBanner } = await import("@/lib/firebase/services")
+      const url = await uploadDeliveryImage(file, "banners")
+      await addDeliveryBanner({ imageUrl: url, title: "", link: "", order: banners.length, active: true })
+      toast({ title: "Banner added" })
+      load()
+    } catch { toast({ title: "Failed to add banner", variant: "destructive" }) }
+    finally { setUploading(false) }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this banner?")) return
+    const { deleteDeliveryBanner } = await import("@/lib/firebase/services")
+    await deleteDeliveryBanner(id)
+    toast({ title: "Banner removed" })
+    load()
+  }
+
+  const handleToggle = async (id: string, active: boolean) => {
+    const { updateDeliveryBanner } = await import("@/lib/firebase/services")
+    await updateDeliveryBanner(id, { active })
+    load()
+  }
+
+  const handleUpdate = async (id: string, field: "title" | "link", value: string) => {
+    const { updateDeliveryBanner } = await import("@/lib/firebase/services")
+    await updateDeliveryBanner(id, { [field]: value })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="font-semibold text-lg">Delivery Homepage Banners</h2>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground">Manage the slide banners shown on the /delivery homepage. Only you (superadmin) can control these.</p>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          {banners.length === 0 && !loading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p>No banners yet. Add one below.</p>
+            </div>
+          )}
+          {banners.map(b => (
+            <div key={b.id} className="flex items-center gap-3 border rounded-lg p-3">
+              <img src={b.imageUrl} alt="" className="h-16 w-28 rounded-lg object-cover shrink-0" />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Input placeholder="Title (optional)" defaultValue={b.title ?? ""} onBlur={e => handleUpdate(b.id, "title", e.target.value)} className="h-8 text-sm" />
+                <Input placeholder="Link (e.g. /delivery?store=1234)" defaultValue={b.link ?? ""} onBlur={e => handleUpdate(b.id, "link", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <Switch checked={b.active} onCheckedChange={v => handleToggle(b.id, v)} />
+                <span className="text-[10px] text-muted-foreground">{b.active ? "Active" : "Hidden"}</span>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 shrink-0" onClick={() => handleDelete(b.id)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+
+          <label className="cursor-pointer block">
+            <Button variant="outline" className="w-full gap-2" disabled={uploading} asChild>
+              <span><Plus className="h-4 w-4" /> {uploading ? "Uploading..." : "Add Banner Image"}</span>
+            </Button>
+            <input type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleAdd(e.target.files[0]) }} />
+          </label>
+        </CardContent>
+      </Card>
     </div>
   )
 }

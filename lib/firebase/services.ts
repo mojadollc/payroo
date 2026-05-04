@@ -18,7 +18,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { getFirebaseDb, getFirebaseStorage } from "./config"
 import { getStoreId } from "@/lib/store-id"
-import type { Product, Category, Sale, EWalletTransaction, CommissionSettings, InventoryTransaction, UtangRecord, UtangPayment, LoyaltyCustomer, LoyaltyTransaction, LoyaltyRule, LoyaltySettings, SubscriptionPlan, CustomerSubscription, SubscriptionTier, SubscriptionFeatures, StoreUser, UserRole, MarketDataPoint, Affiliate, AffiliateEarning, AffiliateWithdrawal } from "./types"
+import type { Product, Category, Sale, EWalletTransaction, CommissionSettings, InventoryTransaction, UtangRecord, UtangPayment, LoyaltyCustomer, LoyaltyTransaction, LoyaltyRule, LoyaltySettings, SubscriptionPlan, CustomerSubscription, SubscriptionTier, SubscriptionFeatures, StoreUser, UserRole, MarketDataPoint, Affiliate, AffiliateEarning, AffiliateWithdrawal, DeliverySettings, DeliveryOrder, DeliveryBanner } from "./types"
 
 // Product Services
 export const addProduct = async (product: Omit<Product, "id" | "createdAt" | "updatedAt">) => {
@@ -642,7 +642,7 @@ const DEFAULT_PLANS: Omit<SubscriptionPlan, "id" | "updatedAt">[] = [
     features: {
       pos: true, inventory: true, ewallet: true, reports: true,
       loyalty: false, utang: false, aiRestock: false, multiUser: false,
-      exportData: false, marketIntelligence: false,
+      exportData: false, marketIntelligence: false, delivery: false,
     },
   },
   {
@@ -654,7 +654,7 @@ const DEFAULT_PLANS: Omit<SubscriptionPlan, "id" | "updatedAt">[] = [
     features: {
       pos: true, inventory: true, ewallet: true, reports: true,
       loyalty: true, utang: true, aiRestock: true, multiUser: true,
-      exportData: true, marketIntelligence: true,
+      exportData: true, marketIntelligence: true, delivery: true,
     },
   },
 ]
@@ -1085,4 +1085,130 @@ export const updateWithdrawalStatus = async (
     }
   }
   await batch.commit()
+}
+
+// ─── Delivery Services ─────────────────────────────────────────────────────────
+
+export const getDeliverySettings = async (storeId: string): Promise<DeliverySettings | null> => {
+  const db = getFirebaseDb()
+  if (!db) return null
+  const snap = await getDocs(query(collection(db, "deliverySettings"), where("storeId", "==", storeId)))
+  if (snap.empty) return null
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as DeliverySettings
+}
+
+export const saveDeliverySettings = async (settings: Omit<DeliverySettings, "id" | "createdAt" | "updatedAt">) => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  const clean = Object.fromEntries(Object.entries(settings).filter(([, v]) => v !== undefined))
+  const snap = await getDocs(query(collection(db, "deliverySettings"), where("storeId", "==", settings.storeId)))
+  if (snap.empty) {
+    await addDoc(collection(db, "deliverySettings"), { ...clean, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+  } else {
+    await updateDoc(snap.docs[0].ref, { ...clean, updatedAt: serverTimestamp() })
+  }
+}
+
+export const getAllDeliveryStores = async (): Promise<DeliverySettings[]> => {
+  const db = getFirebaseDb()
+  if (!db) return []
+  const snap = await getDocs(query(collection(db, "deliverySettings"), where("enabled", "==", true)))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DeliverySettings)
+}
+
+export const getDeliveryProducts = async (storeId: string, productIds: string[]): Promise<Product[]> => {
+  const db = getFirebaseDb()
+  if (!db) return []
+  if (productIds.length === 0) return []
+  // Firestore "in" queries limited to 30
+  const products: Product[] = []
+  for (let i = 0; i < productIds.length; i += 30) {
+    const batch = productIds.slice(i, i + 30)
+    const snap = await getDocs(query(collection(db, "products"), where("storeId", "==", storeId), where("__name__", "in", batch)))
+    products.push(...snap.docs.map(d => ({ id: d.id, ...d.data() }) as Product))
+  }
+  return products
+}
+
+export const addDeliveryOrder = async (order: Omit<DeliveryOrder, "id" | "createdAt" | "updatedAt">) => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  const ref = await addDoc(collection(db, "deliveryOrders"), { ...order, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+  return ref.id
+}
+
+export const getDeliveryOrders = async (storeId: string): Promise<DeliveryOrder[]> => {
+  const db = getFirebaseDb()
+  if (!db) return []
+  const snap = await getDocs(query(collection(db, "deliveryOrders"), where("storeId", "==", storeId), orderBy("createdAt", "desc")))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DeliveryOrder)
+}
+
+export const updateDeliveryOrderStatus = async (orderId: string, status: DeliveryOrder["status"]) => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  await updateDoc(doc(db, "deliveryOrders", orderId), { status, updatedAt: serverTimestamp() })
+}
+
+// Search products across all delivery-enabled stores
+export const searchDeliveryProducts = async (searchTerm: string): Promise<{ product: Product; store: DeliverySettings }[]> => {
+  const db = getFirebaseDb()
+  if (!db) return []
+  const stores = await getAllDeliveryStores()
+  if (!stores.length) return []
+  const lower = searchTerm.toLowerCase()
+  const results: { product: Product; store: DeliverySettings }[] = []
+  for (const store of stores) {
+    if (!store.enabledProductIds.length) continue
+    const prods = await getDeliveryProducts(store.storeId, store.enabledProductIds)
+    for (const p of prods) {
+      if (p.name.toLowerCase().includes(lower) || p.category.toLowerCase().includes(lower)) {
+        results.push({ product: p, store })
+      }
+    }
+  }
+  return results
+}
+
+// ─── Delivery Banner Services ──────────────────────────────────────────────────
+
+export const getDeliveryBanners = async (): Promise<DeliveryBanner[]> => {
+  const db = getFirebaseDb()
+  if (!db) return []
+  const snap = await getDocs(query(collection(db, "deliveryBanners"), where("active", "==", true), orderBy("order")))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DeliveryBanner)
+}
+
+export const getAllDeliveryBanners = async (): Promise<DeliveryBanner[]> => {
+  const db = getFirebaseDb()
+  if (!db) return []
+  const snap = await getDocs(query(collection(db, "deliveryBanners"), orderBy("order")))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DeliveryBanner)
+}
+
+export const addDeliveryBanner = async (banner: Omit<DeliveryBanner, "id" | "createdAt" | "updatedAt">) => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  const ref = await addDoc(collection(db, "deliveryBanners"), { ...banner, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+  return ref.id
+}
+
+export const updateDeliveryBanner = async (id: string, data: Partial<DeliveryBanner>) => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  await updateDoc(doc(db, "deliveryBanners", id), { ...data, updatedAt: serverTimestamp() })
+}
+
+export const deleteDeliveryBanner = async (id: string) => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  await deleteDoc(doc(db, "deliveryBanners", id))
+}
+
+export const uploadDeliveryImage = async (file: File, folder: string) => {
+  const storage = getFirebaseStorage()
+  if (!storage) throw new Error("Firebase not configured.")
+  const storageRef = ref(storage, `delivery/${folder}/${Date.now()}_${file.name}`)
+  await uploadBytes(storageRef, file)
+  return getDownloadURL(storageRef)
 }

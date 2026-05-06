@@ -27,6 +27,38 @@ export default function DashboardPage() {
   const [showPin, setShowPin] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [resettingPin, setResettingPin] = useState(false)
+
+  const handleForgotPin = async () => {
+    if (!email.trim()) {
+      toast({ title: "Enter your email first", variant: "destructive" })
+      return
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      toast({ title: "Please enter a valid email", variant: "destructive" })
+      return
+    }
+
+    setResettingPin(true)
+    try {
+      const res = await fetch("/api/reset-owner-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({ 
+        title: "Temporary PIN sent!", 
+        description: `Check ${email} for your temporary PIN. Valid for 1 hour.` 
+      })
+    } catch (err: any) {
+      toast({ title: "Failed to send reset email", description: err.message, variant: "destructive" })
+    } finally {
+      setResettingPin(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -243,9 +275,16 @@ export default function DashboardPage() {
                   }
                 </Button>
 
-                <p className="text-xs text-center text-muted-foreground mt-3">
-                  Forgot your PIN? Go to <Link href="/users" className="text-primary underline">User Management</Link> after logging in to reset it.
-                </p>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={handleForgotPin}
+                    className="text-xs text-primary hover:underline"
+                    disabled={loading || resettingPin}
+                  >
+                    {resettingPin ? "Sending..." : "Forgot your PIN?"}
+                  </button>
+                </div>
               </form>
             </CardContent>
           </Card>

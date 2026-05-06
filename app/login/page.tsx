@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { loginStoreUser } from "@/lib/firebase/services"
 import { useAuth } from "@/hooks/use-auth"
 import { getFirebaseDb } from "@/lib/firebase/config"
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
@@ -23,67 +22,79 @@ export default function LoginPage() {
   const [storeId, setStoreId] = useState(() =>
     typeof window !== "undefined" ? (localStorage.getItem("pos_ext_id") ?? "") : ""
   )
-  const [username, setUsername] = useState("")
   const [pin, setPin] = useState("")
   const [showPin, setShowPin] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!storeId.trim() || !username.trim() || !pin.trim()) {
-      toast({ title: "Please fill in all fields", variant: "destructive" })
+    if (!storeId.trim() || !pin.trim()) {
+      toast({ title: "Please enter Store ID and PIN", variant: "destructive" })
+      return
+    }
+
+    if (pin.length !== 6) {
+      toast({ title: "PIN must be 6 digits", variant: "destructive" })
       return
     }
 
     setLoading(true)
     try {
-      const user = await loginStoreUser(storeId.trim(), username.trim().toLowerCase(), pin.trim())
-      if (!user) {
-        toast({ title: "Invalid credentials", description: "Check your Store ID, username, and PIN.", variant: "destructive" })
+      const db = getFirebaseDb()
+      if (!db) throw new Error("Database not configured")
+
+      // Find user by storeId + PIN (no username needed)
+      const userSnap = await getDocs(query(
+        collection(db, "storeUsers"),
+        where("externalId", "==", storeId.trim()),
+        where("pin", "==", pin.trim()),
+        where("isActive", "==", true)
+      ))
+
+      if (userSnap.empty) {
+        toast({ title: "Invalid credentials", description: "Check your Store ID and PIN.", variant: "destructive" })
         return
       }
 
+      const user = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as any
+
       localStorage.setItem("pos_ext_id", storeId.trim())
 
-      // Pre-cache subscription so AuthGuard sees features immediately
+      // Pre-cache subscription
       try {
-        const db = getFirebaseDb()
-        if (db) {
-          const subSnap = await getDocs(query(
-            collection(db, "customerSubscriptions"),
-            where("externalId", "==", storeId.trim()),
-            orderBy("createdAt", "desc"),
-            limit(1)
-          ))
-          if (!subSnap.empty) {
-            const sub = subSnap.docs[0].data()
-            const endDateObj = sub.endDate?.toDate?.() ?? null
-            const fullFeatures = {
-              pos: false, inventory: false, ewallet: false, reports: false,
-              loyalty: false, utang: false, aiRestock: false, multiUser: false,
-              exportData: false, marketIntelligence: false,
-              ...(sub.features ?? {}),
-            }
-            localStorage.setItem("pos_subscription", JSON.stringify({
-              loading: false,
-              isActive: sub.status === "active" && (!endDateObj || endDateObj > new Date()),
-              tier: sub.tier ?? "basic",
-              features: fullFeatures,
-              storeName: sub.storeName ?? null,
-              businessType: sub.businessType ?? null,
-              ownerName: sub.ownerName ?? null,
-              ownerEmail: sub.ownerEmail ?? null,
-              endDate: endDateObj?.toISOString() ?? null,
-              externalId: storeId.trim(),
-            }))
-            if (sub.storeName) localStorage.setItem("storeName", sub.storeName)
+        const subSnap = await getDocs(query(
+          collection(db, "customerSubscriptions"),
+          where("externalId", "==", storeId.trim()),
+          orderBy("createdAt", "desc"),
+          limit(1)
+        ))
+        if (!subSnap.empty) {
+          const sub = subSnap.docs[0].data()
+          const endDateObj = sub.endDate?.toDate?.() ?? null
+          const fullFeatures = {
+            pos: false, inventory: false, ewallet: false, reports: false,
+            loyalty: false, utang: false, aiRestock: false, multiUser: false,
+            exportData: false, marketIntelligence: false, delivery: false,
+            ...(sub.features ?? {}),
           }
+          localStorage.setItem("pos_subscription", JSON.stringify({
+            loading: false,
+            isActive: sub.status === "active" && (!endDateObj || endDateObj > new Date()),
+            tier: sub.tier ?? "basic",
+            features: fullFeatures,
+            storeName: sub.storeName ?? null,
+            businessType: sub.businessType ?? null,
+            ownerName: sub.ownerName ?? null,
+            ownerEmail: sub.ownerEmail ?? null,
+            endDate: endDateObj?.toISOString() ?? null,
+            externalId: storeId.trim(),
+          }))
+          if (sub.storeName) localStorage.setItem("storeName", sub.storeName)
         }
       } catch {}
 
       login(user)
       toast({ title: `Welcome, ${user.name}!`, description: `Logged in as ${user.role}` })
-      // Everyone from staff login goes to POS
       router.push("/pos")
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" })
@@ -100,7 +111,7 @@ export default function LoginPage() {
             <img src="/logo.svg" alt="PayrooPOS" className="h-14 w-14 rounded-2xl" />
           </Link>
           <h1 className="text-2xl font-bold">Staff Login</h1>
-          <p className="text-sm text-muted-foreground mt-1">For cashiers and staff — POS access</p>
+          <p className="text-sm text-muted-foreground mt-1">Quick access for cashiers and staff</p>
         </div>
 
         <Alert className="bg-blue-50 border-blue-200">
@@ -113,34 +124,23 @@ export default function LoginPage() {
           <CardContent className="pt-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1">
-                <Label htmlFor="storeId">Store ID (4 digits)</Label>
+                <Label htmlFor="storeId">Store ID</Label>
                 <Input
                   id="storeId"
-                  placeholder="e.g. 8807"
+                  placeholder="Enter 4-digit Store ID"
                   value={storeId}
                   onChange={e => setStoreId(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   disabled={loading}
                   autoComplete="off"
                   maxLength={4}
                   inputMode="numeric"
+                  className="text-center text-lg tracking-widest font-mono"
                 />
                 <p className="text-xs text-muted-foreground">Ask your store owner for the Store ID</p>
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  placeholder="e.g. juan"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  disabled={loading}
-                  autoComplete="username"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="pin">PIN (6 digits)</Label>
+                <Label htmlFor="pin">Your PIN</Label>
                 <div className="relative">
                   <Input
                     id="pin"
@@ -152,6 +152,7 @@ export default function LoginPage() {
                     autoComplete="current-password"
                     maxLength={6}
                     inputMode="numeric"
+                    className="text-center text-lg tracking-widest font-mono pr-10"
                   />
                   <button
                     type="button"
@@ -162,6 +163,7 @@ export default function LoginPage() {
                     {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <p className="text-xs text-muted-foreground">Each staff member has their own PIN</p>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>

@@ -242,6 +242,10 @@ export default function DashboardPage() {
                     : <><LogIn className="h-4 w-4" /> Sign In</>
                   }
                 </Button>
+
+                <p className="text-xs text-center text-muted-foreground mt-3">
+                  Forgot your PIN? Go to <Link href="/users" className="text-primary underline">User Management</Link> after logging in to reset it.
+                </p>
               </form>
             </CardContent>
           </Card>

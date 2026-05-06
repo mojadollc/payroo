@@ -172,6 +172,10 @@ export default function LoginPage() {
                   : <><LogIn className="h-4 w-4 mr-2" /> Sign In</>
                 }
               </Button>
+
+              <p className="text-xs text-center text-muted-foreground mt-3">
+                Forgot your PIN? Ask your store owner to reset it in <span className="font-medium">User Management</span>.
+              </p>
             </form>
           </CardContent>
         </Card>

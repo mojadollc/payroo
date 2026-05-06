@@ -46,12 +46,13 @@ const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
   multiUser: "Multi-User",
   exportData: "Export Data",
   marketIntelligence: "Market Intel",
+  delivery: "Delivery",
 }
 
 const DEFAULT_ALLOWED: Partial<SubscriptionFeatures> = {
   pos: true, inventory: true, ewallet: false, reports: false,
   loyalty: false, utang: false, aiRestock: false, multiUser: false,
-  exportData: false, marketIntelligence: false,
+  exportData: false, marketIntelligence: false, delivery: false,
 }
 
 const DEFAULT_PERMISSIONS: SubadminPermissions = {
@@ -284,13 +285,18 @@ function UsersPageContent() {
                     )}
                     {u.role !== "owner" && (can("owner") || (can("subadmin") && u.role === "cashier")) && (
                       <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(u)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(u)} title="Edit user">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(u)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(u)} title="Delete user">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </>
+                    )}
+                    {u.role === "owner" && can("owner") && isCurrentUser && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(u)} title="Edit your PIN">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                     )}
                   </div>
                 </div>

@@ -20,6 +20,7 @@ import { EditProductDialog } from "./edit-product-dialog"
 import { StockAdjustmentDialog } from "./stock-adjustment-dialog"
 import { InventoryHistoryDialog } from "./inventory-history-dialog"
 import { deleteProduct, deleteProductImage } from "@/lib/firebase/services"
+import { DefaultProductImage } from "@/components/ui/default-product-image"
 import type { Product, Category } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
 
@@ -105,9 +106,7 @@ export function ProductList({ products, categories, onUpdate, isLoading }: Produ
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center">
-                  <span className="text-6xl text-muted-foreground">📦</span>
-                </div>
+                <DefaultProductImage />
               )}
               {product.stock <= 10 && (
                 <Badge variant="destructive" className="absolute top-2 right-2">

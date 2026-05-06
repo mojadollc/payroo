@@ -18,6 +18,7 @@ import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 import { useHardwareScanner } from "@/hooks/use-hardware-scanner"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { DefaultProductImage } from "@/components/ui/default-product-image"
 import Link from "next/link"
 
 interface CartItem extends Product {
@@ -628,9 +629,7 @@ export default function POSPage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="flex h-full items-center justify-center text-muted-foreground">
-                              <span className="text-2xl">📦</span>
-                            </div>
+                            <DefaultProductImage />
                           )}
                           {product.stock <= 0 && (
                             <div className="absolute inset-0 bg-background/80 flex items-center justify-center">

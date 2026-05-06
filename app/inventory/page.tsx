@@ -42,6 +42,7 @@ import type { Product, Category } from "@/lib/firebase/types"
 import { AddProductDialog } from "@/components/inventory/add-product-dialog"
 import { EditProductDialog } from "@/components/inventory/edit-product-dialog"
 import { CategoryManager } from "@/components/inventory/category-manager"
+import { DefaultProductImage } from "@/components/ui/default-product-image"
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 
@@ -326,9 +327,7 @@ export default function InventoryPage() {
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
-                    <span className="text-2xl">📦</span>
-                  </div>
+                  <DefaultProductImage />
                 )}
                 {product.stock === 0 && (
                   <div className="absolute inset-0 bg-background/80 flex items-center justify-center">

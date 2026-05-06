@@ -2,15 +2,17 @@
 
 export function DefaultProductImage({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex h-full w-full items-center justify-center bg-gray-100 ${className}`}>
-      <svg viewBox="0 0 120 80" className="w-3/4 max-w-[120px] opacity-40">
-        {/* Payroo logo circle */}
-        <circle cx="60" cy="32" r="18" fill="#9ca3af" />
-        <text x="60" y="38" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#f3f4f6" fontFamily="Arial, sans-serif">P</text>
-        {/* Brand text */}
-        <text x="60" y="60" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#9ca3af" fontFamily="Arial, sans-serif">Payroo</text>
-        <text x="60" y="73" textAnchor="middle" fontSize="8" fill="#d1d5db" fontFamily="Arial, sans-serif">No Image</text>
+    <div className={`flex h-full w-full flex-col items-center justify-center bg-gray-100 gap-1 ${className}`}>
+      <svg viewBox="0 0 64 64" className="w-10 h-10 opacity-40">
+        {/* Basket icon */}
+        <path d="M8 24h48l-4 28H12L8 24z" fill="#9ca3af" />
+        <path d="M8 24l8-14h32l8 14" fill="none" stroke="#6b7280" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 24h48" fill="none" stroke="#6b7280" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="24" cy="56" r="3" fill="#6b7280" />
+        <circle cx="40" cy="56" r="3" fill="#6b7280" />
+        <path d="M24 32v14M32 32v14M40 32v14" fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" />
       </svg>
+      <span className="text-[10px] font-bold text-gray-400 tracking-wide">Payroo</span>
     </div>
   )
 }

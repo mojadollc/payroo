@@ -153,11 +153,11 @@ export default function HomePage() {
         <div className="container mx-auto max-w-5xl">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl font-black text-yellow-400 mb-2">500+</div>
+              <div className="text-4xl font-black text-yellow-400 mb-2">105+</div>
               <div className="text-sm text-slate-400">Active Stores</div>
             </div>
             <div>
-              <div className="text-4xl font-black text-yellow-400 mb-2">₱10M+</div>
+              <div className="text-4xl font-black text-yellow-400 mb-2">₱3M+</div>
               <div className="text-sm text-slate-400">Transactions</div>
             </div>
             <div>

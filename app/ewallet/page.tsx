@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Smartphone, Settings, TrendingUp, History, Wallet, ArrowDownToLine, ArrowUpFromLine, Signal } from "lucide-react"
+import { Smartphone, Settings, TrendingUp, History, Wallet, ArrowDownToLine, ArrowUpFromLine, Signal, Calendar } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TransactionForm } from "@/components/ewallet/transaction-form"
 import { TransactionHistory } from "@/components/ewallet/transaction-history"
 import { CommissionSettingsDialog } from "@/components/ewallet/commission-settings-dialog"
@@ -20,6 +21,7 @@ export default function EWalletPage() {
   const [commissionSettings, setCommissionSettings] = useState<CommissionSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedMonth, setSelectedMonth] = useState<string>("all")
 
   // Check Firebase configuration synchronously on mount
   if (!isFirebaseConfigured) {
@@ -54,19 +56,29 @@ export default function EWalletPage() {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
+    // Filter transactions based on selected month
+    let filteredTransactions = transactions
+    if (selectedMonth !== "all") {
+      const [year, month] = selectedMonth.split("-")
+      filteredTransactions = transactions.filter((t) => {
+        const transDate = t.createdAt.toDate()
+        return transDate.getFullYear() === parseInt(year) && transDate.getMonth() === parseInt(month)
+      })
+    }
+
     const todayTransactions = transactions.filter((t) => {
       const transDate = t.createdAt.toDate()
       return transDate >= today
     })
 
-    const totalProfit = transactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
+    const totalProfit = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
     const todayProfit = todayTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
-    const totalTransactions = transactions.length
+    const totalTransactions = filteredTransactions.length
     const todayTransactionsCount = todayTransactions.length
 
-    const grossCashin = transactions.filter(t => t.type === "cashin").reduce((sum, t) => sum + t.amount, 0)
-    const grossCashout = transactions.filter(t => t.type === "cashout").reduce((sum, t) => sum + t.amount, 0)
-    const grossLoad = transactions.filter(t => t.type === "load").reduce((sum, t) => sum + t.amount, 0)
+    const grossCashin = filteredTransactions.filter(t => t.type === "cashin").reduce((sum, t) => sum + t.amount, 0)
+    const grossCashout = filteredTransactions.filter(t => t.type === "cashout").reduce((sum, t) => sum + t.amount, 0)
+    const grossLoad = filteredTransactions.filter(t => t.type === "load").reduce((sum, t) => sum + t.amount, 0)
 
     return {
       totalProfit,
@@ -81,6 +93,26 @@ export default function EWalletPage() {
 
   const stats = calculateStats()
 
+  // Generate month options from transactions
+  const getMonthOptions = () => {
+    const months = new Set<string>()
+    transactions.forEach((t) => {
+      const date = t.createdAt.toDate()
+      const monthKey = `${date.getFullYear()}-${date.getMonth()}`
+      months.add(monthKey)
+    })
+    return Array.from(months).sort().reverse().map((key) => {
+      const [year, month] = key.split("-")
+      const date = new Date(parseInt(year), parseInt(month))
+      return {
+        value: key,
+        label: date.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      }
+    })
+  }
+
+  const monthOptions = getMonthOptions()
+
   return (
     <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
@@ -91,6 +123,20 @@ export default function EWalletPage() {
                 <p className="text-sm text-muted-foreground mt-0.5">GCash & Maya services</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <Calendar className="h-3.5 w-3.5 mr-2" />
+                    <SelectValue placeholder="Filter by month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    {monthOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button onClick={() => setShowSettings(true)} variant="outline" size="sm" className="gap-1.5">
                   <Settings className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Settings</span>
@@ -108,7 +154,7 @@ export default function EWalletPage() {
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <TrendingUp className="h-3 w-3" />
-                  Total Profit
+                  {selectedMonth === "all" ? "Total Profit" : "Monthly Profit"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
@@ -132,7 +178,7 @@ export default function EWalletPage() {
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <ArrowDownToLine className="h-3 w-3" />
-                  Gross Cash-In
+                  {selectedMonth === "all" ? "Gross Cash-In" : "Monthly Cash-In"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
@@ -144,7 +190,7 @@ export default function EWalletPage() {
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <ArrowUpFromLine className="h-3 w-3" />
-                  Gross Cash-Out
+                  {selectedMonth === "all" ? "Gross Cash-Out" : "Monthly Cash-Out"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
@@ -156,7 +202,7 @@ export default function EWalletPage() {
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <Signal className="h-3 w-3" />
-                  Gross Load
+                  {selectedMonth === "all" ? "Gross Load" : "Monthly Load"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
@@ -168,7 +214,7 @@ export default function EWalletPage() {
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <History className="h-3 w-3" />
-                  Total Transactions
+                  {selectedMonth === "all" ? "Total Transactions" : "Monthly Transactions"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">

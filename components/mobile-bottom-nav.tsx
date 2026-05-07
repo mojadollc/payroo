@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import {
   Store, Package, Smartphone, TrendingUp, HandCoins, Star,
-  Brain, BarChart2, Users, Settings, MoreHorizontal, X,
+  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
@@ -25,10 +25,12 @@ const ALL_ITEMS: NavItem[] = [
   { href: "/inventory",           label: "Inventory",    icon: Package,    feature: "inventory",          ownerOnly: true },
   { href: "/ewallet",             label: "E-Wallet",     icon: Smartphone, feature: "ewallet",            ownerOnly: true },
   { href: "/utang",               label: "Utang",        icon: HandCoins,  feature: "utang",              ownerOnly: true },
+  { href: "/elista",              label: "e-Lista",      icon: FileText,                                  ownerOnly: true },
   { href: "/loyalty",             label: "Loyalty",      icon: Star,       feature: "loyalty",            ownerOnly: true },
   { href: "/restock",             label: "AI Restock",   icon: Brain,      feature: "aiRestock",          ownerOnly: true },
   { href: "/reports",             label: "Reports",      icon: TrendingUp, feature: "reports" },
   { href: "/market-intelligence", label: "Market",       icon: BarChart2,  feature: "marketIntelligence", ownerOnly: true },
+  { href: "/delivery-manage",     label: "Delivery",     icon: Truck,      feature: "delivery",           ownerOnly: true },
   { href: "/users",               label: "Users",        icon: Users,      feature: "multiUser", permission: "manageUsers",     ownerOnly: true },
   { href: "/settings",            label: "Settings",     icon: Settings,   permission: "manageSettings",  ownerOnly: true },
 ]
@@ -44,9 +46,12 @@ export function MobileBottomNav() {
 
   if (!user || authLoading) return null
 
+  const isOwner = user?.role === "owner"
   const visibleItems = ALL_ITEMS.filter(item => {
     if (!user) return false
     if (isCashier && item.ownerOnly) return false
+    // Owner bypasses ALL subscription feature checks
+    if (isOwner) return true
     if (item.feature) {
       if (item.feature === "pos") return true
       if (!isActive || !features[item.feature] || !hasFeature(item.feature)) return false

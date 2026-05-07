@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Store, Package, Smartphone, TrendingUp, Menu, Settings, Download,
-  HandCoins, Star, Brain, Users, LogOut, BarChart2, RefreshCw,
+  HandCoins, Star, Brain, Users, LogOut, BarChart2, RefreshCw, Truck, FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -34,10 +34,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/inventory",           label: "Inventory",     icon: Package,    feature: "inventory",          ownerOnly: true },
   { href: "/ewallet",             label: "E-Wallet",      icon: Smartphone, feature: "ewallet",            ownerOnly: true },
   { href: "/utang",               label: "Utang",         icon: HandCoins,  feature: "utang",              ownerOnly: true },
+  { href: "/elista",              label: "e-Lista",       icon: FileText,                                  ownerOnly: true },
   { href: "/loyalty",             label: "Loyalty",       icon: Star,       feature: "loyalty",            ownerOnly: true },
   { href: "/restock",             label: "AI Restock",    icon: Brain,      feature: "aiRestock",          ownerOnly: true },
   { href: "/reports",             label: "Reports",       icon: TrendingUp, feature: "reports" },
   { href: "/market-intelligence", label: "Market Intel",  icon: BarChart2,  feature: "marketIntelligence", ownerOnly: true },
+  { href: "/delivery-manage",     label: "Delivery",      icon: Truck,      feature: "delivery",           ownerOnly: true },
   { href: "/users",               label: "Users",         icon: Users,      feature: "multiUser", permission: "manageUsers",     ownerOnly: true },
   { href: "/settings",            label: "Settings",      icon: Settings,   permission: "manageSettings",  ownerOnly: true },
 ]
@@ -99,10 +101,13 @@ export function Navbar() {
   }
 
   // Build visible nav items based on role + subscription + user-level feature/permission access
+  const isOwner = user?.role === "owner"
   const visibleItems = NAV_ITEMS.filter(item => {
     if (!user) return false
     // Cashier can ONLY see POS and Reports
     if (isCashier && item.ownerOnly) return false
+    // Owner bypasses ALL subscription feature checks — always sees every menu
+    if (isOwner) return true
     // Check subscription feature AND user-level feature access (subadmin restrictions)
     if (item.feature) {
       if (item.feature === "pos") return true // POS always visible
@@ -128,120 +133,114 @@ export function Navbar() {
   // Don't render navbar if not logged in
   if (!user && !authLoading) return null
 
-  const NavLinks = ({ mobile = false }: { mobile?: boolean }) => (
-    <>
-      {visibleItems.map((item) => {
-        const Icon = item.icon
-        const active = pathname === item.href
-        return (
-          <Link key={item.href} href={item.href} onClick={() => mobile && setMobileOpen(false)}>
-            <Button variant={active ? "default" : "ghost"} className={mobile ? "w-full justify-start gap-2" : "gap-2"}>
-              <Icon className="h-4 w-4" /> {item.label}
-            </Button>
-          </Link>
-        )
-      })}
-    </>
-  )
-
   return (
     <nav className="border-b bg-card sticky top-0 z-50 hidden md:block">
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between gap-4">
+        <div className="flex h-14 items-center gap-3">
+          {/* Logo */}
           <Link href="/pos" className="flex items-center gap-2 shrink-0">
-            <img src="/logo.svg" alt="Logo" className="h-8 w-8 rounded" />
+            <img src="/logo.svg" alt="Logo" className="h-7 w-7 rounded" />
             <div className="flex flex-col leading-tight">
-              <span className="font-bold text-base md:text-xl">{storeName}</span>
-              <span className="text-[10px] text-muted-foreground tracking-wide hidden md:block">
-                Store ID: {typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") ?? "" : ""}
+              <span className="font-bold text-sm">{storeName}</span>
+              <span className="text-[9px] text-muted-foreground tracking-wide">
+                {typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") ?? "" : ""}
               </span>
             </div>
           </Link>
 
-          {/* Desktop */}
-          <div className="hidden items-center gap-1 md:flex flex-1 justify-end flex-wrap">
-            <NavLinks />
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-muted-foreground hover:text-primary" 
-              onClick={refresh}
-              disabled={isRefreshing}
-              title="Refresh app"
+          {/* Scrollable nav items */}
+          <div className="flex-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-0.5 min-w-max">
+              {visibleItems.map((item) => {
+                const Icon = item.icon
+                const active = pathname === item.href
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <Button variant={active ? "default" : "ghost"} size="sm" className="gap-1.5 h-8 px-2.5 text-xs shrink-0">
+                      <Icon className="h-3.5 w-3.5" /> {item.label}
+                    </Button>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
+              onClick={refresh} disabled={isRefreshing} title="Refresh app"
             >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
             {installPrompt && (
-              <Button variant="outline" className="gap-2 border-primary text-primary" onClick={handleInstall}>
-                <Download className="h-4 w-4" /> Install
+              <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs border-primary text-primary" onClick={handleInstall}>
+                <Download className="h-3.5 w-3.5" /> Install
               </Button>
             )}
             {!authLoading && user && (
-              <div className="flex items-center gap-2 ml-2 pl-2 border-l">
+              <div className="flex items-center gap-1.5 ml-1 pl-1.5 border-l">
                 <div className="text-right hidden lg:block">
-                  <p className="text-xs font-semibold leading-none">{user.name}</p>
+                  <p className="text-[11px] font-semibold leading-none">{user.name}</p>
                   <div className="flex items-center gap-1 justify-end mt-0.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${ROLE_BADGE[user.role]}`}>
-                      {user.role}
-                    </span>
-                    {tier && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase ${TIER_BADGE[tier] || TIER_BADGE.basic}`}>
-                        {tier}
-                      </span>
-                    )}
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium capitalize ${ROLE_BADGE[user.role]}`}>{user.role}</span>
+                    {tier && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium uppercase ${TIER_BADGE[tier] || TIER_BADGE.basic}`}>{tier}</span>}
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={handleLogout} title="Logout">
-                  <LogOut className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={handleLogout} title="Logout">
+                  <LogOut className="h-3.5 w-3.5" />
                 </Button>
               </div>
             )}
           </div>
-
-          {/* Mobile */}
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild className="md:hidden">
-              <Button variant="outline" size="icon"><Menu className="h-5 w-5" /></Button>
-            </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle className="text-left">{storeName}</SheetTitle>
-                {user && (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${ROLE_BADGE[user.role]}`}>{user.role}</span>
-                    {tier && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium uppercase ${TIER_BADGE[tier] || TIER_BADGE.basic}`}>{tier}</span>
-                    )}
-                    <span className="text-sm font-medium">{user.name}</span>
-                  </div>
-                )}
-              </SheetHeader>
-              <div className="mt-6 flex flex-col gap-2">
-                <NavLinks mobile />
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start gap-2" 
-                  onClick={refresh}
-                  disabled={isRefreshing}
-                >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} /> 
-                  {isRefreshing ? 'Refreshing...' : 'Refresh App'}
-                </Button>
-                {installPrompt && (
-                  <Button variant="outline" className="w-full justify-start gap-2 border-primary text-primary" onClick={handleInstall}>
-                    <Download className="h-4 w-4" /> Install App
-                  </Button>
-                )}
-                <div className="border-t pt-2 mt-2">
-                  <Button variant="ghost" className="w-full justify-start gap-2 text-destructive" onClick={() => { handleLogout(); setMobileOpen(false) }}>
-                    <LogOut className="h-4 w-4" /> Logout
-                  </Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
         </div>
       </div>
+
+      {/* Mobile sheet — unchanged */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild className="md:hidden">
+          <Button variant="outline" size="icon"><Menu className="h-5 w-5" /></Button>
+        </SheetTrigger>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className="text-left">{storeName}</SheetTitle>
+            {user && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${ROLE_BADGE[user.role]}`}>{user.role}</span>
+                {tier && <span className={`text-xs px-2 py-0.5 rounded-full font-medium uppercase ${TIER_BADGE[tier] || TIER_BADGE.basic}`}>{tier}</span>}
+                <span className="text-sm font-medium">{user.name}</span>
+              </div>
+            )}
+          </SheetHeader>
+          <div className="mt-6 flex flex-col gap-2">
+            {visibleItems.map((item) => {
+              const Icon = item.icon
+              const active = pathname === item.href
+              return (
+                <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
+                  <Button variant={active ? "default" : "ghost"} className="w-full justify-start gap-2">
+                    <Icon className="h-4 w-4" /> {item.label}
+                  </Button>
+                </Link>
+              )
+            })}
+            <Button variant="ghost" className="w-full justify-start gap-2" onClick={refresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh App'}
+            </Button>
+            {installPrompt && (
+              <Button variant="outline" className="w-full justify-start gap-2 border-primary text-primary" onClick={handleInstall}>
+                <Download className="h-4 w-4" /> Install App
+              </Button>
+            )}
+            <div className="border-t pt-2 mt-2">
+              <Button variant="ghost" className="w-full justify-start gap-2 text-destructive" onClick={() => { handleLogout(); setMobileOpen(false) }}>
+                <LogOut className="h-4 w-4" /> Logout
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </nav>
   )
 }

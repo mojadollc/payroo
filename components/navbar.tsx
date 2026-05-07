@@ -6,9 +6,18 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Store, Package, Smartphone, TrendingUp, Menu, Settings, Download,
   HandCoins, Star, Brain, Users, LogOut, BarChart2, RefreshCw, Truck, FileText,
+  ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { getStoreSettings } from "@/lib/firebase/services"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
@@ -24,24 +33,46 @@ interface NavItem {
   label: string
   icon: React.ElementType
   feature?: keyof SubscriptionFeatures
-  permission?: keyof SubadminPermissions  // For management pages (Users, Settings)
-  ownerOnly?: boolean // true = only owner/subadmin can see, cashier cannot
+  permission?: keyof SubadminPermissions
+  ownerOnly?: boolean
 }
 
-// All store nav items — visibility controlled by role + subscription plan
-const NAV_ITEMS: NavItem[] = [
-  { href: "/pos",                 label: "POS",           icon: Store,      feature: "pos" },
-  { href: "/inventory",           label: "Inventory",     icon: Package,    feature: "inventory",          ownerOnly: true },
-  { href: "/ewallet",             label: "E-Wallet",      icon: Smartphone, feature: "ewallet",            ownerOnly: true },
-  { href: "/utang",               label: "Utang",         icon: HandCoins,  feature: "utang",              ownerOnly: true },
-  { href: "/elista",              label: "e-Lista",       icon: FileText,                                  ownerOnly: true },
-  { href: "/loyalty",             label: "Loyalty",       icon: Star,       feature: "loyalty",            ownerOnly: true },
-  { href: "/restock",             label: "AI Restock",    icon: Brain,      feature: "aiRestock",          ownerOnly: true },
-  { href: "/reports",             label: "Reports",       icon: TrendingUp, feature: "reports" },
-  { href: "/market-intelligence", label: "Market Intel",  icon: BarChart2,  feature: "marketIntelligence", ownerOnly: true },
-  { href: "/delivery-manage",     label: "Delivery",      icon: Truck,      feature: "delivery",           ownerOnly: true },
-  { href: "/users",               label: "Users",         icon: Users,      feature: "multiUser", permission: "manageUsers",     ownerOnly: true },
-  { href: "/settings",            label: "Settings",      icon: Settings,   permission: "manageSettings",  ownerOnly: true },
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+// Primary nav items (always visible in main bar)
+const PRIMARY_NAV: NavItem[] = [
+  { href: "/pos", label: "POS", icon: Store, feature: "pos" },
+  { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
+  { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
+]
+
+// Grouped nav items (in dropdown menus)
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Finance",
+    items: [
+      { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
+      { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/elista", label: "e-Lista", icon: FileText, ownerOnly: true },
+      { href: "/restock", label: "AI Restock", icon: Brain, feature: "aiRestock", ownerOnly: true },
+      { href: "/delivery-manage", label: "Delivery", icon: Truck, feature: "delivery", ownerOnly: true },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      { href: "/loyalty", label: "Loyalty", icon: Star, feature: "loyalty", ownerOnly: true },
+      { href: "/market-intelligence", label: "Market Intel", icon: BarChart2, feature: "marketIntelligence", ownerOnly: true },
+    ],
+  },
 ]
 
 export function Navbar() {
@@ -100,23 +131,25 @@ export function Navbar() {
     router.push("/")
   }
 
-  // Build visible nav items based on role + subscription + user-level feature/permission access
   const isOwner = user?.role === "owner"
-  const visibleItems = NAV_ITEMS.filter(item => {
+
+  const filterItems = (items: NavItem[]) => items.filter(item => {
     if (!user) return false
-    // Cashier can ONLY see POS and Reports
     if (isCashier && item.ownerOnly) return false
-    // Owner bypasses ALL subscription feature checks — always sees every menu
     if (isOwner) return true
-    // Check subscription feature AND user-level feature access (subadmin restrictions)
     if (item.feature) {
-      if (item.feature === "pos") return true // POS always visible
+      if (item.feature === "pos") return true
       if (!isActive || !features[item.feature] || !hasFeature(item.feature)) return false
     }
-    // Check management permissions (Users, Settings)
     if (item.permission && !hasPermission(item.permission)) return false
     return true
   })
+
+  const visiblePrimary = filterItems(PRIMARY_NAV)
+  const visibleGroups = NAV_GROUPS.map(group => ({
+    ...group,
+    items: filterItems(group.items),
+  })).filter(group => group.items.length > 0)
 
   const TIER_BADGE: Record<string, string> = {
     basic:      "bg-slate-100 text-slate-600",
@@ -148,25 +181,83 @@ export function Navbar() {
             </div>
           </Link>
 
-          {/* Scrollable nav items */}
-          <div className="flex-1 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-0.5 min-w-max">
-              {visibleItems.map((item) => {
-                const Icon = item.icon
-                const active = pathname === item.href
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button variant={active ? "default" : "ghost"} size="sm" className="gap-1.5 h-8 px-2.5 text-xs shrink-0">
-                      <Icon className="h-3.5 w-3.5" /> {item.label}
+          {/* Primary nav items */}
+          <div className="flex items-center gap-0.5">
+            {visiblePrimary.map((item) => {
+              const Icon = item.icon
+              const active = pathname === item.href
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button variant={active ? "default" : "ghost"} size="sm" className="gap-1.5 h-8 px-2.5 text-xs shrink-0">
+                    <Icon className="h-3.5 w-3.5" /> {item.label}
+                  </Button>
+                </Link>
+              )
+            })}
+
+            {/* Grouped nav dropdowns */}
+            {visibleGroups.map((group) => {
+              const hasActive = group.items.some(item => pathname === item.href)
+              return (
+                <DropdownMenu key={group.label}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant={hasActive ? "default" : "ghost"} size="sm" className="gap-1 h-8 px-2.5 text-xs shrink-0">
+                      {group.label} <ChevronDown className="h-3 w-3" />
                     </Button>
-                  </Link>
-                )
-              })}
-            </div>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {group.items.map((item) => {
+                      const Icon = item.icon
+                      const active = pathname === item.href
+                      return (
+                        <DropdownMenuItem key={item.href} asChild>
+                          <Link href={item.href} className={`flex items-center gap-2 cursor-pointer ${active ? 'bg-accent' : ''}`}>
+                            <Icon className="h-4 w-4" /> {item.label}
+                          </Link>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            })}
           </div>
 
-          {/* Right actions */}
+          <div className="flex-1" />
+
+          {/* Management & Actions */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Settings & Users dropdown */}
+            {(hasPermission("manageSettings") || hasPermission("manageUsers")) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1 h-8 px-2.5 text-xs shrink-0">
+                    <Settings className="h-3.5 w-3.5" /> Manage
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Management</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {hasPermission("manageUsers") && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/users" className="flex items-center gap-2 cursor-pointer">
+                        <Users className="h-4 w-4" /> Users
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {hasPermission("manageSettings") && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
+                        <Settings className="h-4 w-4" /> Settings
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <Button
               variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary"
               onClick={refresh} disabled={isRefreshing} title="Refresh app"
@@ -213,7 +304,8 @@ export function Navbar() {
             )}
           </SheetHeader>
           <div className="mt-6 flex flex-col gap-2">
-            {visibleItems.map((item) => {
+            {/* Primary items */}
+            {visiblePrimary.map((item) => {
               const Icon = item.icon
               const active = pathname === item.href
               return (
@@ -224,6 +316,45 @@ export function Navbar() {
                 </Link>
               )
             })}
+            
+            {/* Grouped items */}
+            {visibleGroups.map((group) => (
+              <div key={group.label} className="mt-2">
+                <p className="text-xs font-semibold text-muted-foreground px-2 mb-1">{group.label}</p>
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  const active = pathname === item.href
+                  return (
+                    <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
+                      <Button variant={active ? "default" : "ghost"} className="w-full justify-start gap-2">
+                        <Icon className="h-4 w-4" /> {item.label}
+                      </Button>
+                    </Link>
+                  )
+                })}
+              </div>
+            ))}
+            
+            {/* Management */}
+            {(hasPermission("manageSettings") || hasPermission("manageUsers")) && (
+              <div className="mt-2">
+                <p className="text-xs font-semibold text-muted-foreground px-2 mb-1">Management</p>
+                {hasPermission("manageUsers") && (
+                  <Link href="/users" onClick={() => setMobileOpen(false)}>
+                    <Button variant={pathname === "/users" ? "default" : "ghost"} className="w-full justify-start gap-2">
+                      <Users className="h-4 w-4" /> Users
+                    </Button>
+                  </Link>
+                )}
+                {hasPermission("manageSettings") && (
+                  <Link href="/settings" onClick={() => setMobileOpen(false)}>
+                    <Button variant={pathname === "/settings" ? "default" : "ghost"} className="w-full justify-start gap-2">
+                      <Settings className="h-4 w-4" /> Settings
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            )}
             <Button variant="ghost" className="w-full justify-start gap-2" onClick={refresh} disabled={isRefreshing}>
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Refreshing...' : 'Refresh App'}

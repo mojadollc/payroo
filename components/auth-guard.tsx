@@ -14,6 +14,9 @@ import type { SubscriptionFeatures } from "@/lib/firebase/types"
 const PUBLIC_ROUTES = ["/", "/subscription", "/login", "/dashboard", "/payment/success", "/payment/failed", "/affiliate"]
 const SUPERADMIN_ROUTES = ["/management", "/setup"]
 
+// Prefix-based public routes (customer-facing delivery pages)
+const PUBLIC_PREFIXES = ["/delivery"]
+
 // Maps route → required subscription feature.
 // Owner role bypasses ALL feature checks — only subadmin/cashier are gated.
 const ROUTE_FEATURE_MAP: Record<string, keyof SubscriptionFeatures> = {
@@ -24,6 +27,7 @@ const ROUTE_FEATURE_MAP: Record<string, keyof SubscriptionFeatures> = {
   "/utang":              "utang",
   "/restock":            "aiRestock",
   "/market-intelligence":"marketIntelligence",
+  "/delivery-manage":    "delivery",
   "/users":              "multiUser",
 }
 
@@ -44,7 +48,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, hasPermission } = useAuth()
   const { isActive, features, loading: subLoading } = useSubscription()
 
-  const isPublic = PUBLIC_ROUTES.includes(pathname)
+  const isPublic = PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
   const isSuperadmin = SUPERADMIN_ROUTES.includes(pathname)
 
   // Track which path has already been validated so background Firestore

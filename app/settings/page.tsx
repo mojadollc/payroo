@@ -33,6 +33,7 @@ const FEATURE_INFO: Record<keyof SubscriptionFeatures, { label: string; desc: st
   multiUser: { label: "Multi-User", desc: "Staff & cashier accounts" },
   exportData: { label: "Export", desc: "Download reports as CSV" },
   marketIntelligence: { label: "Market Intel", desc: "Regional sales insights" },
+  delivery: { label: "Delivery", desc: "Online delivery store" },
 }
 
 const TIER_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {

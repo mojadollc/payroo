@@ -29,6 +29,7 @@ const DEFAULT_FEATURES: SubscriptionFeatures = {
   multiUser: false,
   exportData: false,
   marketIntelligence: false,
+  delivery: false,
 }
 
 const LS_KEY = "pos_subscription"
@@ -39,14 +40,22 @@ function readCache(): SubscriptionState | null {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     const endDate = parsed.endDate ? new Date(parsed.endDate) : null
-    // Re-evaluate expiry against current time — cache may be stale
     const expired = endDate ? endDate < new Date() : false
     const isActive = (parsed.isActive ?? false) && !expired
+    const cachedFeatures = parsed.features ?? {}
+    // Invalidate cache if feature keys don't match current schema
+    // (e.g. new features like 'delivery' were added)
+    const expectedKeys = Object.keys(DEFAULT_FEATURES)
+    const cachedKeys = Object.keys(cachedFeatures)
+    if (expectedKeys.length !== cachedKeys.length || !expectedKeys.every(k => k in cachedFeatures)) {
+      localStorage.removeItem(LS_KEY)
+      return null
+    }
     return {
       ...parsed,
       loading: false,
       isActive,
-      features: isActive ? { ...DEFAULT_FEATURES, ...(parsed.features ?? {}) } : DEFAULT_FEATURES,
+      features: isActive ? { ...DEFAULT_FEATURES, ...cachedFeatures } : DEFAULT_FEATURES,
       endDate,
     }
   } catch {
@@ -97,8 +106,12 @@ export function useSubscription(): SubscriptionState {
       const expired = endDate ? endDate < new Date() : false
       const active = isPaid && !expired
 
+      // Merge Firestore features on top of defaults so newly added feature keys
+      // (e.g. delivery) that don't exist yet in the stored doc default to false
+      // instead of being undefined (which would show as "locked").
+      const storedFeatures = data.features ?? {}
       const freshFeatures: SubscriptionFeatures = active
-        ? { ...DEFAULT_FEATURES, ...(data.features ?? {}) }
+        ? { ...DEFAULT_FEATURES, ...storedFeatures }
         : DEFAULT_FEATURES
 
       const newState: SubscriptionState = {
@@ -116,9 +129,10 @@ export function useSubscription(): SubscriptionState {
 
       // Only update state if something actually changed to avoid re-render loops
       setState(prev => {
+        if (prev.loading) return newState  // always update on first load
         const prevKey = JSON.stringify({ isActive: prev.isActive, tier: prev.tier, features: prev.features, storeName: prev.storeName, endDate: prev.endDate?.toISOString() })
         const nextKey = JSON.stringify({ isActive: newState.isActive, tier: newState.tier, features: newState.features, storeName: newState.storeName, endDate: endDate?.toISOString() })
-        if (prevKey === nextKey && !prev.loading) return prev  // no change — return same ref, no re-render
+        if (prevKey === nextKey) return prev
         return newState
       })
 

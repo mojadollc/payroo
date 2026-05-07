@@ -27,6 +27,7 @@ const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
   multiUser: "Multi-User Access",
   exportData: "Export Data",
   marketIntelligence: "Market Intelligence",
+  delivery: "Online Delivery",
 }
 
 const TIER_ICONS: Record<SubscriptionTier, React.ReactNode> = {

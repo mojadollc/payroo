@@ -3,8 +3,8 @@
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import {
-  Store, Package, Smartphone, TrendingUp, HandCoins, Star,
-  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText,
+  Store, Package, TrendingUp, HandCoins, Star,
+  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
@@ -20,23 +20,50 @@ interface NavItem {
   ownerOnly?: boolean
 }
 
-const ALL_ITEMS: NavItem[] = [
-  { href: "/pos",                 label: "POS",          icon: Store,      feature: "pos" },
-  { href: "/inventory",           label: "Inventory",    icon: Package,    feature: "inventory",          ownerOnly: true },
-  { href: "/ewallet",             label: "E-Wallet",     icon: Smartphone, feature: "ewallet",            ownerOnly: true },
-  { href: "/utang",               label: "Utang",        icon: HandCoins,  feature: "utang",              ownerOnly: true },
-  { href: "/elista",              label: "e-Lista",      icon: FileText,                                  ownerOnly: true },
-  { href: "/loyalty",             label: "Loyalty",      icon: Star,       feature: "loyalty",            ownerOnly: true },
-  { href: "/restock",             label: "AI Restock",   icon: Brain,      feature: "aiRestock",          ownerOnly: true },
-  { href: "/reports",             label: "Reports",      icon: TrendingUp, feature: "reports" },
-  { href: "/market-intelligence", label: "Market",       icon: BarChart2,  feature: "marketIntelligence", ownerOnly: true },
-  { href: "/delivery-manage",     label: "Delivery",     icon: Truck,      feature: "delivery",           ownerOnly: true },
-  { href: "/users",               label: "Users",        icon: Users,      feature: "multiUser", permission: "manageUsers",     ownerOnly: true },
-  { href: "/settings",            label: "Settings",     icon: Settings,   permission: "manageSettings",  ownerOnly: true },
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+// Primary tabs (always in bottom bar)
+const PRIMARY_TABS: NavItem[] = [
+  { href: "/pos", label: "POS", icon: Store, feature: "pos" },
+  { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
+  { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
 ]
 
-// Max tabs shown in bottom bar (rest go into "More" sheet)
-const MAX_TABS = 4
+// Grouped items (in "More" sheet)
+const MORE_GROUPS: NavGroup[] = [
+  {
+    label: "Finance",
+    items: [
+      { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
+      { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/elista", label: "e-Lista", icon: FileText, ownerOnly: true },
+      { href: "/restock", label: "AI Restock", icon: Brain, feature: "aiRestock", ownerOnly: true },
+      { href: "/delivery-manage", label: "Delivery", icon: Truck, feature: "delivery", ownerOnly: true },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
+      { href: "/loyalty", label: "Loyalty", icon: Star, feature: "loyalty", ownerOnly: true },
+      { href: "/market-intelligence", label: "Market Intel", icon: BarChart2, feature: "marketIntelligence", ownerOnly: true },
+    ],
+  },
+  {
+    label: "Management",
+    items: [
+      { href: "/users", label: "Users", icon: Users, feature: "multiUser", permission: "manageUsers", ownerOnly: true },
+      { href: "/settings", label: "Settings", icon: Settings, permission: "manageSettings", ownerOnly: true },
+    ],
+  },
+]
 
 export function MobileBottomNav() {
   const pathname = usePathname()
@@ -47,10 +74,10 @@ export function MobileBottomNav() {
   if (!user || authLoading) return null
 
   const isOwner = user?.role === "owner"
-  const visibleItems = ALL_ITEMS.filter(item => {
+
+  const filterItems = (items: NavItem[]) => items.filter(item => {
     if (!user) return false
     if (isCashier && item.ownerOnly) return false
-    // Owner bypasses ALL subscription feature checks
     if (isOwner) return true
     if (item.feature) {
       if (item.feature === "pos") return true
@@ -60,16 +87,20 @@ export function MobileBottomNav() {
     return true
   })
 
-  const primaryTabs = visibleItems.slice(0, MAX_TABS)
-  const overflowTabs = visibleItems.slice(MAX_TABS)
-  const hasMore = overflowTabs.length > 0
+  const visiblePrimary = filterItems(PRIMARY_TABS)
+  const visibleGroups = MORE_GROUPS.map(group => ({
+    ...group,
+    items: filterItems(group.items),
+  })).filter(group => group.items.length > 0)
+
+  const hasMoreItems = visibleGroups.some(g => g.items.length > 0)
 
   return (
     <>
       {/* Bottom nav bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card border-t safe-area-bottom">
         <div className="flex items-stretch justify-around">
-          {primaryTabs.map(item => {
+          {visiblePrimary.map(item => {
             const Icon = item.icon
             const active = pathname === item.href
             return (
@@ -85,11 +116,11 @@ export function MobileBottomNav() {
               </Link>
             )
           })}
-          {hasMore && (
+          {hasMoreItems && (
             <button
               onClick={() => setMoreOpen(true)}
               className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 min-h-[56px] active:scale-95 transition-transform ${
-                overflowTabs.some(i => pathname === i.href) ? "text-primary" : "text-muted-foreground"
+                visibleGroups.some(g => g.items.some(i => pathname === i.href)) ? "text-primary" : "text-muted-foreground"
               }`}
             >
               <MoreHorizontal className="h-5 w-5" />
@@ -103,31 +134,38 @@ export function MobileBottomNav() {
       {moreOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl safe-area-bottom animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <span className="font-semibold text-sm">More</span>
+          <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl safe-area-bottom animate-in slide-in-from-bottom duration-200 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 sticky top-0 bg-background border-b">
+              <span className="font-semibold text-sm">More Features</span>
               <button onClick={() => setMoreOpen(false)} className="p-1 rounded-full hover:bg-muted">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-1 px-3 pb-4">
-              {overflowTabs.map(item => {
-                const Icon = item.icon
-                const active = pathname === item.href
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMoreOpen(false)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-xl active:scale-95 transition-transform ${
-                      active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <Icon className="h-6 w-6 mb-1" />
-                    <span className="text-[11px] font-medium">{item.label}</span>
-                  </Link>
-                )
-              })}
+            <div className="px-3 pb-4">
+              {visibleGroups.map((group, idx) => (
+                <div key={group.label} className={idx > 0 ? "mt-4" : "mt-2"}>
+                  <p className="text-xs font-semibold text-muted-foreground px-2 mb-2">{group.label}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {group.items.map(item => {
+                      const Icon = item.icon
+                      const active = pathname === item.href
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMoreOpen(false)}
+                          className={`flex flex-col items-center justify-center py-3 rounded-xl active:scale-95 transition-transform ${
+                            active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          <Icon className="h-6 w-6 mb-1" />
+                          <span className="text-[11px] font-medium text-center">{item.label}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

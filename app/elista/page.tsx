@@ -42,8 +42,8 @@ export default function EListaPage() {
   const [items, setItems] = useState<ListaItem[]>([{ name: "", amount: undefined, notes: "" }])
 
   useEffect(() => {
-    if (!user) return
-    const q = query(collection(db, "elistas"), where("userId", "==", user.uid))
+    if (!user?.id) return
+    const q = query(collection(db, "elistas"), where("userId", "==", user.id))
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lista))
       setListas(data.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()))
@@ -71,12 +71,17 @@ export default function EListaPage() {
   }
 
   const handleCreate = async () => {
-    if (!user || !title.trim()) {
-      toast({ title: "Error", description: "Title is required", variant: "destructive" })
+    if (!user?.id || !title.trim()) {
+      toast({ title: "Error", description: !user?.id ? "Please sign in" : "Title is required", variant: "destructive" })
       return
     }
 
-    const validItems = items.filter(item => item.name.trim())
+    const validItems = items.filter(item => item.name.trim()).map(item => ({
+      name: item.name,
+      amount: item.amount || null,
+      notes: item.notes || null,
+    }))
+    
     if (validItems.length === 0) {
       toast({ title: "Error", description: "Add at least one item", variant: "destructive" })
       return
@@ -86,7 +91,7 @@ export default function EListaPage() {
       await addDoc(collection(db, "elistas"), {
         title: title.trim(),
         items: validItems,
-        userId: user.uid,
+        userId: user.id,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
@@ -102,7 +107,12 @@ export default function EListaPage() {
   const handleUpdate = async () => {
     if (!editingLista?.id || !title.trim()) return
 
-    const validItems = items.filter(item => item.name.trim())
+    const validItems = items.filter(item => item.name.trim()).map(item => ({
+      name: item.name,
+      amount: item.amount || null,
+      notes: item.notes || null,
+    }))
+    
     if (validItems.length === 0) {
       toast({ title: "Error", description: "Add at least one item", variant: "destructive" })
       return
@@ -250,8 +260,21 @@ export default function EListaPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
+                    {/* Item preview */}
+                    <div className="text-sm text-muted-foreground">
+                      <span className="font-medium">Items: </span>
+                      {lista.items.slice(0, 3).map((item, idx) => (
+                        <span key={idx}>
+                          {item.name}
+                          {idx < Math.min(2, lista.items.length - 1) ? ", " : ""}
+                        </span>
+                      ))}
+                      {lista.items.length > 3 && (
+                        <span className="text-primary font-medium"> +{lista.items.length - 3} more...</span>
+                      )}
+                    </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Items:</span>
+                      <span className="text-muted-foreground">Total Items:</span>
                       <span className="font-semibold">{lista.items.length}</span>
                     </div>
                     {total > 0 && (
@@ -291,9 +314,6 @@ export default function EListaPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Items</Label>
-                <Button size="sm" variant="outline" onClick={handleAddItem}>
-                  <Plus className="h-3 w-3 mr-1" /> Add Item
-                </Button>
               </div>
 
               {items.map((item, index) => (
@@ -328,6 +348,15 @@ export default function EListaPage() {
                   </div>
                 </Card>
               ))}
+
+              <Button 
+                type="button"
+                variant="outline" 
+                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-yellow-500" 
+                onClick={handleAddItem}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add Item
+              </Button>
             </div>
 
             {calculateTotal(items) > 0 && (

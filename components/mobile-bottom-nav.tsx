@@ -28,6 +28,7 @@ interface NavGroup {
 // Primary tabs (always in bottom bar)
 const PRIMARY_TABS: NavItem[] = [
   { href: "/pos", label: "POS", icon: Store, feature: "pos" },
+  { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
   { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
   { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
 ]
@@ -37,7 +38,6 @@ const MORE_GROUPS: NavGroup[] = [
   {
     label: "Finance",
     items: [
-      { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
     ],
   },

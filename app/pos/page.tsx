@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ShoppingCart, Barcode, Trash2, X, Usb } from "lucide-react"
+import { ShoppingCart, Barcode, Trash2, X, Usb, Plus, Minus, Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner"
 import { CheckoutDialog } from "@/components/pos/checkout-dialog"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
+import { FloatingActionButton } from "@/components/ui/floating-action-button"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { getProductByBarcode, getProducts, onProductsSnapshot } from "@/lib/firebase/services"
 import type { Product } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
@@ -479,29 +482,152 @@ export default function POSPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-        <PWAInstallPrompt />
-        <div className="container mx-auto px-4 py-8">
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl font-semibold">POS</h1>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <p className="text-sm text-muted-foreground">{cfg.emoji} {cfg.label}</p>
-                  <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">
-                    <Usb className="h-3 w-3" /> Ready
-                  </span>
-                </div>
-              </div>
-            </div>
-            {lastHwScan && (
-              <div className="mt-2 text-sm text-green-600 font-medium animate-pulse">
-                ✅ Scanned: {lastHwScan}
-              </div>
-            )}
-          </div>
+    <MobileAppShell
+      title="Point of Sale"
+      subtitle={`${cfg.emoji} ${cfg.label}`}
+      headerAction={
+        <div className="flex items-center gap-2">
+          {lastHwScan && (
+            <span className="text-xs text-green-600 font-medium animate-pulse hidden md:inline">
+              ✅ {lastHwScan}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-full">
+            <Usb className="h-3 w-3" /> Ready
+          </span>
+        </div>
+      }
+    >
+      <PWAInstallPrompt />
 
-          <div className="grid gap-6 lg:grid-cols-3">
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {/* Search Bar */}
+        <MobileCard className="sticky top-0 z-30 bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  ref={scannerInputRef}
+                  placeholder={cfg.posPlaceholder}
+                  value={barcodeInput}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
+                  autoFocus
+                  onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
+                />
+                {searchSuggestions.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-background border-2 border-yellow-300 rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                    {searchSuggestions.map(p => {
+                      const q = barcodeInput.toLowerCase()
+                      const name = p.name.toLowerCase()
+                      const category = p.category.toLowerCase()
+                      const description = (p.description || '').toLowerCase()
+                      
+                      let matchReason = ''
+                      if (name.includes(q)) {
+                        matchReason = 'Name match'
+                      } else if (p.barcode.includes(q)) {
+                        matchReason = 'Barcode match'
+                      } else if (category.includes(q)) {
+                        matchReason = `Category: ${p.category}`
+                      } else if (description.includes(q)) {
+                        matchReason = 'Description match'
+                      } else {
+                        matchReason = 'Related item'
+                      }
+                      
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-yellow-50 active:bg-yellow-100 flex justify-between items-center border-b last:border-b-0"
+                          onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold truncate text-base">{p.name}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {matchReason} • Stock: {p.stock}
+                            </div>
+                          </div>
+                          <div className="text-right ml-3 flex-shrink-0">
+                            <div className="font-bold text-base text-primary">₱{effectivePrice(p).toFixed(2)}</div>
+                            {p.onSale && p.salePrice && (
+                              <div className="text-xs text-red-500 font-semibold">SALE</div>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              <Button
+                size="lg"
+                className="h-12 w-12 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white border-0 shadow-lg"
+                onClick={() => setShowScanner(true)}
+              >
+                <Barcode className="h-6 w-6" />
+              </Button>
+            </div>
+          </div>
+        </MobileCard>
+
+        {/* Product Grid */}
+        <div>
+          <MobileSectionHeader title="Products" />
+          <div className="grid grid-cols-2 gap-3">
+            {shuffledProducts.slice(0, 20).map((product) => (
+              <MobileCard
+                key={product.id}
+                onClick={() => product.stock > 0 && addToCart(product)}
+                className={product.stock <= 0 ? "opacity-50" : ""}
+              >
+                <div className="relative aspect-square bg-muted">
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <DefaultProductImage />
+                  )}
+                  {product.stock <= 0 && (
+                    <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
+                      <span className="text-sm font-bold text-destructive">Out of Stock</span>
+                    </div>
+                  )}
+                  {product.onSale && product.salePrice && product.stock > 0 && (
+                    <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">
+                      SALE
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <div className="font-semibold text-sm truncate mb-1" title={product.name}>
+                    {product.name}
+                  </div>
+                  {product.onSale && product.salePrice ? (
+                    <div className="flex items-center gap-2">
+                      <div className="text-base font-bold text-red-500">₱{product.salePrice.toFixed(2)}</div>
+                      <div className="text-xs line-through text-muted-foreground">₱{product.price.toFixed(2)}</div>
+                    </div>
+                  ) : (
+                    <div className="text-base font-bold text-primary">₱{product.price.toFixed(2)}</div>
+                  )}
+                  <div className="text-xs text-muted-foreground mt-1">Stock: {product.stock}</div>
+                </div>
+              </MobileCard>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop View (unchanged) */}
+      <div className="hidden md:block">
+        <div className="grid gap-6 lg:grid-cols-3">
             {/* Product Selection */}
             <div className="lg:col-span-2 space-y-6">
               {/* Sticky Scan Product Bar */}
@@ -761,89 +887,130 @@ export default function POSPage() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Floating Cart Button (mobile) */}
-        <button
-          className="fixed bottom-24 right-4 z-40 lg:hidden flex items-center justify-center w-14 h-14 rounded-full bg-primary text-white shadow-2xl active:scale-95 transition-transform"
-          onClick={() => setShowCartDrawer(true)}
-        >
-          <ShoppingCart className="h-7 w-7" />
-          {cart.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
-              {cart.reduce((s, i) => s + i.quantity, 0)}
-            </span>
-          )}
-        </button>
+      {/* Floating Cart Button (Mobile) */}
+      <FloatingActionButton
+        icon={<ShoppingCart className="h-7 w-7" />}
+        onClick={() => setShowCartDrawer(true)}
+        badge={cart.reduce((s, i) => s + i.quantity, 0)}
+      />
 
-        {/* Cart Drawer (mobile) */}
-        {showCartDrawer && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setShowCartDrawer(false)} />
-            <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl max-h-[85vh] overflow-y-auto pb-safe">
-              <div className="flex items-center justify-between p-4 border-b">
-                <span className="font-bold flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" /> Cart ({cart.length})
-                </span>
-                <div className="flex items-center gap-2">
-                  {cart.length > 0 && (
-                    <Button variant="ghost" size="sm" className="bg-red-500 hover:bg-red-600 text-white" onClick={clearCart}>
-                      Clear
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" onClick={() => setShowCartDrawer(false)}>
-                    <X className="h-5 w-5" />
-                  </Button>
+      {/* Cart Bottom Sheet (Mobile) */}
+      <BottomSheet
+        open={showCartDrawer}
+        onClose={() => setShowCartDrawer(false)}
+        title="Shopping Cart"
+        description={cart.length > 0 ? `${cart.length} items` : "Your cart is empty"}
+      >
+        {cart.length === 0 ? (
+          <div className="py-16 text-center">
+            <ShoppingCart className="h-20 w-20 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <p className="text-base text-muted-foreground">Your cart is empty</p>
+            <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
+          </div>
+        ) : (
+          <div className="space-y-4 pb-6">
+            {/* Cart Items */}
+            <div className="space-y-3">
+              {cart.map((item) => (
+                <MobileCard key={item.id} className="p-4">
+                  <div className="flex gap-3">
+                    <div className="w-20 h-20 bg-muted rounded-xl overflow-hidden flex-shrink-0">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <DefaultProductImage />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-base truncate">{item.name}</p>
+                          <p className="text-sm text-muted-foreground">₱{item.price.toFixed(2)} each</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 -mr-2 -mt-1 text-destructive"
+                          onClick={() => removeFromCart(item.id!)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-10 w-10 rounded-xl border-2 border-red-200 text-red-600 hover:bg-red-50"
+                            onClick={() => updateQuantity(item.id!, item.quantity - 1)}
+                          >
+                            <Minus className="h-5 w-5" />
+                          </Button>
+                          <div className="w-14 text-center">
+                            <div className="text-xl font-bold">{item.quantity}</div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-10 w-10 rounded-xl border-2 border-green-200 text-green-600 hover:bg-green-50"
+                            onClick={() => updateQuantity(item.id!, item.quantity + 1)}
+                          >
+                            <Plus className="h-5 w-5" />
+                          </Button>
+                        </div>
+                        <div className="text-lg font-bold text-primary">₱{item.subtotal.toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </MobileCard>
+              ))}
+            </div>
+
+            {/* Summary */}
+            <MobileCard className="p-4 bg-gradient-to-br from-primary/5 to-primary/10">
+              <div className="space-y-3">
+                <div className="flex justify-between text-base">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-semibold">₱{calculateTotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-base">
+                  <span className="text-muted-foreground">Est. Profit</span>
+                  <span className="font-semibold text-green-600">₱{calculateProfit().toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-xl font-bold">
+                  <span>Total</span>
+                  <span className="text-primary">₱{calculateTotal().toFixed(2)}</span>
                 </div>
               </div>
-              <div className="p-4 space-y-3">
-                {cart.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground">Cart is empty</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-3">
-                      {cart.map((item) => (
-                        <div key={item.id} className="space-y-2 pb-3 border-b last:border-0">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{item.name}</p>
-                              <p className="text-xs text-muted-foreground">₱{item.price.toFixed(2)} each</p>
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeFromCart(item.id!)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg border-red-300 text-red-600 text-lg font-bold" onClick={() => updateQuantity(item.id!, item.quantity - 1)}>−</Button>
-                              <CartQuantityInput item={item} onUpdate={updateQuantity} />
-                              <Button variant="outline" size="sm" className="h-9 w-9 p-0 rounded-lg border-green-300 text-green-600 text-lg font-bold" onClick={() => updateQuantity(item.id!, item.quantity + 1)}>+</Button>
-                            </div>
-                            <div className="ml-auto font-semibold text-sm">₱{item.subtotal.toFixed(2)}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>₱{calculateTotal().toFixed(2)}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Est. Profit</span><span className="text-secondary font-semibold">₱{calculateProfit().toFixed(2)}</span></div>
-                      <Separator />
-                      <div className="flex justify-between font-bold text-lg"><span>Total</span><span>₱{calculateTotal().toFixed(2)}</span></div>
-                    </div>
-                    <div className="pb-20">
-                      <Button size="lg" className="w-full" onClick={() => { setShowCartDrawer(false); setShowCheckout(true) }}>
-                        Checkout
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
+            </MobileCard>
+
+            {/* Actions */}
+            <div className="space-y-3 pt-2">
+              <Button
+                size="lg"
+                className="w-full h-14 text-lg rounded-xl shadow-lg"
+                onClick={() => {
+                  setShowCartDrawer(false)
+                  setShowCheckout(true)
+                }}
+              >
+                Proceed to Checkout
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full h-12 rounded-xl border-2 text-destructive border-destructive/20 hover:bg-destructive/10"
+                onClick={clearCart}
+              >
+                Clear Cart
+              </Button>
             </div>
           </div>
         )}
+      </BottomSheet>
 
         {showScanner && (
           <BarcodeScanner
@@ -864,6 +1031,6 @@ export default function POSPage() {
             onSuccess={handleCheckoutSuccess}
           />
         )}
-      </div>
-    )
+    </MobileAppShell>
+  )
 }

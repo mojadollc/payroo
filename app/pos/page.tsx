@@ -625,7 +625,7 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Desktop View (unchanged) */}
+      {/* Desktop View */}
       <div className="hidden md:block">
         <div className="grid gap-6 lg:grid-cols-3">
             {/* Product Selection */}
@@ -1031,6 +1031,6 @@ export default function POSPage() {
             onSuccess={handleCheckoutSuccess}
           />
         )}
-    </MobileAppShell>
+      </MobileAppShell>
   )
 }

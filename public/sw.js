@@ -2,7 +2,7 @@
 // SIMPLE strategy: never cache HTML, network-first for JS/CSS, cache-first for images.
 // This prevents stale page loads and reload loops on PWA/TWA.
 
-const APP_VERSION = "20260508T101630"
+const APP_VERSION = "20260508T105304"
 const CACHE_NAME = "payroo-v" + APP_VERSION
 
 const PRECACHE = [

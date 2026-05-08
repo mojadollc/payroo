@@ -8,6 +8,7 @@ interface MobileAppShellProps {
   title?: string
   subtitle?: string
   headerAction?: ReactNode
+  stickyBar?: ReactNode
   className?: string
   noPadding?: boolean
 }
@@ -17,14 +18,15 @@ export function MobileAppShell({
   title,
   subtitle,
   headerAction,
+  stickyBar,
   className,
   noPadding = false,
 }: MobileAppShellProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-background">
       {/* Native-style header */}
       {(title || headerAction) && (
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b border-border/50 shadow-sm">
+        <div className="sticky top-0 z-40 bg-background border-b border-border/50 shadow-sm">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
@@ -44,6 +46,12 @@ export function MobileAppShell({
               )}
             </div>
           </div>
+          {/* Optional second sticky bar — sits flush below the title row */}
+          {stickyBar && (
+            <div className="border-t border-border/40 bg-background px-4 py-2">
+              {stickyBar}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,8 +1,7 @@
 // ── Payroo POS Service Worker ──────────────────────────────────────────────────
-// SIMPLE strategy: never cache HTML, network-first for JS/CSS, cache-first for images.
-// This prevents stale page loads and reload loops on PWA/TWA.
+// Strategy: never cache HTML, stale-while-revalidate for JS/CSS, cache-first for images.
 
-const APP_VERSION = "20260601T000001"
+const APP_VERSION = "20260602T120000"
 const CACHE_NAME = "payroo-v" + APP_VERSION
 
 const PRECACHE = [
@@ -11,12 +10,13 @@ const PRECACHE = [
   "/logo.svg",
 ]
 
-// ── Install: precache icons, skip waiting immediately ─────────────────────────
+// ── Install: precache icons only — do NOT skipWaiting automatically ───────────
+// Calling skipWaiting() here causes an immediate controllerchange on every deploy
+// which triggers a reload loop in PWA/TWA. We only skip waiting when the user
+// explicitly taps "Update Now" (SKIP_WAITING message from PWAUpdateManager).
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(c => c.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE))
   )
 })
 
@@ -33,6 +33,7 @@ self.addEventListener("activate", (e) => {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 self.addEventListener("message", (e) => {
+  // Only skip waiting when user explicitly requests it
   if (e.data?.type === "SKIP_WAITING") self.skipWaiting()
   if (e.data?.type === "GET_VERSION" && e.ports[0]) {
     e.ports[0].postMessage({ version: APP_VERSION })
@@ -49,7 +50,7 @@ self.addEventListener("fetch", (e) => {
   // NEVER intercept API calls
   if (url.pathname.startsWith("/api/")) return
 
-  // NEVER cache HTML — always go to network, no fallback to stale pages
+  // NEVER cache HTML — always network, offline fallback only
   if (e.request.mode === "navigate" || e.request.headers.get("accept")?.includes("text/html")) {
     e.respondWith(
       fetch(e.request).catch(() =>
@@ -62,7 +63,7 @@ self.addEventListener("fetch", (e) => {
     return
   }
 
-  // JS/CSS bundles (_next): network-first, cache fallback, correct content-type on error
+  // JS/CSS bundles (_next): network-first, cache fallback
   if (url.pathname.startsWith("/_next/")) {
     e.respondWith(
       fetch(e.request)
@@ -82,7 +83,7 @@ self.addEventListener("fetch", (e) => {
     return
   }
 
-  // Static assets (images, fonts, etc): cache-first
+  // Static assets: cache-first
   if (url.pathname.match(/\.(png|svg|jpg|jpeg|webp|gif|ico|woff2?|ttf|css)$/)) {
     e.respondWith(
       caches.match(e.request).then(cached => {
@@ -99,5 +100,5 @@ self.addEventListener("fetch", (e) => {
     return
   }
 
-  // Everything else: network only, no caching
+  // Everything else: network only
 })

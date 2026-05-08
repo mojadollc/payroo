@@ -11,78 +11,68 @@ export function PWAUpdateManager() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
 
-    const checkForUpdate = async () => {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration()
-        if (!reg) return
+    // Clear any stale reload guard from a previous session
+    sessionStorage.removeItem("sw_reloading")
 
-        // Listen for new SW installing
-        reg.addEventListener("updatefound", () => {
-          const newWorker = reg.installing
-          if (!newWorker) return
-          newWorker.addEventListener("statechange", () => {
-            // New SW is ready and waiting — show update banner
-            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              setUpdateAvailable(true)
-            }
-          })
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (!reg) return
+
+      const onNewWorkerReady = (worker: ServiceWorker) => {
+        worker.addEventListener("statechange", () => {
+          // Only show banner when new SW is waiting AND there is an active controller
+          // (i.e. this is an update, not a first install)
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            setUpdateAvailable(true)
+          }
         })
+      }
 
-        // Also check if there's already a waiting worker (e.g. from a previous visit)
-        if (reg.waiting && navigator.serviceWorker.controller) {
-          setUpdateAvailable(true)
-        }
-      } catch {}
-    }
+      // New SW found during this session
+      reg.addEventListener("updatefound", () => {
+        if (reg.installing) onNewWorkerReady(reg.installing)
+      })
 
-    checkForUpdate()
+      // SW was already waiting before this page loaded
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        setUpdateAvailable(true)
+      }
+    }).catch(() => {})
   }, [])
 
   const handleUpdate = () => {
+    if (isUpdating) return
     setIsUpdating(true)
 
     navigator.serviceWorker.getRegistration().then(reg => {
-      if (!reg) { window.location.reload(); return }
-
-      // Guard: if we already reloaded for this update, don't reload again
-      if (sessionStorage.getItem("sw_reloading")) {
-        sessionStorage.removeItem("sw_reloading")
-        setIsUpdating(false)
-        setUpdateAvailable(false)
+      if (!reg?.waiting) {
+        // No waiting worker — just reload to get fresh content
+        window.location.reload()
         return
       }
 
-      const doReload = () => {
-        if (sessionStorage.getItem("sw_reloading")) return
-        sessionStorage.setItem("sw_reloading", "1")
+      // Listen for controller change ONCE, then reload exactly once
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
         window.location.reload()
-      }
+      }, { once: true })
 
-      if (reg.waiting) {
-        reg.waiting.postMessage({ type: "SKIP_WAITING" })
-      }
+      // Tell the waiting SW to activate
+      reg.waiting.postMessage({ type: "SKIP_WAITING" })
 
-      navigator.serviceWorker.addEventListener("controllerchange", doReload, { once: true })
-
-      // Fallback: reload after 3s if controllerchange never fires
-      setTimeout(doReload, 3000)
-    })
+      // Safety fallback: if controllerchange never fires within 4s, reload anyway
+      setTimeout(() => window.location.reload(), 4000)
+    }).catch(() => window.location.reload())
   }
 
   if (!updateAvailable) return null
 
   return (
     <div className="fixed top-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
-      <div className="rounded-lg border border-green-200 bg-green-50 shadow-lg p-4">
+      <div className="rounded-xl border border-green-200 bg-green-50 shadow-lg p-4">
         <div className="flex items-start gap-3">
           <Download className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-green-800">
-              New version available!
-            </p>
-            <p className="text-xs text-green-700 mt-1">
-              Tap update to get the latest features.
-            </p>
+            <p className="text-sm font-semibold text-green-800">Update available!</p>
+            <p className="text-xs text-green-700 mt-0.5">Tap update to get the latest version.</p>
             <div className="flex gap-2 mt-3">
               <Button
                 size="sm"
@@ -90,14 +80,10 @@ export function PWAUpdateManager() {
                 disabled={isUpdating}
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
-                {isUpdating ? (
-                  <>
-                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  "Update Now"
-                )}
+                {isUpdating
+                  ? <><RefreshCw className="h-3 w-3 mr-1 animate-spin" />Updating...</>
+                  : "Update Now"
+                }
               </Button>
               <Button
                 size="sm"

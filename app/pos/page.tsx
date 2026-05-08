@@ -628,8 +628,7 @@ export default function POSPage() {
       {/* Desktop View */}
       <div className="hidden md:block">
         <div className="grid gap-6 lg:grid-cols-3">
-            {/* Product Selection */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6">
               {/* Sticky Scan Product Bar */}
               <div className="sticky top-0 z-30 bg-background pb-2 -mx-4 px-4 pt-2">
                 <Card className="border-2 border-yellow-300 bg-gradient-to-r from-yellow-50 to-amber-50 shadow-lg">
@@ -790,10 +789,10 @@ export default function POSPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+          </div>
 
-            {/* Cart */}
-            <div className="lg:col-span-1">
+          {/* Cart */}
+          <div className="lg:col-span-1">
               <Card className="sticky top-4">
                 <CardHeader className="p-3 pb-2">
                   <CardTitle className="flex items-center justify-between text-sm">
@@ -884,7 +883,6 @@ export default function POSPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
           </div>
         </div>
       </div>

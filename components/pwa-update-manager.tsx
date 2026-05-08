@@ -42,28 +42,30 @@ export function PWAUpdateManager() {
     setIsUpdating(true)
 
     navigator.serviceWorker.getRegistration().then(reg => {
-      if (!reg) return
+      if (!reg) { window.location.reload(); return }
 
-      // Tell waiting SW to activate
+      // Guard: if we already reloaded for this update, don't reload again
+      if (sessionStorage.getItem("sw_reloading")) {
+        sessionStorage.removeItem("sw_reloading")
+        setIsUpdating(false)
+        setUpdateAvailable(false)
+        return
+      }
+
+      const doReload = () => {
+        if (sessionStorage.getItem("sw_reloading")) return
+        sessionStorage.setItem("sw_reloading", "1")
+        window.location.reload()
+      }
+
       if (reg.waiting) {
         reg.waiting.postMessage({ type: "SKIP_WAITING" })
       }
 
-      // Listen for the new SW to take control, then reload ONCE
-      let reloaded = false
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (reloaded) return
-        reloaded = true
-        window.location.reload()
-      })
+      navigator.serviceWorker.addEventListener("controllerchange", doReload, { once: true })
 
-      // Fallback: if controllerchange doesn't fire within 3s, just reload
-      setTimeout(() => {
-        if (!reloaded) {
-          reloaded = true
-          window.location.reload()
-        }
-      }, 3000)
+      // Fallback: reload after 3s if controllerchange never fires
+      setTimeout(doReload, 3000)
     })
   }
 

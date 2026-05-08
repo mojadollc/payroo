@@ -221,11 +221,8 @@ export default function RootLayout({
         <Script id="sw-register" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
-              // Check for updates on visibility change and every 5 min
-              setInterval(function() { reg.update().catch(function(){}); }, 300000);
-              document.addEventListener('visibilitychange', function() {
-                if (document.visibilityState === 'visible') reg.update().catch(function(){});
-              });
+              // Check for updates once every 60 minutes — not on every tab focus
+              setInterval(function() { reg.update().catch(function(){}); }, 3600000);
             }).catch(function(err) {
               console.warn('SW registration failed:', err);
             });

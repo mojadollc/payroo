@@ -10,6 +10,7 @@
     }
   ],
   "hosting": {
+    "site": "sari-pos-88979",
     "public": "out",
     "ignore": [
       "firebase.json",

@@ -118,15 +118,12 @@ export async function POST(req: NextRequest) {
 
     // Send email via Nodemailer (Gmail SMTP)
     const smtpUser = process.env.SMTP_USER
-    const smtpPass = process.env.SMTP_PASS?.replace(/\s+/g, "") // strip spaces from App Password
+    const smtpPass = process.env.SMTP_PASS
 
     if (smtpUser && smtpPass) {
       const transporter = nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
+        service: "gmail",
         auth: { user: smtpUser, pass: smtpPass },
-        tls: { rejectUnauthorized: false },
       })
 
       await transporter.sendMail({

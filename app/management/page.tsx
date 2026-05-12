@@ -297,10 +297,10 @@ export default function ManagementPage() {
           appUrl: window.location.origin,
         }),
       })
-      if (!res.ok) throw new Error("Failed")
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       toast({ title: `Welcome email sent to ${c.ownerEmail}`, description: `Store ID: ${c.externalId} · PIN: ${ownerPin}` })
-    } catch {
-      toast({ title: "Failed to send welcome email", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Failed to send welcome email", description: err?.message, variant: "destructive" })
     } finally {
       setSendingWelcome(null)
     }
@@ -325,7 +325,7 @@ export default function ManagementPage() {
           appUrl: window.location.origin,
         }),
       })
-      if (!res.ok) throw new Error("Failed")
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       toast({ title: `Follow-up sent to ${c.ownerEmail}` })
     } catch {
       toast({ title: "Failed to send follow-up", variant: "destructive" })

@@ -67,12 +67,15 @@ export async function POST(req: NextRequest) {
 </html>`
 
     const smtpUser = process.env.SMTP_USER
-    const smtpPass = process.env.SMTP_PASS
+    const smtpPass = process.env.SMTP_PASS?.replace(/\s+/g, "") // strip spaces from App Password
 
     if (smtpUser && smtpPass) {
       const transporter = nodemailer.createTransport({
-        service: "gmail",
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
         auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false },
       })
       await transporter.sendMail({
         from: `"Payroo POS" <${smtpUser}>`,

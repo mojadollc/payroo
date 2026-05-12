@@ -29,37 +29,46 @@ interface CartItem extends Product {
   subtotal: number
 }
 
-function CartQuantityInput({ item, onUpdate }: { item: CartItem; onUpdate: (id: string, qty: number) => void }) {
+function CartQuantityInput({
+  item, onUpdate, onLiveChange, className,
+}: {
+  item: CartItem
+  onUpdate: (id: string, qty: number) => void
+  onLiveChange?: (qty: number) => void
+  className?: string
+}) {
   const [localVal, setLocalVal] = useState(String(item.quantity))
+  const editing = useRef(false)
 
   useEffect(() => {
-    setLocalVal(String(item.quantity))
+    if (!editing.current) setLocalVal(String(item.quantity))
   }, [item.quantity])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value
-    setLocalVal(raw)
+  const commit = (raw: string) => {
+    editing.current = false
     const val = parseInt(raw)
     if (!isNaN(val) && val > 0) {
       onUpdate(item.id!, val)
-    }
-  }
-
-  const handleBlur = () => {
-    const val = parseInt(localVal)
-    if (isNaN(val) || val <= 0) {
+    } else {
       setLocalVal(String(item.quantity))
-      onUpdate(item.id!, 1)
+      onLiveChange?.(item.quantity)
     }
   }
 
   return (
     <Input
       type="number"
+      inputMode="numeric"
       value={localVal}
-      onChange={handleChange}
-      onBlur={handleBlur}
-      className="h-9 w-14 text-center p-0 text-base font-semibold"
+      onFocus={(e) => { editing.current = true; e.target.select() }}
+      onChange={(e) => {
+        setLocalVal(e.target.value)
+        const v = parseInt(e.target.value)
+        if (!isNaN(v) && v > 0) onLiveChange?.(v)
+      }}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(localVal) } }}
+      className={className ?? "h-9 w-14 text-center p-0 text-base font-semibold"}
       min="1"
       max={item.stock}
     />
@@ -84,6 +93,7 @@ export default function POSPage() {
   }, [cart])
   const [barcodeInput, setBarcodeInput] = useState("")
   const [searchSuggestions, setSearchSuggestions] = useState<Product[]>([])
+  const [liveQuantities, setLiveQuantities] = useState<Record<string, number>>({})
   const [showCartDrawer, setShowCartDrawer] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
@@ -497,85 +507,70 @@ export default function POSPage() {
           </span>
         </div>
       }
+      stickyBar={
+        <div className="md:hidden flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+            <Input
+              ref={scannerInputRef}
+              placeholder={cfg.posPlaceholder}
+              value={barcodeInput}
+              onChange={(e) => handleInputChange(e.target.value)}
+              className="pl-10 h-11 text-base rounded-xl border-2 border-yellow-300 bg-white focus:border-yellow-400"
+              autoFocus
+              onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
+            />
+            {searchSuggestions.length > 0 && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border-2 border-yellow-300 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
+                {searchSuggestions.map(p => {
+                  const q = barcodeInput.toLowerCase()
+                  const name = p.name.toLowerCase()
+                  const category = p.category.toLowerCase()
+                  const description = (p.description || '').toLowerCase()
+                  let matchReason = ''
+                  if (name.includes(q)) matchReason = 'Name match'
+                  else if (p.barcode.includes(q)) matchReason = 'Barcode match'
+                  else if (category.includes(q)) matchReason = `Category: ${p.category}`
+                  else if (description.includes(q)) matchReason = 'Description match'
+                  else matchReason = 'Related item'
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-yellow-50 active:bg-yellow-100 flex justify-between items-center border-b last:border-b-0"
+                      onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">{p.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{matchReason} • Stock: {p.stock}</div>
+                      </div>
+                      <div className="text-right ml-3 flex-shrink-0">
+                        <div className="font-bold text-sm text-primary">₱{effectivePrice(p).toFixed(2)}</div>
+                        {p.onSale && p.salePrice && <div className="text-xs text-red-500 font-semibold">SALE</div>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          <Button
+            size="lg"
+            className="h-11 w-11 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white border-0 shadow-md flex-shrink-0"
+            onClick={() => setShowScanner(true)}
+          >
+            <Barcode className="h-5 w-5" />
+          </Button>
+        </div>
+      }
     >
       <PWAInstallPrompt />
 
       {/* Mobile View */}
       <div className="md:hidden space-y-4">
-        {/* Search Bar */}
-        <MobileCard className="sticky top-0 z-30 bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  ref={scannerInputRef}
-                  placeholder={cfg.posPlaceholder}
-                  value={barcodeInput}
-                  onChange={(e) => handleInputChange(e.target.value)}
-                  className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
-                  autoFocus
-                  onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
-                />
-                {searchSuggestions.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-background border-2 border-yellow-300 rounded-xl shadow-2xl max-h-80 overflow-y-auto">
-                    {searchSuggestions.map(p => {
-                      const q = barcodeInput.toLowerCase()
-                      const name = p.name.toLowerCase()
-                      const category = p.category.toLowerCase()
-                      const description = (p.description || '').toLowerCase()
-                      
-                      let matchReason = ''
-                      if (name.includes(q)) {
-                        matchReason = 'Name match'
-                      } else if (p.barcode.includes(q)) {
-                        matchReason = 'Barcode match'
-                      } else if (category.includes(q)) {
-                        matchReason = `Category: ${p.category}`
-                      } else if (description.includes(q)) {
-                        matchReason = 'Description match'
-                      } else {
-                        matchReason = 'Related item'
-                      }
-                      
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          className="w-full text-left px-4 py-3 text-sm hover:bg-yellow-50 active:bg-yellow-100 flex justify-between items-center border-b last:border-b-0"
-                          onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold truncate text-base">{p.name}</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {matchReason} • Stock: {p.stock}
-                            </div>
-                          </div>
-                          <div className="text-right ml-3 flex-shrink-0">
-                            <div className="font-bold text-base text-primary">₱{effectivePrice(p).toFixed(2)}</div>
-                            {p.onSale && p.salePrice && (
-                              <div className="text-xs text-red-500 font-semibold">SALE</div>
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-              <Button
-                size="lg"
-                className="h-12 w-12 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white border-0 shadow-lg"
-                onClick={() => setShowScanner(true)}
-              >
-                <Barcode className="h-6 w-6" />
-              </Button>
-            </div>
-          </div>
-        </MobileCard>
 
         {/* Product Grid */}
-        <div>
+        <div className="pt-1">
           <MobileSectionHeader title="Products" />
           <div className="grid grid-cols-2 gap-3">
             {shuffledProducts.slice(0, 20).map((product) => (
@@ -842,7 +837,7 @@ export default function POSPage() {
                                 >
                                   −
                                 </Button>
-                                <CartQuantityInput item={item} onUpdate={updateQuantity} />
+                                <CartQuantityInput item={item} onUpdate={updateQuantity} onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.id!]: q }))} />
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -852,7 +847,7 @@ export default function POSPage() {
                                   +
                                 </Button>
                               </div>
-                              <div className="ml-auto font-semibold text-sm">₱{item.subtotal.toFixed(2)}</div>
+                              <div className="ml-auto font-semibold text-sm">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
                             </div>
                           </div>
                         ))}
@@ -946,9 +941,12 @@ export default function POSPage() {
                           >
                             <Minus className="h-5 w-5" />
                           </Button>
-                          <div className="w-14 text-center">
-                            <div className="text-xl font-bold">{item.quantity}</div>
-                          </div>
+                          <CartQuantityInput
+                            item={item}
+                            onUpdate={updateQuantity}
+                            onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.id!]: q }))}
+                            className="h-10 w-16 text-center p-0 text-xl font-bold rounded-xl border-2"
+                          />
                           <Button
                             variant="outline"
                             size="icon"
@@ -958,7 +956,7 @@ export default function POSPage() {
                             <Plus className="h-5 w-5" />
                           </Button>
                         </div>
-                        <div className="text-lg font-bold text-primary">₱{item.subtotal.toFixed(2)}</div>
+                        <div className="text-lg font-bold text-primary">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
                       </div>
                     </div>
                   </div>

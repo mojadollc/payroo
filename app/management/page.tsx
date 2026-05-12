@@ -275,12 +275,23 @@ export default function ManagementPage() {
       const ownerSnap = await getDocs(
         query(collection(db, "storeUsers"), where("externalId", "==", c.externalId), where("role", "==", "owner"))
       )
-      let ownerPin = "(not found)"
-      let username = c.ownerName.split(" ")[0].toLowerCase()
+      let username = c.ownerName.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "")
+      let ownerPin = ""
       if (!ownerSnap.empty) {
         const ownerData = ownerSnap.docs[0].data()
-        ownerPin = ownerData.pin ?? ownerPin
+        ownerPin = ownerData.pin ?? ""
         username = ownerData.username ?? username
+      }
+      // No storeUser found (paid subscription) - auto-create owner account with new PIN
+      if (!ownerPin) {
+        ownerPin = String(Math.floor(100000 + Math.random() * 900000))
+        const { addStoreUser } = await import("@/lib/firebase/services")
+        try {
+          await addStoreUser({ name: c.ownerName, username, pin: ownerPin, role: "owner", externalId: c.externalId, isActive: true })
+        } catch {
+          username = username + "1"
+          await addStoreUser({ name: c.ownerName, username, pin: ownerPin, role: "owner", externalId: c.externalId, isActive: true })
+        }
       }
       const plan = plans.find(p => p.id === c.planId)
       const res = await fetch("/api/send-welcome", {

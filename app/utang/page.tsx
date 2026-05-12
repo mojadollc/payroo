@@ -2,7 +2,7 @@
 
 import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect, useCallback } from "react"
-import { AlertTriangle, Plus, Search, PhilippinePeso, QrCode, Clock, CheckCircle2, Trash2, ChevronDown, ChevronUp } from "lucide-react"
+import { AlertTriangle, Plus, Search, PhilippinePeso, QrCode, Clock, CheckCircle2, Trash2, ChevronDown, ChevronUp, User, CreditCard, AlertCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,9 @@ import { addUtang, getUtangList, addUtangPayment, deleteUtang, searchUtangByName
 import { getStoreSettings } from "@/lib/firebase/services"
 import type { UtangRecord, UtangPayment } from "@/lib/firebase/types"
 import { Timestamp } from "firebase/firestore"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
+import { FloatingActionButton } from "@/components/ui/floating-action-button"
 
 // ── Credit Score ──────────────────────────────────────────────────────────────
 function getCreditScore(records: UtangRecord[]): { score: number; label: string; color: string } {
@@ -102,41 +105,35 @@ function AddUtangDialog({ onClose, onSuccess, storeName, storeId }: { onClose: (
   }
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Record Utang</DialogTitle><DialogDescription>Add a new credit transaction</DialogDescription></DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Customer Name</Label>
-            <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Juan dela Cruz" autoFocus />
-          </div>
-          {warning.length > 0 && (
-            <div className="rounded-lg border border-red-300 bg-red-50 p-3 space-y-1">
-              <p className="text-sm font-semibold text-red-700 flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Network Warning</p>
-              {warning.map(w => (
-                <p key={w.id} className="text-xs text-red-600">⚠ {w.customerName} owes ₱{w.balance.toFixed(2)} at {w.storeName}</p>
-              ))}
-            </div>
-          )}
-          <div>
-            <Label>Phone (optional)</Label>
-            <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="09xxxxxxxxx" />
-          </div>
-          <div>
-            <Label>Amount (₱)</Label>
-            <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" min="0" />
-          </div>
-          <div>
-            <Label>Notes / Items</Label>
-            <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Rice, Sardines..." rows={2} />
-          </div>
+    <div className="space-y-4">
+      <div>
+        <Label>Customer Name</Label>
+        <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Juan dela Cruz" autoFocus />
+      </div>
+      {warning.length > 0 && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 space-y-1">
+          <p className="text-sm font-semibold text-red-700 flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> Network Warning</p>
+          {warning.map(w => (
+            <p key={w.id} className="text-xs text-red-600">⚠ {w.customerName} owes ₱{w.balance.toFixed(2)} at {w.storeName}</p>
+          ))}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      )}
+      <div>
+        <Label>Phone (optional)</Label>
+        <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="09xxxxxxxxx" />
+      </div>
+      <div>
+        <Label>Amount (₱)</Label>
+        <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" min="0" />
+      </div>
+      <div>
+        <Label>Notes / Items</Label>
+        <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Rice, Sardines..." rows={2} />
+      </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        {saving ? "Saving..." : "Save Utang"}
+      </Button>
+    </div>
   )
 }
 
@@ -225,7 +222,7 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
   const createdAt = record.createdAt instanceof Timestamp ? record.createdAt.toDate() : new Date()
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <MobileCard className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -241,32 +238,33 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
           <p className="text-xs text-muted-foreground">of ₱{record.totalAmount.toFixed(2)}</p>
         </div>
       </div>
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex gap-1 flex-wrap mt-3">
         {record.status !== "settled" && (
           <>
-            <Button size="sm" variant="outline" className="h-7 text-xs text-green-700 border-green-300" onClick={onPay}>
+            <Button size="sm" variant="outline" className="h-8 text-xs text-green-700 border-green-300" onClick={onPay}>
               <PhilippinePeso className="h-4 w-4 mr-1" /> Pay
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onQR}>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onQR}>
               <QrCode className="h-4 w-4 mr-1" /> QR
             </Button>
           </>
         )}
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={loadPayments}>
+        <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={loadPayments}>
           {expanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />} History
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={onDelete}>
+        <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive ml-auto" onClick={onDelete}>
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
       {expanded && (
-        <div className="pt-1 border-t space-y-1">
+        <div className="pt-3 border-t mt-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground">Payment History</p>
           {payments.length === 0 ? (
             <p className="text-xs text-muted-foreground">No payments yet</p>
           ) : payments.map(p => {
             const pDate = p.createdAt instanceof Timestamp ? p.createdAt.toDate() : new Date()
             return (
-              <div key={p.id} className="flex justify-between text-xs">
+              <div key={p.id} className="flex justify-between text-xs bg-muted/30 rounded-lg p-2">
                 <span className="text-muted-foreground">{pDate.toLocaleDateString()} · {p.method.toUpperCase()}{p.referenceNumber ? ` #${p.referenceNumber}` : ""}</span>
                 <span className="text-green-600 font-medium">+₱{p.amount.toFixed(2)}</span>
               </div>
@@ -274,7 +272,7 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
           })}
         </div>
       )}
-    </div>
+    </MobileCard>
   )
 }
 
@@ -310,7 +308,6 @@ function UtangPageContent() {
   useEffect(() => {
     load()
     getStoreSettings().then(s => { if (s?.name) setStoreName(s.name) })
-    // Use the store's externalId from localStorage
     setStoreId(localStorage.getItem("pos_ext_id") || "unknown-store")
   }, [load])
 
@@ -343,120 +340,261 @@ function UtangPageContent() {
   })
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Utang</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Credit network</p>
-          </div>
-          <Button size="sm" onClick={() => setShowAdd(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
-          </Button>
-        </div>
-      </div>
+    <MobileAppShell
+      title="Utang"
+      subtitle="Credit tracking"
+      headerAction={
+        <Button size="sm" className="h-9" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline ml-1.5">Add</span>
+        </Button>
+      }
+    >
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-4 bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-red-500 rounded-lg">
+                <PhilippinePeso className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Total Receivable</span>
+            </div>
+            <div className="text-2xl font-bold text-red-600">₱{totalActive.toLocaleString()}</div>
+            <div className="text-xs text-muted-foreground mt-1">{activeCount} active debts</div>
+          </MobileCard>
 
-      {/* Summary Cards */}
-      <div className="grid gap-3 md:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Total Receivable</CardTitle>
-            <PhilippinePeso className="h-3 w-3 text-red-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-red-600">₱{totalActive.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground">{activeCount} active debts</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Settled</CardTitle>
-            <CheckCircle2 className="h-3 w-3 text-green-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-green-600">{settledCount}</div>
-            <p className="text-xs text-muted-foreground">fully paid records</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Overdue Reminders</CardTitle>
-            <Clock className="h-3 w-3 text-yellow-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-yellow-600">
+          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-green-500 rounded-lg">
+                <CheckCircle2 className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Settled</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">{settledCount}</div>
+            <div className="text-xs text-muted-foreground mt-1">fully paid records</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-yellow-500 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Overdue</span>
+            </div>
+            <div className="text-2xl font-bold text-yellow-600">
               {records.filter(r => r.status !== "settled" && r.balance > 500).length}
             </div>
-            <p className="text-xs text-muted-foreground">balances over ₱500</p>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="text-xs text-muted-foreground mt-1">balances over ₱500</div>
+          </MobileCard>
 
-      {/* Search & Filter */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search customer..." value={search} onChange={e => setSearch(e.target.value)} />
+          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Customers</span>
+            </div>
+            <div className="text-2xl font-bold text-purple-600">{customerMap.size}</div>
+            <div className="text-xs text-muted-foreground mt-1">unique customers</div>
+          </MobileCard>
         </div>
+
+        {/* Search */}
+        <MobileCard className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+          <div className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search customer..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
+              />
+            </div>
+          </div>
+        </MobileCard>
+
+        {/* Filter */}
         <Select value={filter} onValueChange={v => setFilter(v as typeof filter)}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full h-12 rounded-xl border-2">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="all">All Records</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="partial">Partial</SelectItem>
             <SelectItem value="settled">Settled</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Credit Scores */}
+        {!search && filter === "all" && customerMap.size > 0 && (
+          <div>
+            <MobileSectionHeader title="Credit Scores" />
+            <MobileCard>
+              <div className="p-3 flex gap-2 flex-wrap">
+                {Array.from(customerMap.entries()).slice(0, 6).map(([key, recs]) => {
+                  const { score, label, color } = getCreditScore(recs)
+                  return (
+                    <div key={key} className="flex items-center gap-1.5 border rounded-full px-3 py-1.5 text-xs bg-background">
+                      <span className="font-medium capitalize">{recs[0].customerName}</span>
+                      <span className={`font-bold ${color}`}>{score} · {label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </MobileCard>
+          </div>
+        )}
+
+        {/* Records List */}
+        <div>
+          <MobileSectionHeader title={filter === "all" ? "All Records" : filter === "active" ? "Active" : filter === "partial" ? "Partial" : "Settled"} />
+          {filtered.length === 0 ? (
+            <MobileCard className="p-8 text-center">
+              <PhilippinePeso className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="text-muted-foreground">No utang records found</p>
+            </MobileCard>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map(r => (
+                <UtangRow
+                  key={r.id}
+                  record={r}
+                  onPay={() => setPayTarget(r)}
+                  onQR={() => setQrTarget(r)}
+                  onDelete={() => handleDelete(r.id!)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Credit Scores (unique customers with active debt) */}
-      {!search && filter === "all" && customerMap.size > 0 && (
-        <div className="mb-4">
-          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Credit Scores</p>
-          <div className="flex gap-2 flex-wrap">
-            {Array.from(customerMap.entries()).slice(0, 8).map(([key, recs]) => {
-              const { score, label, color } = getCreditScore(recs)
-              return (
-                <div key={key} className="flex items-center gap-1.5 border rounded-full px-3 py-1 text-xs bg-card">
-                  <span className="font-medium capitalize">{recs[0].customerName}</span>
-                  <span className={`font-bold ${color}`}>{score} · {label}</span>
-                </div>
-              )
-            })}
+      {/* Desktop View */}
+      <div className="hidden md:block space-y-6">
+        {/* Summary Cards */}
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+              <CardTitle className="text-xs font-medium">Total Receivable</CardTitle>
+              <PhilippinePeso className="h-3 w-3 text-red-500" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold text-red-600">₱{totalActive.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              <p className="text-xs text-muted-foreground">{activeCount} active debts</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+              <CardTitle className="text-xs font-medium">Settled</CardTitle>
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold text-green-600">{settledCount}</div>
+              <p className="text-xs text-muted-foreground">fully paid records</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+              <CardTitle className="text-xs font-medium">Overdue Reminders</CardTitle>
+              <Clock className="h-3 w-3 text-yellow-500" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold text-yellow-600">
+                {records.filter(r => r.status !== "settled" && r.balance > 500).length}
+              </div>
+              <p className="text-xs text-muted-foreground">balances over ₱500</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search customer..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
+          <Select value={filter} onValueChange={v => setFilter(v as typeof filter)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="partial">Partial</SelectItem>
+              <SelectItem value="settled">Settled</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      )}
 
-      {/* Records List */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <PhilippinePeso className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p>No utang records found</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(r => (
-            <UtangRow
-              key={r.id}
-              record={r}
-              onPay={() => setPayTarget(r)}
-              onQR={() => setQrTarget(r)}
-              onDelete={() => handleDelete(r.id!)}
-            />
-          ))}
-        </div>
-      )}
+        {/* Credit Scores */}
+        {!search && filter === "all" && customerMap.size > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Credit Scores</p>
+            <div className="flex gap-2 flex-wrap">
+              {Array.from(customerMap.entries()).slice(0, 8).map(([key, recs]) => {
+                const { score, label, color } = getCreditScore(recs)
+                return (
+                  <div key={key} className="flex items-center gap-1.5 border rounded-full px-3 py-1 text-xs bg-card">
+                    <span className="font-medium capitalize">{recs[0].customerName}</span>
+                    <span className={`font-bold ${color}`}>{score} · {label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
-      {showAdd && (
-        <AddUtangDialog
-          onClose={() => setShowAdd(false)}
-          onSuccess={load}
-          storeName={storeName}
-          storeId={storeId}
-        />
-      )}
+        {/* Records List */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <PhilippinePeso className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p>No utang records found</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map(r => (
+              <UtangRow
+                key={r.id}
+                record={r}
+                onPay={() => setPayTarget(r)}
+                onQR={() => setQrTarget(r)}
+                onDelete={() => handleDelete(r.id!)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Floating Add Button (Mobile) */}
+      <FloatingActionButton
+        icon={<Plus className="h-7 w-7" />}
+        label="Add Utang"
+        onClick={() => setShowAdd(true)}
+      />
+
+      {/* Add Utang Bottom Sheet (Mobile) */}
+      <BottomSheet
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Record Utang"
+        description="Add a new credit transaction"
+      >
+        <div className="pb-20">
+          <AddUtangDialog
+            onClose={() => setShowAdd(false)}
+            onSuccess={load}
+            storeName={storeName}
+            storeId={storeId}
+          />
+        </div>
+      </BottomSheet>
+
+      {/* Pay Dialog */}
       {payTarget && <PayDialog utang={payTarget} onClose={() => setPayTarget(null)} onSuccess={load} />}
+      {/* QR Dialog */}
       {qrTarget && <QRPaymentDialog utang={qrTarget} onClose={() => setQrTarget(null)} />}
-    </div>
+    </MobileAppShell>
   )
 }

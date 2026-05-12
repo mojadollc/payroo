@@ -1,15 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Edit2, Save, X, FileText, Download, Printer } from "lucide-react"
+import { Plus, Trash2, Edit2, Save, FileText } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
+import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { db } from "@/lib/firebase/config"
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, serverTimestamp } from "firebase/firestore"
 
@@ -224,204 +226,329 @@ export default function EListaPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">e-Lista</h1>
-          <p className="text-sm text-muted-foreground">Create and manage your lists</p>
-        </div>
-        <Button onClick={() => { resetForm(); setIsCreateOpen(true) }}>
-          <Plus className="h-4 w-4 mr-2" /> New Lista
-        </Button>
-      </div>
+    <MobileAppShell
+      title="e-Lista"
+      subtitle="Create and manage lists"
+    >
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-yellow-500 rounded-lg">
+                <FileText className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Total Listas</span>
+            </div>
+            <div className="text-2xl font-bold text-yellow-600">{listas.length}</div>
+          </MobileCard>
 
-      {listas.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-green-500 rounded-lg">
+                <Plus className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Total Items</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">
+              {listas.reduce((sum, l) => sum + l.items.length, 0)}
+            </div>
+          </MobileCard>
+        </div>
+
+        {/* Listas Grid */}
+        {listas.length === 0 ? (
+          <MobileCard className="p-8 text-center">
+            <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-40" />
             <p className="text-lg font-semibold mb-2">No e-Listas yet</p>
             <p className="text-sm text-muted-foreground mb-4">Create your first list to get started</p>
-            <Button onClick={() => { resetForm(); setIsCreateOpen(true) }}>
+            <Button onClick={() => { resetForm(); setIsCreateOpen(true) }} className="bg-yellow-500 hover:bg-yellow-600">
               <Plus className="h-4 w-4 mr-2" /> Create e-Lista
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {listas.map((lista) => {
-            const total = calculateTotal(lista.items)
-            return (
-              <Card key={lista.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setViewingLista(lista)}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    <span className="truncate">{lista.title}</span>
-                    <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {/* Item preview */}
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">Items: </span>
-                      {lista.items.slice(0, 3).map((item, idx) => (
-                        <span key={idx}>
-                          {item.name}
-                          {idx < Math.min(2, lista.items.length - 1) ? ", " : ""}
-                        </span>
-                      ))}
-                      {lista.items.length > 3 && (
-                        <span className="text-primary font-medium"> +{lista.items.length - 3} more...</span>
-                      )}
+          </MobileCard>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {listas.map((lista) => {
+              const total = calculateTotal(lista.items)
+              return (
+                <MobileCard 
+                  key={lista.id} 
+                  onClick={() => setViewingLista(lista)}
+                  className="p-4"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="p-2 bg-yellow-100 rounded-lg">
+                      <FileText className="h-4 w-4 text-yellow-600" />
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total Items:</span>
-                      <span className="font-semibold">{lista.items.length}</span>
-                    </div>
-                    {total > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total:</span>
-                        <span className="font-bold text-green-600">₱{total.toFixed(2)}</span>
-                      </div>
-                    )}
-                    <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline" className="flex-1" onClick={(e) => { e.stopPropagation(); openEdit(lista) }}>
-                        <Edit2 className="h-3 w-3 mr-1" /> Edit
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(lista.id!) }}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8 text-destructive hover:bg-red-50"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(lista.id!) }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={isCreateOpen || !!editingLista} onOpenChange={(open) => { if (!open) { setIsCreateOpen(false); setEditingLista(null); resetForm() } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingLista ? "Edit e-Lista" : "Create e-Lista"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" placeholder="e.g., Shopping List, Restock Items" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Items</Label>
-              </div>
-
-              {items.map((item, index) => (
-                <Card key={index} className="p-3">
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Input
-                          placeholder="Item name"
-                          value={item.name}
-                          onChange={(e) => handleItemChange(index, "name", e.target.value)}
-                        />
-                      </div>
-                      <div className="w-32">
-                        <Input
-                          type="number"
-                          placeholder="Amount"
-                          value={item.amount || ""}
-                          onChange={(e) => handleItemChange(index, "amount", e.target.value ? parseFloat(e.target.value) : undefined)}
-                        />
-                      </div>
-                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleRemoveItem(index)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Input
-                      placeholder="Notes (optional)"
-                      value={item.notes || ""}
-                      onChange={(e) => handleItemChange(index, "notes", e.target.value)}
-                      className="text-sm"
-                    />
-                  </div>
-                </Card>
-              ))}
-
-              <Button 
-                type="button"
-                variant="outline" 
-                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-yellow-500" 
-                onClick={handleAddItem}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Item
-              </Button>
-            </div>
-
-            {calculateTotal(items) > 0 && (
-              <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                <span className="font-semibold">Total:</span>
-                <span className="text-xl font-bold text-green-600">₱{calculateTotal(items).toFixed(2)}</span>
-              </div>
-            )}
+                  <h3 className="font-semibold text-sm truncate mb-1">{lista.title}</h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {lista.items.length} item{lista.items.length !== 1 ? "s" : ""}
+                  </p>
+                  {total > 0 && (
+                    <div className="text-lg font-bold text-green-600">₱{total.toFixed(2)}</div>
+                  )}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="w-full mt-3 h-9"
+                    onClick={(e) => { e.stopPropagation(); openEdit(lista) }}
+                  >
+                    <Edit2 className="h-3 w-3 mr-1" /> Edit
+                  </Button>
+                </MobileCard>
+              )
+            })}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsCreateOpen(false); setEditingLista(null); resetForm() }}>
-              Cancel
-            </Button>
-            <Button onClick={editingLista ? handleUpdate : handleCreate}>
-              <Save className="h-4 w-4 mr-2" /> {editingLista ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
 
-      {/* View Dialog */}
-      <Dialog open={!!viewingLista} onOpenChange={(open) => !open && setViewingLista(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{viewingLista?.title}</span>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => viewingLista && downloadLista(viewingLista)}>
-                  <Download className="h-4 w-4" />
+      {/* Desktop View */}
+      <div className="hidden md:block">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">e-Lista</h1>
+            <p className="text-sm text-muted-foreground">Create and manage your lists</p>
+          </div>
+          <Button onClick={() => { resetForm(); setIsCreateOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" /> New Lista
+          </Button>
+        </div>
+
+        {listas.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-semibold mb-2">No e-Listas yet</p>
+              <p className="text-sm text-muted-foreground mb-4">Create your first list to get started</p>
+              <Button onClick={() => { resetForm(); setIsCreateOpen(true) }}>
+                <Plus className="h-4 w-4 mr-2" /> Create e-Lista
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {listas.map((lista) => {
+              const total = calculateTotal(lista.items)
+              return (
+                <Card key={lista.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setViewingLista(lista)}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span className="truncate">{lista.title}</span>
+                      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-medium">Items: </span>
+                        {lista.items.slice(0, 3).map((item, idx) => (
+                          <span key={idx}>
+                            {item.name}
+                            {idx < Math.min(2, lista.items.length - 1) ? ", " : ""}
+                          </span>
+                        ))}
+                        {lista.items.length > 3 && (
+                          <span className="text-primary font-medium"> +{lista.items.length - 3} more...</span>
+                        )}
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Items:</span>
+                        <span className="font-semibold">{lista.items.length}</span>
+                      </div>
+                      {total > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Total:</span>
+                          <span className="font-bold text-green-600">₱{total.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-4">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={(e) => { e.stopPropagation(); openEdit(lista) }}>
+                          <Edit2 className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(lista.id!) }}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Floating Add Button (Mobile) */}
+      <FloatingActionButton
+        icon={<Plus className="h-7 w-7" />}
+        label="New Lista"
+        onClick={() => { resetForm(); setIsCreateOpen(true) }}
+      />
+
+      {/* Create/Edit Bottom Sheet (Mobile) / Dialog (Desktop) */}
+      <>
+        {/* Desktop Dialog */}
+        <div className="hidden md:block">
+          <Dialog open={isCreateOpen || !!editingLista} onOpenChange={(open) => { if (!open) { setIsCreateOpen(false); setEditingLista(null); resetForm() } }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingLista ? "Edit e-Lista" : "Create e-Lista"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="title">Title</Label>
+                  <Input id="title" placeholder="e.g., Shopping List, Restock Items" value={title} onChange={(e) => setTitle(e.target.value)} />
+                </div>
+                <div className="space-y-3">
+                  <Label>Items</Label>
+                  {items.map((item, index) => (
+                    <Card key={index} className="p-3">
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Input placeholder="Item name" value={item.name} onChange={(e) => handleItemChange(index, "name", e.target.value)} />
+                          </div>
+                          <div className="w-32">
+                            <Input type="number" placeholder="Amount" value={item.amount || ""} onChange={(e) => handleItemChange(index, "amount", e.target.value ? parseFloat(e.target.value) : undefined)} />
+                          </div>
+                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleRemoveItem(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Input placeholder="Notes (optional)" value={item.notes || ""} onChange={(e) => handleItemChange(index, "notes", e.target.value)} className="text-sm" />
+                      </div>
+                    </Card>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-yellow-500" onClick={handleAddItem}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Item
+                  </Button>
+                </div>
+                {calculateTotal(items) > 0 && (
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="font-semibold">Total:</span>
+                    <span className="text-xl font-bold text-green-600">₱{calculateTotal(items).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setIsCreateOpen(false); setEditingLista(null); resetForm() }}>Cancel</Button>
+                <Button onClick={editingLista ? handleUpdate : handleCreate}>
+                  <Save className="h-4 w-4 mr-2" /> {editingLista ? "Update" : "Create"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => viewingLista && printLista(viewingLista)}>
-                  <Printer className="h-4 w-4" />
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Mobile Bottom Sheet */}
+        <div className="md:hidden">
+          <BottomSheet
+            open={isCreateOpen || !!editingLista}
+            onClose={() => { setIsCreateOpen(false); setEditingLista(null); resetForm() }}
+            title={editingLista ? "Edit e-Lista" : "Create e-Lista"}
+            description={editingLista ? "Update your list" : "Create a new list"}
+          >
+            <div className="pb-20 space-y-4">
+              <div>
+                <Label htmlFor="title-mobile">Title</Label>
+                <Input id="title-mobile" placeholder="e.g., Shopping List" value={title} onChange={(e) => setTitle(e.target.value)} className="h-12" />
+              </div>
+              <div className="space-y-3">
+                <Label>Items</Label>
+                {items.map((item, index) => (
+                  <MobileCard key={index} className="p-3">
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Input placeholder="Item name" value={item.name} onChange={(e) => handleItemChange(index, "name", e.target.value)} />
+                        </div>
+                        <div className="w-28">
+                          <Input type="number" placeholder="₱" value={item.amount || ""} onChange={(e) => handleItemChange(index, "amount", e.target.value ? parseFloat(e.target.value) : undefined)} />
+                        </div>
+                        <Button size="icon" variant="ghost" className="text-destructive shrink-0" onClick={() => handleRemoveItem(index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Input placeholder="Notes (optional)" value={item.notes || ""} onChange={(e) => handleItemChange(index, "notes", e.target.value)} className="text-sm" />
+                    </div>
+                  </MobileCard>
+                ))}
+                <Button type="button" variant="outline" className="w-full bg-yellow-400 hover:bg-yellow-500 text-black border-yellow-500" onClick={handleAddItem}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Item
                 </Button>
               </div>
-            </DialogTitle>
-          </DialogHeader>
+              {calculateTotal(items) > 0 && (
+                <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                  <span className="font-semibold">Total:</span>
+                  <span className="text-xl font-bold text-green-600">₱{calculateTotal(items).toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => { setIsCreateOpen(false); setEditingLista(null); resetForm() }} className="flex-1 h-12">
+                  Cancel
+                </Button>
+                <Button onClick={editingLista ? handleUpdate : handleCreate} className="flex-1 h-12 bg-yellow-500 hover:bg-yellow-600">
+                  <Save className="h-4 w-4 mr-2" /> {editingLista ? "Update" : "Create"}
+                </Button>
+              </div>
+            </div>
+          </BottomSheet>
+        </div>
+      </>
+
+      {/* View Bottom Sheet (Mobile) / Dialog (Desktop) */}
+      <BottomSheet
+        open={!!viewingLista}
+        onClose={() => setViewingLista(null)}
+        title={viewingLista?.title || ""}
+        description={viewingLista ? `${viewingLista.items.length} items` : ""}
+      >
+        <div className="pb-20">
           {viewingLista && (
             <div className="space-y-3">
               {viewingLista.items.map((item, index) => (
-                <div key={index} className="flex justify-between items-start p-3 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="font-medium">{index + 1}. {item.name}</div>
-                    {item.notes && <div className="text-sm text-muted-foreground mt-1">{item.notes}</div>}
+                <MobileCard key={index} className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="font-medium">{index + 1}. {item.name}</div>
+                      {item.notes && <div className="text-sm text-muted-foreground mt-1">{item.notes}</div>}
+                    </div>
+                    {item.amount && (
+                      <div className="font-bold text-green-600 ml-4">₱{item.amount.toFixed(2)}</div>
+                    )}
                   </div>
-                  {item.amount && (
-                    <div className="font-bold text-green-600 ml-4">₱{item.amount.toFixed(2)}</div>
-                  )}
-                </div>
+                </MobileCard>
               ))}
               {calculateTotal(viewingLista.items) > 0 && (
-                <div className="flex justify-between items-center p-4 bg-muted rounded-lg font-bold text-lg">
-                  <span>TOTAL:</span>
-                  <span className="text-green-600">₱{calculateTotal(viewingLista.items).toFixed(2)}</span>
-                </div>
+                <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                  <div className="flex justify-between items-center font-bold text-lg">
+                    <span>TOTAL:</span>
+                    <span className="text-green-600">₱{calculateTotal(viewingLista.items).toFixed(2)}</span>
+                  </div>
+                </MobileCard>
               )}
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setViewingLista(null)} className="flex-1 h-12">
+                  Close
+                </Button>
+                <Button onClick={() => { if (viewingLista) { openEdit(viewingLista); setViewingLista(null) } }} className="flex-1 h-12 bg-yellow-500 hover:bg-yellow-600">
+                  <Edit2 className="h-4 w-4 mr-2" /> Edit
+                </Button>
+              </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewingLista(null)}>Close</Button>
-            <Button onClick={() => { if (viewingLista) { openEdit(viewingLista); setViewingLista(null) } }}>
-              <Edit2 className="h-4 w-4 mr-2" /> Edit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+      </BottomSheet>
+    </MobileAppShell>
   )
 }

@@ -409,17 +409,19 @@ export default function EWalletPage() {
         title="New Transaction"
         description="Record a new e-wallet transaction"
       >
-        {commissionSettings ? (
-          <TransactionForm
-            commissionSettings={commissionSettings}
-            onSuccess={() => {
-              loadData()
-              setShowNewTransaction(false)
-            }}
-          />
-        ) : (
-          <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>
-        )}
+        <div className="pb-24 md:pb-0">
+          {commissionSettings ? (
+            <TransactionForm
+              commissionSettings={commissionSettings}
+              onSuccess={() => {
+                loadData()
+                setShowNewTransaction(false)
+              }}
+            />
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>
+          )}
+        </div>
       </BottomSheet>
 
       {/* Settings Dialog */}

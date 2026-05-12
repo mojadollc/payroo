@@ -8,7 +8,7 @@ import {
 } from "recharts"
 import {
   Brain, TrendingUp, MapPin, Package, Clock, RefreshCw,
-  Filter, Download, Globe, Store, Flame, BarChart2,
+  Filter, Download, Globe, Store, Flame, BarChart2, Calendar,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ import {
   getMarketCityBreakdown,
   getMarketDistinctValues,
 } from "@/lib/firebase/services"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 
 const HOUR_LABELS = ["12am","1am","2am","3am","4am","5am","6am","7am","8am","9am","10am","11am",
   "12pm","1pm","2pm","3pm","4pm","5pm","6pm","7pm","8pm","9pm","10pm","11pm"]
@@ -134,27 +135,147 @@ function MarketIntelligencePageContent() {
   })
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Brain className="h-7 w-7 text-primary" />
-            Market Intelligence
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Real-time consumer behavior data across your entire POS network
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+    <MobileAppShell
+      title="Market Intel"
+      subtitle="Consumer behavior data"
+      headerAction={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV} disabled={topProducts.length === 0} className="h-9 gap-1.5">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={exportCSV} disabled={topProducts.length === 0}>
-            <Download className="h-4 w-4 mr-1" /> Export CSV
+          <Button variant="outline" size="sm" onClick={loadData} disabled={loading} className="h-9 gap-1.5">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">{loading ? "Loading..." : "Refresh"}</span>
           </Button>
         </div>
+      }
+    >
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {/* Month Filter */}
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-full h-12 rounded-xl border-2">
+            <Calendar className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Select month" />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        {/* Summary KPIs */}
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <Package className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Units Sold</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-600">{totalQty.toLocaleString()}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-green-500 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Revenue</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">{formatPeso(totalRevenue)}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-orange-500 rounded-lg">
+                <Clock className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Peak Hour</span>
+            </div>
+            <div className="text-2xl font-bold text-orange-600">{peakHour ? HOUR_LABELS[peakHour.hour] : "—"}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <MapPin className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Top City</span>
+            </div>
+            <div className="text-lg font-bold text-purple-600 truncate">{topCity?.city ?? "—"}</div>
+          </MobileCard>
+        </div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="products" className="w-full">
+          <div className="px-1 pt-1">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="products" className="text-xs gap-1"><Flame className="h-3 w-3" /> Products</TabsTrigger>
+              <TabsTrigger value="hourly" className="text-xs gap-1"><Clock className="h-3 w-3" /> Hourly</TabsTrigger>
+              <TabsTrigger value="cities" className="text-xs gap-1"><Globe className="h-3 w-3" /> Cities</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="products" className="mt-0">
+            <MobileCard className="p-4">
+              {topProducts.length === 0 ? <EmptyState /> : (
+                <div className="space-y-3">
+                  {topProducts.slice(0, 8).map((p, i) => (
+                    <div key={p.productName} className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">#{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.productName}</p>
+                        <p className="text-xs text-muted-foreground">{p.totalQty.toLocaleString()} units • {formatPeso(p.totalRevenue)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </MobileCard>
+          </TabsContent>
+
+          <TabsContent value="hourly" className="mt-0">
+            <MobileCard className="p-4">
+              {hourlySales.every(h => h.totalQty === 0) ? <EmptyState /> : (
+                <div className="space-y-2">
+                  {hourlySales.filter((_, i) => i % 2 === 0).map((h, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground w-12">{HOUR_LABELS[h.hour]}</span>
+                      <div className="flex-1 mx-3 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-orange-500 rounded-full" style={{ width: `${Math.min(100, (h.totalQty / (peakHour?.totalQty || 1)) * 100)}%` }} />
+                      </div>
+                      <span className="font-medium w-8 text-right">{h.totalQty}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </MobileCard>
+          </TabsContent>
+
+          <TabsContent value="cities" className="mt-0">
+            <MobileCard className="p-4">
+              {cityBreakdown.length === 0 ? <EmptyState /> : (
+                <div className="space-y-3">
+                  {cityBreakdown.slice(0, 6).map((c, i) => (
+                    <div key={c.city} className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">#{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{c.city}</p>
+                        <p className="text-xs text-muted-foreground">{c.totalQty.toLocaleString()} units</p>
+                      </div>
+                      <span className="font-bold text-green-600">{formatPeso(c.totalRevenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </MobileCard>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Desktop View */}
+      <div className="hidden md:block">
 
       {/* Filters */}
       <Card className="mb-6">
@@ -509,7 +630,8 @@ function MarketIntelligencePageContent() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </MobileAppShell>
   )
 }
 

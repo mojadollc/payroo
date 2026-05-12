@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown } from "lucide-react"
+import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -16,6 +16,7 @@ import { DateRangePicker } from "@/components/reports/date-range-picker"
 import { SalesReport } from "@/components/reports/sales-report"
 import { EWalletReport } from "@/components/reports/ewallet-report"
 import { ProfitChart } from "@/components/reports/profit-chart"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { getSales, getEWalletTransactions, getProducts } from "@/lib/firebase/services"
 import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"
 import { isFirebaseConfigured } from "@/lib/firebase/config"
@@ -280,92 +281,244 @@ export default function ReportsPage() {
     : new Date().toLocaleDateString("en-CA")
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">Reports</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Sales & analytics</p>
+    <MobileAppShell
+      title="Reports"
+      subtitle="Sales & analytics"
+      headerAction={
+        <div className="flex items-center gap-2">
+          <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
+          {!isCashier && (
+            canExport ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 h-9">
+                    <Download className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Export</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Sales Reports</div>
+                  <DropdownMenuItem
+                    disabled={sales.length === 0}
+                    onClick={() => exportSalesSummary(sales, rangeLabel)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-2" />
+                    Sales Summary
+                    <span className="ml-auto text-xs text-muted-foreground">{sales.length} tx</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={sales.length === 0}
+                    onClick={() => exportSalesLineItems(sales, rangeLabel)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-2" />
+                    Sales Line Items
+                    <span className="ml-auto text-xs text-muted-foreground">per product</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={sales.length === 0}
+                    onClick={() => exportDailySummary(sales, rangeLabel)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-2" />
+                    Daily Breakdown
+                    <span className="ml-auto text-xs text-muted-foreground">by day</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={sales.length === 0}
+                    onClick={() => exportProductPerformance(sales, rangeLabel)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-2" />
+                    Product Performance
+                    <span className="ml-auto text-xs text-muted-foreground">top sellers</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">E-Wallet & Inventory</div>
+                  <DropdownMenuItem
+                    disabled={ewalletTransactions.length === 0}
+                    onClick={() => exportEWallet(ewalletTransactions, rangeLabel)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-2" />
+                    E-Wallet Transactions
+                    <span className="ml-auto text-xs text-muted-foreground">{ewalletTransactions.length} tx</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={products.length === 0}
+                    onClick={() => exportInventorySnapshot(products, new Date().toLocaleDateString("en-CA"))}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-2" />
+                    Inventory Snapshot
+                    <span className="ml-auto text-xs text-muted-foreground">{products.length} items</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button variant="outline" size="sm" disabled className="gap-1.5 opacity-60 cursor-not-allowed h-9" title="Upgrade to Gold or Enterprise to export reports">
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Export</span>
+                <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-full font-semibold">PRO</span>
+              </Button>
+            )
+          )}
+        </div>
+      }
+    >
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {/* Today's Performance Card */}
+        <MobileCard className="p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 bg-primary rounded-lg">
+              <Activity className="h-4 w-4 text-white" />
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
-              {!isCashier && (
-                canExport ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <Download className="h-3.5 w-3.5" />
-                      Export
-                      <ChevronDown className="h-3 w-3 opacity-60" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Sales Reports</div>
-                    <DropdownMenuItem
-                      disabled={sales.length === 0}
-                      onClick={() => exportSalesSummary(sales, rangeLabel)}
-                    >
-                      <Download className="h-3.5 w-3.5 mr-2" />
-                      Sales Summary
-                      <span className="ml-auto text-xs text-muted-foreground">{sales.length} tx</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={sales.length === 0}
-                      onClick={() => exportSalesLineItems(sales, rangeLabel)}
-                    >
-                      <Download className="h-3.5 w-3.5 mr-2" />
-                      Sales Line Items
-                      <span className="ml-auto text-xs text-muted-foreground">per product</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={sales.length === 0}
-                      onClick={() => exportDailySummary(sales, rangeLabel)}
-                    >
-                      <Download className="h-3.5 w-3.5 mr-2" />
-                      Daily Breakdown
-                      <span className="ml-auto text-xs text-muted-foreground">by day</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={sales.length === 0}
-                      onClick={() => exportProductPerformance(sales, rangeLabel)}
-                    >
-                      <Download className="h-3.5 w-3.5 mr-2" />
-                      Product Performance
-                      <span className="ml-auto text-xs text-muted-foreground">top sellers</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">E-Wallet & Inventory</div>
-                    <DropdownMenuItem
-                      disabled={ewalletTransactions.length === 0}
-                      onClick={() => exportEWallet(ewalletTransactions, rangeLabel)}
-                    >
-                      <Download className="h-3.5 w-3.5 mr-2" />
-                      E-Wallet Transactions
-                      <span className="ml-auto text-xs text-muted-foreground">{ewalletTransactions.length} tx</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={products.length === 0}
-                      onClick={() => exportInventorySnapshot(products, new Date().toLocaleDateString("en-CA"))}
-                    >
-                      <Download className="h-3.5 w-3.5 mr-2" />
-                      Inventory Snapshot
-                      <span className="ml-auto text-xs text-muted-foreground">{products.length} items</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                ) : (
-                <Button variant="outline" size="sm" disabled className="gap-1.5 opacity-60 cursor-not-allowed" title="Upgrade to Gold or Enterprise to export reports">
-                  <Download className="h-3.5 w-3.5" />
-                  Export
-                  <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-full font-semibold">PRO</span>
-                </Button>
-                )
-              )}
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-foreground">Today's Performance</div>
+              <div className="text-xs text-muted-foreground">{todayFormatted}</div>
             </div>
           </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-background rounded-xl p-3 border">
+              <div className="flex items-center gap-1 mb-1">
+                <Receipt className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Gross Sales</span>
+              </div>
+              <div className="text-xl font-bold text-primary">₱{today.gross.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{today.txCount} transaction{today.txCount !== 1 ? "s" : ""}</div>
+            </div>
+            
+            <div className="bg-background rounded-xl p-3 border">
+              <div className="flex items-center gap-1 mb-1">
+                <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Net Profit</span>
+              </div>
+              <div className="text-xl font-bold text-green-600">₱{today.profit.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{today.itemsSold} items sold</div>
+            </div>
+            
+            <div className="bg-background rounded-xl p-3 border">
+              <div className="flex items-center gap-1 mb-1">
+                <Wallet className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">E-Wallet</span>
+              </div>
+              <div className="text-xl font-bold text-blue-600">₱{today.eGross.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">₱{today.eProfit.toFixed(2)} commission</div>
+            </div>
+            
+            <div className="bg-background rounded-xl p-3 border">
+              <div className="flex items-center gap-1 mb-1">
+                <CircleDollarSign className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Total Earnings</span>
+              </div>
+              <div className="text-xl font-bold text-orange-600">₱{(today.profit + today.eProfit).toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Sales + E-Wallet</div>
+            </div>
+          </div>
+
+          {today.topItems.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Top Selling Today</p>
+              <div className="flex flex-wrap gap-2">
+                {today.topItems.map((item, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">
+                    {item.name} × {item.qty}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </MobileCard>
+
+        {/* Period Summary Cards */}
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-green-500 rounded-lg">
+                <ArrowUpRight className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Total Revenue</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">₱{stats.totalRevenue.toFixed(2)}</div>
+            <div className="text-xs text-muted-foreground mt-1">Sales + E-Wallet</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-emerald-500 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Net Profit</span>
+            </div>
+            <div className="text-2xl font-bold text-emerald-600">₱{stats.totalProfit.toFixed(2)}</div>
+            <div className="text-xs text-muted-foreground mt-1">After cost of goods</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <ShoppingCart className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Sales</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-600">₱{stats.salesRevenue.toFixed(2)}</div>
+            <div className="text-xs text-green-600 font-semibold mt-1">Profit: ₱{stats.salesProfit.toFixed(2)}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <Wallet className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">E-Wallet</span>
+            </div>
+            <div className="text-2xl font-bold text-purple-600">₱{stats.ewalletRevenue.toFixed(2)}</div>
+            <div className="text-xs text-green-600 font-semibold mt-1">Commission: ₱{stats.ewalletProfit.toFixed(2)}</div>
+          </MobileCard>
         </div>
 
+        {/* Profit Chart */}
+        <div>
+          <MobileSectionHeader title="Profit Tracker" />
+          <MobileCard>
+            <div className="p-4">
+              <ProfitChart sales={sales} ewalletTransactions={ewalletTransactions} isLoading={isLoading} />
+            </div>
+          </MobileCard>
+        </div>
+
+        {/* Detailed Reports Tabs */}
+        <div>
+          <MobileSectionHeader title="Detailed Reports" />
+          <MobileCard>
+            <Tabs defaultValue="sales" className="w-full">
+              <div className="px-4 pt-4">
+                <TabsList className="w-full grid grid-cols-2">
+                  <TabsTrigger value="sales" className="gap-2 text-xs">
+                    <ShoppingCart className="h-3.5 w-3.5" />
+                    Sales
+                  </TabsTrigger>
+                  <TabsTrigger value="ewallet" className="gap-2 text-xs">
+                    <Wallet className="h-3.5 w-3.5" />
+                    E-Wallet
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="sales" className="mt-0">
+                <div className="p-3">
+                  <SalesReport sales={sales} isLoading={isLoading} />
+                </div>
+              </TabsContent>
+              <TabsContent value="ewallet" className="mt-0">
+                <div className="p-3">
+                  <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
+                </div>
+              </TabsContent>
+            </Tabs>
+          </MobileCard>
+        </div>
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden md:block">
         {/* Today's Sales */}
         <Card className="mb-4 border-primary/30 bg-primary/5">
           <CardHeader className="p-3 pb-2">
@@ -493,6 +646,6 @@ export default function ReportsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </MobileAppShell>
   )
 }

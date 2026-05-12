@@ -2,7 +2,7 @@
 
 import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect, useCallback } from "react"
-import { QrCode, Plus, Coins, Gift, Settings2, Trash2, Users, ChevronDown, ChevronUp } from "lucide-react"
+import { QrCode, Plus, Coins, Gift, Settings2, Trash2, Users, ChevronDown, ChevronUp, Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,9 @@ import { getProducts } from "@/lib/firebase/services"
 import type { LoyaltyCustomer, LoyaltyRule, LoyaltySettings, LoyaltyTransaction } from "@/lib/firebase/types"
 import type { Product } from "@/lib/firebase/types"
 import { Timestamp } from "firebase/firestore"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
+import { FloatingActionButton } from "@/components/ui/floating-action-button"
 
 // ── QR Display ────────────────────────────────────────────────────────────────
 function CustomerQRDialog({ customer, onClose }: { customer: LoyaltyCustomer; onClose: () => void }) {
@@ -41,7 +44,7 @@ function CustomerQRDialog({ customer, onClose }: { customer: LoyaltyCustomer; on
   )
 }
 
-// ── Add Customer Dialog ───────────────────────────────────────────────────────
+// ── Add Customer Dialog ────────────────────────────────────────────────────────
 function AddCustomerDialog({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
@@ -62,19 +65,19 @@ function AddCustomerDialog({ onClose, onSuccess }: { onClose: () => void; onSucc
   }
 
   return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Enroll Customer</DialogTitle><DialogDescription>Add a new loyalty member</DialogDescription></DialogHeader>
-        <div className="space-y-3">
-          <div><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Juan dela Cruz" autoFocus /></div>
-          <div><Label>Phone (optional)</Label><Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="09xxxxxxxxx" /></div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Enroll"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className="space-y-4">
+      <div>
+        <Label>Name</Label>
+        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Juan dela Cruz" autoFocus />
+      </div>
+      <div>
+        <Label>Phone (optional)</Label>
+        <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="09xxxxxxxxx" />
+      </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        {saving ? "Saving..." : "Enroll Customer"}
+      </Button>
+    </div>
   )
 }
 
@@ -148,7 +151,7 @@ function CustomerRow({ customer, settings, onQR, onRedeem, onRefresh }: {
     : { label: "Bronze", color: "bg-orange-100 text-orange-700" }
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <MobileCard className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -165,26 +168,27 @@ function CustomerRow({ customer, settings, onQR, onRedeem, onRefresh }: {
           <p className="text-xs text-muted-foreground">coins</p>
         </div>
       </div>
-      <div className="flex gap-1 flex-wrap">
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onQR}>
+      <div className="flex gap-1 flex-wrap mt-3">
+        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onQR}>
           <QrCode className="h-4 w-4 mr-1" /> QR
         </Button>
         {customer.coins >= settings.minRedeemCoins && (
-          <Button size="sm" variant="outline" className="h-7 text-xs text-green-700 border-green-300" onClick={onRedeem}>
+          <Button size="sm" variant="outline" className="h-8 text-xs text-green-700 border-green-300" onClick={onRedeem}>
             <Gift className="h-4 w-4 mr-1" /> Redeem
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={loadTxs}>
+        <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={loadTxs}>
           {expanded ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />} History
         </Button>
       </div>
       {expanded && (
-        <div className="pt-1 border-t space-y-1">
+        <div className="pt-3 border-t mt-3 space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground">Transaction History</p>
           {txs.length === 0 ? <p className="text-xs text-muted-foreground">No transactions yet</p>
-            : txs.slice(0, 10).map(tx => {
+            : txs.slice(0, 8).map(tx => {
               const d = tx.createdAt instanceof Timestamp ? tx.createdAt.toDate() : new Date()
               return (
-                <div key={tx.id} className="flex justify-between text-xs">
+                <div key={tx.id} className="flex justify-between text-xs bg-muted/30 rounded-lg p-2">
                   <span className="text-muted-foreground">{d.toLocaleDateString()} · {tx.type}</span>
                   <span className={tx.type === "earn" ? "text-yellow-600 font-medium" : "text-red-500 font-medium"}>
                     {tx.type === "earn" ? "+" : "-"}{tx.coins} 🪙
@@ -194,7 +198,7 @@ function CustomerRow({ customer, settings, onQR, onRedeem, onRefresh }: {
             })}
         </div>
       )}
-    </div>
+    </MobileCard>
   )
 }
 
@@ -233,9 +237,9 @@ function RulesTab({ products }: { products: Product[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="border rounded-lg p-4 space-y-3">
-        <p className="text-sm font-semibold">Add / Update Rule</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <MobileCard className="p-4">
+        <p className="text-sm font-semibold mb-3">Add / Update Rule</p>
+        <div className="space-y-3">
           <div>
             <Label className="text-xs">Product</Label>
             <Select value={selectedProductId} onValueChange={setSelectedProductId}>
@@ -245,36 +249,41 @@ function RulesTab({ products }: { products: Product[] }) {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label className="text-xs">Buy Qty</Label>
-            <Input type="number" value={buyQty} onChange={e => setBuyQty(e.target.value)} min="1" placeholder="5" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Buy Qty</Label>
+              <Input type="number" value={buyQty} onChange={e => setBuyQty(e.target.value)} min="1" placeholder="5" />
+            </div>
+            <div>
+              <Label className="text-xs">Earn Coins</Label>
+              <Input type="number" value={earnCoins} onChange={e => setEarnCoins(e.target.value)} min="1" placeholder="1" />
+            </div>
           </div>
-          <div>
-            <Label className="text-xs">Earn Coins</Label>
-            <Input type="number" value={earnCoins} onChange={e => setEarnCoins(e.target.value)} min="1" placeholder="1" />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            {selectedProductId && buyQty && earnCoins
+              ? `Buy ${buyQty}x ${products.find(p => p.id === selectedProductId)?.name} → earn ${earnCoins} coin(s)`
+              : "e.g. Buy 5 Noodles → earn 1 coin"}
+          </p>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="w-full">{saving ? "Saving..." : "Save Rule"}</Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {selectedProductId && buyQty && earnCoins
-            ? `Buy ${buyQty}x ${products.find(p => p.id === selectedProductId)?.name} → earn ${earnCoins} coin(s)`
-            : "e.g. Buy 5 Noodles → earn 1 coin"}
-        </p>
-        <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save Rule"}</Button>
-      </div>
+      </MobileCard>
 
-      {rules.length === 0
-        ? <p className="text-sm text-muted-foreground text-center py-8">No rules yet. Add one above.</p>
-        : <div className="space-y-2">
+      {rules.length === 0 ? (
+        <MobileCard className="p-8 text-center">
+          <p className="text-sm text-muted-foreground">No rules yet. Add one above.</p>
+        </MobileCard>
+      ) : (
+        <div className="space-y-2">
           {rules.map(r => (
-            <div key={r.id} className="flex items-center justify-between border rounded-lg px-3 py-2">
+            <MobileCard key={r.id} className="p-3 flex items-center justify-between">
               <span className="text-sm">Buy <strong>{r.buyQty}x</strong> {r.productName} → <strong className="text-yellow-600">🪙 {r.earnCoins}</strong></span>
               <Button size="sm" variant="ghost" className="h-7 text-destructive" onClick={() => handleDelete(r.id!)}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
-            </div>
+            </MobileCard>
           ))}
         </div>
-      }
+      )}
     </div>
   )
 }
@@ -300,7 +309,7 @@ function SettingsTab() {
   }
 
   return (
-    <div className="border rounded-lg p-4 space-y-4 max-w-sm">
+    <MobileCard className="p-4 space-y-4">
       <div>
         <Label>Minimum coins to redeem</Label>
         <Input type="number" value={minCoins} onChange={e => setMinCoins(e.target.value)} min="1" />
@@ -311,8 +320,8 @@ function SettingsTab() {
         <Input type="number" value={coinValue} onChange={e => setCoinValue(e.target.value)} min="0.01" step="0.01" />
         <p className="text-xs text-muted-foreground mt-1">Peso discount per coin when redeeming</p>
       </div>
-      <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save Settings"}</Button>
-    </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? "Saving..." : "Save Settings"}</Button>
+    </MobileCard>
   )
 }
 
@@ -349,87 +358,215 @@ function LoyaltyPageContent() {
   const totalRedeemed = customers.reduce((s, c) => s + c.totalRedeemed, 0)
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Loyalty</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">QR rewards program</p>
-          </div>
-          <Button size="sm" onClick={() => setShowAdd(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> Enroll
-          </Button>
+    <MobileAppShell
+      title="Loyalty"
+      subtitle="QR rewards program"
+      headerAction={
+        <Button size="sm" className="h-9" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline ml-1.5">Enroll</span>
+        </Button>
+      }
+    >
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <Users className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Members</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-600">{customers.length}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-yellow-500 rounded-lg">
+                <Coins className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Coins Outstanding</span>
+            </div>
+            <div className="text-2xl font-bold text-yellow-600">🪙 {totalCoinsOutstanding}</div>
+            <div className="text-xs text-muted-foreground mt-1">≈ ₱{(totalCoinsOutstanding * settings.coinValuePeso).toFixed(2)}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-green-500 rounded-lg">
+                <Gift className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Total Redeemed</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">🪙 {totalRedeemed}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <Coins className="h-4 w-4 text-white" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Coin Value</span>
+            </div>
+            <div className="text-2xl font-bold text-purple-600">₱{settings.coinValuePeso}</div>
+            <div className="text-xs text-muted-foreground mt-1">per coin</div>
+          </MobileCard>
         </div>
-      </div>
 
-      {/* Summary */}
-      <div className="grid gap-3 md:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Enrolled Customers</CardTitle>
-            <Users className="h-3 w-3 text-blue-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-blue-600">{customers.length}</div>
-            <p className="text-xs text-muted-foreground">loyalty members</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Coins Outstanding</CardTitle>
-            <Coins className="h-3 w-3 text-yellow-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-yellow-600">🪙 {totalCoinsOutstanding}</div>
-            <p className="text-xs text-muted-foreground">≈ ₱{(totalCoinsOutstanding * settings.coinValuePeso).toFixed(2)} value</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Total Redeemed</CardTitle>
-            <Gift className="h-3 w-3 text-green-500" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-green-600">🪙 {totalRedeemed}</div>
-            <p className="text-xs text-muted-foreground">coins used by customers</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="customers" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="rules">Earn Rules</TabsTrigger>
-          <TabsTrigger value="settings"><Settings2 className="h-4 w-4 mr-1" />Settings</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="customers" className="space-y-3">
-          <Input placeholder="Search customer..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-          {filtered.length === 0
-            ? <div className="text-center py-16 text-muted-foreground"><QrCode className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No customers enrolled yet</p></div>
-            : filtered.map(c => (
-              <CustomerRow
-                key={c.id} customer={c} settings={settings}
-                onQR={() => setQrTarget(c)}
-                onRedeem={() => setRedeemTarget(c)}
-                onRefresh={load}
+        {/* Search */}
+        <MobileCard className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+          <div className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search customer..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
               />
-            ))
-          }
-        </TabsContent>
+            </div>
+          </div>
+        </MobileCard>
 
-        <TabsContent value="rules">
-          <RulesTab products={products} />
-        </TabsContent>
+        {/* Tabs */}
+        <Tabs defaultValue="customers" className="w-full">
+          <div className="px-4 pt-2">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="customers" className="text-xs">Members</TabsTrigger>
+              <TabsTrigger value="rules" className="text-xs">Rules</TabsTrigger>
+              <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="settings">
-          <SettingsTab />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="customers" className="mt-0">
+            <div className="p-3 space-y-3">
+              {filtered.length === 0 ? (
+                <MobileCard className="p-8 text-center">
+                  <QrCode className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-muted-foreground">No customers enrolled yet</p>
+                </MobileCard>
+              ) : (
+                filtered.map(c => (
+                  <CustomerRow
+                    key={c.id} customer={c} settings={settings}
+                    onQR={() => setQrTarget(c)}
+                    onRedeem={() => setRedeemTarget(c)}
+                    onRefresh={load}
+                  />
+                ))
+              )}
+            </div>
+          </TabsContent>
 
-      {showAdd && <AddCustomerDialog onClose={() => setShowAdd(false)} onSuccess={load} />}
+          <TabsContent value="rules" className="mt-0">
+            <div className="p-3">
+              <RulesTab products={products} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="settings" className="mt-0">
+            <div className="p-3">
+              <SettingsTab />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden md:block space-y-6">
+        {/* Summary */}
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+              <CardTitle className="text-xs font-medium">Enrolled Customers</CardTitle>
+              <Users className="h-3 w-3 text-blue-500" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold text-blue-600">{customers.length}</div>
+              <p className="text-xs text-muted-foreground">loyalty members</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+              <CardTitle className="text-xs font-medium">Coins Outstanding</CardTitle>
+              <Coins className="h-3 w-3 text-yellow-500" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold text-yellow-600">🪙 {totalCoinsOutstanding}</div>
+              <p className="text-xs text-muted-foreground">≈ ₱{(totalCoinsOutstanding * settings.coinValuePeso).toFixed(2)} value</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+              <CardTitle className="text-xs font-medium">Total Redeemed</CardTitle>
+              <Gift className="h-3 w-3 text-green-500" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold text-green-600">🪙 {totalRedeemed}</div>
+              <p className="text-xs text-muted-foreground">coins used by customers</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="customers" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="customers">Customers</TabsTrigger>
+            <TabsTrigger value="rules">Earn Rules</TabsTrigger>
+            <TabsTrigger value="settings"><Settings2 className="h-4 w-4 mr-1" />Settings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="customers" className="space-y-3">
+            <Input placeholder="Search customer..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
+            {filtered.length === 0
+              ? <div className="text-center py-16 text-muted-foreground"><QrCode className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>No customers enrolled yet</p></div>
+              : filtered.map(c => (
+                <CustomerRow
+                  key={c.id} customer={c} settings={settings}
+                  onQR={() => setQrTarget(c)}
+                  onRedeem={() => setRedeemTarget(c)}
+                  onRefresh={load}
+                />
+              ))
+            }
+          </TabsContent>
+
+          <TabsContent value="rules">
+            <RulesTab products={products} />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <SettingsTab />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Floating Add Button (Mobile) */}
+      <FloatingActionButton
+        icon={<Plus className="h-7 w-7" />}
+        label="Enroll Customer"
+        onClick={() => setShowAdd(true)}
+      />
+
+      {/* Add Customer Bottom Sheet (Mobile) */}
+      <BottomSheet
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="Enroll Customer"
+        description="Add a new loyalty member"
+      >
+        <div className="pb-20">
+          <AddCustomerDialog
+            onClose={() => setShowAdd(false)}
+            onSuccess={load}
+          />
+        </div>
+      </BottomSheet>
+
+      {/* Dialogs */}
       {qrTarget && <CustomerQRDialog customer={qrTarget} onClose={() => setQrTarget(null)} />}
       {redeemTarget && <RedeemDialog customer={redeemTarget} settings={settings} onClose={() => setRedeemTarget(null)} onSuccess={load} />}
-    </div>
+    </MobileAppShell>
   )
 }

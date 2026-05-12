@@ -21,7 +21,7 @@ export function BottomSheet({
   children,
   title,
   description,
-  maxHeight = "85vh",
+  maxHeight = "90vh",
 }: BottomSheetProps) {
   useEffect(() => {
     if (open) {
@@ -87,7 +87,7 @@ export function BottomSheet({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-8" style={{ maxHeight: 'calc(90vh - 100px)' }}>
           {children}
         </div>
       </div>

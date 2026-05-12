@@ -5,11 +5,13 @@ import { getBusinessConfig, type BusinessConfig, type BusinessType } from "@/lib
 import { getStoreSettings } from "@/lib/firebase/services"
 
 export function useBusinessConfig(): BusinessConfig {
-  const [config, setConfig] = useState<BusinessConfig>(() =>
-    getBusinessConfig((typeof window !== "undefined" ? localStorage.getItem("businessType") : null) ?? "retail")
-  )
+  const [config, setConfig] = useState<BusinessConfig>(() => getBusinessConfig("retail"))
 
   useEffect(() => {
+    // Seed from cache immediately, then confirm from Firestore
+    const cached = localStorage.getItem("businessType")
+    if (cached) setConfig(getBusinessConfig(cached))
+
     const fetchConfig = async () => {
       try {
         const s = await getStoreSettings()

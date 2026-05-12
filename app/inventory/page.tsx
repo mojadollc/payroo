@@ -43,6 +43,10 @@ import { AddProductDialog } from "@/components/inventory/add-product-dialog"
 import { EditProductDialog } from "@/components/inventory/edit-product-dialog"
 import { CategoryManager } from "@/components/inventory/category-manager"
 import { DefaultProductImage } from "@/components/ui/default-product-image"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
+import { FloatingActionButton } from "@/components/ui/floating-action-button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 
@@ -154,6 +158,7 @@ export default function InventoryPage() {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
   const [bulkUploading, setBulkUploading] = useState(false)
+  const [activeTab, setActiveTab] = useState("products")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -469,120 +474,250 @@ export default function InventoryPage() {
     }
   }
 
+  const tabProducts = {
+    products: filteredProducts,
+    "low-stock": filteredProducts.filter(p => p.stock > 0 && p.stock <= 5),
+    "out-of-stock": filteredProducts.filter(p => p.stock === 0),
+  } as Record<string, typeof filteredProducts>
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">Inventory</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{cfg.emoji} {cfg.itemLabelPlural}</p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setParsedRows([]); setBulkOpen(true) }}
-              disabled={!canExport}
-              title={!canExport ? "Upgrade to Gold plan to use Bulk Upload" : undefined}
-              className={!canExport ? "opacity-60 cursor-not-allowed" : ""}
-            >
-              <Upload className="mr-1.5 h-3.5 w-3.5" /> Bulk
-              {!canExport && (
-                <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-full font-semibold">GOLD</span>
-              )}
-            </Button>
-            <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
-            </Button>
-          </div>
+    <MobileAppShell
+      title="Inventory"
+      subtitle={`${cfg.emoji} ${cfg.itemLabelPlural}`}
+      headerAction={
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setParsedRows([]); setBulkOpen(true) }}
+            disabled={!canExport}
+            title={!canExport ? "Upgrade to Gold plan to use Bulk Upload" : undefined}
+            className={!canExport ? "opacity-60 cursor-not-allowed h-9" : "h-9"}
+          >
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1.5">Bulk</span>
+            {!canExport && (
+              <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded-full font-semibold">GOLD</span>
+            )}
+          </Button>
+          <Button size="sm" className="h-9" onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1.5">Add</span>
+          </Button>
         </div>
+      }
+    >
+      {/* ── Mobile View ── */}
+      <div className="md:hidden space-y-4">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-blue-500 rounded-lg"><DollarSign className="h-4 w-4 text-white" /></div>
+              <span className="text-xs font-medium text-muted-foreground">Stock Value</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-600">₱{totalStockValue.toLocaleString()}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-green-500 rounded-lg"><Package className="h-4 w-4 text-white" /></div>
+              <span className="text-xs font-medium text-muted-foreground">Total Items</span>
+            </div>
+            <div className="text-2xl font-bold text-green-600">{totalItems}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-purple-500 rounded-lg"><LayoutGrid className="h-4 w-4 text-white" /></div>
+              <span className="text-xs font-medium text-muted-foreground">Products</span>
+            </div>
+            <div className="text-2xl font-bold text-purple-600">{products.length}</div>
+          </MobileCard>
+
+          <MobileCard className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-orange-500 rounded-lg"><AlertTriangle className="h-4 w-4 text-white" /></div>
+              <span className="text-xs font-medium text-muted-foreground">Alerts</span>
+            </div>
+            <div className="text-2xl font-bold text-orange-600">{lowStockCount + outOfStockCount}</div>
+            <div className="text-xs text-orange-600/80 mt-1">{lowStockCount} low • {outOfStockCount} out</div>
+          </MobileCard>
+        </div>
+
+        {/* Tab Filter */}
+        <Select value={activeTab} onValueChange={setActiveTab}>
+          <SelectTrigger className="w-full h-12 rounded-xl border-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="products">All {cfg.itemLabelPlural}</SelectItem>
+            <SelectItem value="low-stock">Low Stock ({lowStockCount})</SelectItem>
+            <SelectItem value="out-of-stock">Out of Stock ({outOfStockCount})</SelectItem>
+            <SelectItem value="categories">Categories</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Search */}
+        {activeTab !== "categories" && (
+          <MobileCard className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
+                />
+              </div>
+            </div>
+          </MobileCard>
+        )}
+
+        {/* Product List / Categories */}
+        {activeTab === "categories" ? (
+          <MobileCard>
+            <div className="p-3">
+              <CategoryManager categories={categories} onUpdate={loadCategories} />
+            </div>
+          </MobileCard>
+        ) : (
+          <div>
+            <MobileSectionHeader title={activeTab === "products" ? `All ${cfg.itemLabelPlural}` : activeTab === "low-stock" ? "Low Stock" : "Out of Stock"} />
+            <div className="grid grid-cols-2 gap-3">
+              {(tabProducts[activeTab] ?? filteredProducts).map((product) => (
+                <MobileCard key={product.id}>
+                  <div className="relative aspect-square bg-muted">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <DefaultProductImage />
+                    )}
+                    {product.stock === 0 && (
+                      <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
+                        <span className="text-sm font-bold text-destructive">Out of Stock</span>
+                      </div>
+                    )}
+                    {product.onSale && product.salePrice && product.stock > 0 && (
+                      <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">SALE</div>
+                    )}
+                    {product.stock > 0 && product.stock <= 5 && (
+                      <div className="absolute top-2 right-2 bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-lg">LOW</div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <div className="font-semibold text-sm truncate mb-1" title={product.name}>{product.name}</div>
+                    {product.onSale && product.salePrice ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-base font-bold text-red-500">₱{product.salePrice}</div>
+                        <div className="text-xs line-through text-muted-foreground">₱{product.price}</div>
+                      </div>
+                    ) : (
+                      <div className="text-base font-bold text-primary">₱{product.price}</div>
+                    )}
+                    <div className="text-xs text-muted-foreground mt-0.5">Stock: {product.stock} • Cost: ₱{product.cost}</div>
+                    <div className="flex gap-1 mt-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 rounded-lg" onClick={() => setEditProduct(product)}>
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-lg" onClick={() => { setRestockProduct(product); setRestockQty("") }}>
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 hover:bg-gray-50 rounded-lg" onClick={() => setSelectedProductForBarcode(product)}>
+                        <Barcode className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-lg ml-auto" onClick={() => handleDeleteProduct(product.id!)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </MobileCard>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Stock Value Cards - Mobile Friendly 2 Rows */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {/* Row 1 */}
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <DollarSign className="h-8 w-8 text-blue-600" />
-              <div className="text-right">
-                <div className="text-lg font-bold text-blue-700">₱{totalStockValue.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
-                <div className="text-xs text-blue-600 font-medium">Stock Value</div>
+      {/* ── Desktop View ── */}
+      <div className="hidden md:block space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <DollarSign className="h-8 w-8 text-blue-600" />
+                <div className="text-right">
+                  <div className="text-lg font-bold text-blue-700">₱{totalStockValue.toLocaleString()}</div>
+                  <div className="text-xs text-blue-600 font-medium">Stock Value</div>
+                </div>
               </div>
-            </div>
-            <div className="text-xs text-blue-600/80">Based on {cfg.costLabel.toLowerCase()}</div>
-          </CardContent>
-        </Card>
+              <div className="text-xs text-blue-600/80">Based on {cfg.costLabel.toLowerCase()}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Package className="h-8 w-8 text-green-600" />
+                <div className="text-right">
+                  <div className="text-lg font-bold text-green-700">{totalItems}</div>
+                  <div className="text-xs text-green-600 font-medium">Total Items</div>
+                </div>
+              </div>
+              <div className="text-xs text-green-600/80">{cfg.trackStock ? "Units in stock" : "Active services"}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <LayoutGrid className="h-8 w-8 text-purple-600" />
+                <div className="text-right">
+                  <div className="text-lg font-bold text-purple-700">{products.length}</div>
+                  <div className="text-xs text-purple-600 font-medium">Products</div>
+                </div>
+              </div>
+              <div className="text-xs text-purple-600/80">{cfg.itemLabelPlural}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-6 w-6 text-orange-600" />
+                  <XCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-orange-700">{lowStockCount + outOfStockCount}</div>
+                  <div className="text-xs text-orange-600 font-medium">Alerts</div>
+                </div>
+              </div>
+              <div className="text-xs text-orange-600/80">{lowStockCount} low • {outOfStockCount} out</div>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <Package className="h-8 w-8 text-green-600" />
-              <div className="text-right">
-                <div className="text-lg font-bold text-green-700">{totalItems}</div>
-                <div className="text-xs text-green-600 font-medium">Total Items</div>
-              </div>
-            </div>
-            <div className="text-xs text-green-600/80">{cfg.trackStock ? "Units in stock" : "Active services"}</div>
-          </CardContent>
-        </Card>
-
-        {/* Row 2 */}
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <LayoutGrid className="h-8 w-8 text-purple-600" />
-              <div className="text-right">
-                <div className="text-lg font-bold text-purple-700">{products.length}</div>
-                <div className="text-xs text-purple-600 font-medium">Products</div>
-              </div>
-            </div>
-            <div className="text-xs text-purple-600/80">{cfg.itemLabelPlural}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-6 w-6 text-orange-600" />
-                <XCircle className="h-6 w-6 text-red-600" />
-              </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-orange-700">{lowStockCount + outOfStockCount}</div>
-                <div className="text-xs text-orange-600 font-medium">Alerts</div>
-              </div>
-            </div>
-            <div className="text-xs text-orange-600/80">{lowStockCount} low • {outOfStockCount} out</div>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="products" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
+            <TabsTrigger value="products" className="text-sm font-medium">All {cfg.itemLabelPlural}</TabsTrigger>
+            <TabsTrigger value="low-stock" className="text-sm font-medium text-yellow-700">Low Stock ({lowStockCount})</TabsTrigger>
+            <TabsTrigger value="out-of-stock" className="text-sm font-medium text-red-700">Out of Stock ({outOfStockCount})</TabsTrigger>
+            <TabsTrigger value="categories" className="text-sm font-medium">Categories</TabsTrigger>
+          </TabsList>
+          <TabsContent value="products" className="space-y-6">{renderProductList(filteredProducts)}</TabsContent>
+          <TabsContent value="low-stock" className="space-y-6">{renderProductList(filteredProducts.filter(p => p.stock > 0 && p.stock <= 5))}</TabsContent>
+          <TabsContent value="out-of-stock" className="space-y-6">{renderProductList(filteredProducts.filter(p => p.stock === 0))}</TabsContent>
+          <TabsContent value="categories"><CategoryManager categories={categories} onUpdate={loadCategories} /></TabsContent>
+        </Tabs>
       </div>
 
-      <Tabs defaultValue="products" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 bg-gray-100 p-1 rounded-lg">
-          <TabsTrigger value="products" className="text-sm font-medium">All {cfg.itemLabelPlural}</TabsTrigger>
-          <TabsTrigger value="low-stock" className="text-sm font-medium text-yellow-700">Low Stock ({lowStockCount})</TabsTrigger>
-          <TabsTrigger value="out-of-stock" className="text-sm font-medium text-red-700 hidden lg:flex">Out of Stock ({outOfStockCount})</TabsTrigger>
-          <TabsTrigger value="categories" className="text-sm font-medium hidden lg:flex">Categories</TabsTrigger>
-        </TabsList>
+      {/* Floating Add Button (Mobile) */}
+      <FloatingActionButton
+        icon={<Plus className="h-7 w-7" />}
+        label="Add Product"
+        onClick={() => setIsAddDialogOpen(true)}
+      />
 
-        <TabsContent value="products" className="space-y-6">
-          {renderProductList(filteredProducts)}
-        </TabsContent>
-
-        <TabsContent value="low-stock" className="space-y-6">
-          {renderProductList(filteredProducts.filter(p => p.stock > 0 && p.stock <= 5))}
-        </TabsContent>
-
-        <TabsContent value="out-of-stock" className="space-y-6">
-          {renderProductList(filteredProducts.filter(p => p.stock === 0))}
-        </TabsContent>
-
-        <TabsContent value="categories">
-          <CategoryManager categories={categories} onUpdate={loadCategories} />
-        </TabsContent>
-      </Tabs>
-
+      {/* ── Dialogs (shared) ── */}
       <AddProductDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
@@ -791,6 +926,6 @@ export default function InventoryPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </MobileAppShell>
   )
 }

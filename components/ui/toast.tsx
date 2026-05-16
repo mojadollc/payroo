@@ -25,7 +25,7 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  'group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-6 pr-8 shadow-lg transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full',
+  'group pointer-events-auto relative flex w-full items-center justify-between space-x-2 overflow-hidden rounded-lg border p-4 pr-6 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-80 data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full',
   {
     variants: {
       variant: {
@@ -44,13 +44,60 @@ const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
     VariantProps<typeof toastVariants>
->(({ className, variant, ...props }, ref) => {
+>(({ className, variant, children, ...props }, ref) => {
+  const wrapperRef = React.useRef<HTMLDivElement>(null)
+  const startX = React.useRef(0)
+  const dragging = React.useRef(false)
+
   return (
     <ToastPrimitives.Root
       ref={ref}
       className={cn(toastVariants({ variant }), className)}
       {...props}
-    />
+    >
+      <div
+        ref={wrapperRef}
+        className="flex w-full items-center justify-between"
+        onPointerDown={(e) => {
+          startX.current = e.clientX
+          dragging.current = true
+          wrapperRef.current?.setPointerCapture(e.pointerId)
+          if (wrapperRef.current) wrapperRef.current.style.transition = 'none'
+        }}
+        onPointerMove={(e) => {
+          if (!dragging.current || !wrapperRef.current) return
+          const diff = e.clientX - startX.current
+          wrapperRef.current.style.transform = `translateX(${diff}px)`
+          wrapperRef.current.style.opacity = `${Math.max(0.2, 1 - Math.abs(diff) / 200)}`
+        }}
+        onPointerUp={(e) => {
+          if (!dragging.current || !wrapperRef.current) return
+          dragging.current = false
+          const diff = e.clientX - startX.current
+
+          if (Math.abs(diff) > 50) {
+            wrapperRef.current.style.transition = 'transform 150ms, opacity 150ms'
+            wrapperRef.current.style.transform = `translateX(${diff > 0 ? '100vw' : '-100vw'})`
+            wrapperRef.current.style.opacity = '0'
+            setTimeout(() => props.onOpenChange?.(false), 150)
+          } else {
+            wrapperRef.current.style.transition = 'transform 150ms, opacity 150ms'
+            wrapperRef.current.style.transform = 'translateX(0)'
+            wrapperRef.current.style.opacity = '1'
+          }
+        }}
+        onPointerCancel={() => {
+          dragging.current = false
+          if (wrapperRef.current) {
+            wrapperRef.current.style.transition = 'transform 150ms, opacity 150ms'
+            wrapperRef.current.style.transform = 'translateX(0)'
+            wrapperRef.current.style.opacity = '1'
+          }
+        }}
+      >
+        {children}
+      </div>
+    </ToastPrimitives.Root>
   )
 })
 Toast.displayName = ToastPrimitives.Root.displayName

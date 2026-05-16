@@ -545,8 +545,8 @@ export default function POSPage() {
                         <div className="text-xs text-muted-foreground mt-0.5">{matchReason} • Stock: {p.stock}</div>
                       </div>
                       <div className="text-right ml-3 flex-shrink-0">
-                        <div className="font-bold text-sm text-primary">₱{effectivePrice(p).toFixed(2)}</div>
-                        {p.onSale && p.salePrice && <div className="text-xs text-red-500 font-semibold">SALE</div>}
+                        <div className="font-bold text-sm text-emerald-700">₱{effectivePrice(p).toFixed(2)}</div>
+                        {p.onSale && p.salePrice && <div className="text-xs text-orange-500 font-semibold">SALE</div>}
                       </div>
                     </button>
                   )
@@ -606,11 +606,11 @@ export default function POSPage() {
                   </div>
                   {product.onSale && product.salePrice ? (
                     <div className="flex items-center gap-2">
-                      <div className="text-base font-bold text-red-500">₱{product.salePrice.toFixed(2)}</div>
+                      <div className="text-base font-bold text-orange-600">₱{product.salePrice.toFixed(2)}</div>
                       <div className="text-xs line-through text-muted-foreground">₱{product.price.toFixed(2)}</div>
                     </div>
                   ) : (
-                    <div className="text-base font-bold text-primary">₱{product.price.toFixed(2)}</div>
+                    <div className="text-base font-bold text-emerald-700">₱{product.price.toFixed(2)}</div>
                   )}
                   <div className="text-xs text-muted-foreground mt-1">Stock: {product.stock}</div>
                 </div>
@@ -707,7 +707,7 @@ export default function POSPage() {
                                   <div className="text-right ml-2 flex-shrink-0">
                                     <div className="font-semibold text-sm">₱{effectivePrice(p).toFixed(2)}</div>
                                     {p.onSale && p.salePrice && (
-                                      <div className="text-xs text-red-500 font-medium">ON SALE</div>
+                                      <div className="text-xs text-orange-500 font-medium">ON SALE</div>
                                     )}
                                   </div>
                                 </button>
@@ -769,11 +769,11 @@ export default function POSPage() {
                           <div className="flex justify-between items-center mt-1">
                             {product.onSale && product.salePrice ? (
                               <div className="flex flex-col">
-                                <div className="text-sm font-bold text-red-500">₱{product.salePrice.toFixed(2)}</div>
+                                <div className="text-sm font-bold text-orange-600">₱{product.salePrice.toFixed(2)}</div>
                                 <div className="text-[10px] line-through text-muted-foreground">₱{product.price.toFixed(2)}</div>
                               </div>
                             ) : (
-                              <div className="text-sm font-bold text-primary">₱{product.price.toFixed(2)}</div>
+                              <div className="text-sm font-bold text-emerald-700">₱{product.price.toFixed(2)}</div>
                             )}
                           </div>
                           <div className="text-[10px] text-muted-foreground">Stock: {product.stock}</div>
@@ -862,7 +862,7 @@ export default function POSPage() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Est. Profit</span>
-                          <span className="text-secondary font-semibold">₱{calculateProfit().toFixed(2)}</span>
+                          <span className="text-teal-600 font-semibold">₱{calculateProfit().toFixed(2)}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-bold text-lg">
@@ -903,102 +903,82 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="space-y-4 pb-6">
+          <div className="space-y-3 pb-6">
             {/* Cart Items */}
-            <div className="space-y-3">
+            <div className="divide-y divide-border/50">
               {cart.map((item) => (
-                <MobileCard key={item.id} className="p-4">
-                  <div className="flex gap-3">
-                    <div className="w-20 h-20 bg-muted rounded-xl overflow-hidden flex-shrink-0">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <DefaultProductImage />
-                      )}
-                    </div>
+                <div key={item.id} className="py-2.5 first:pt-0">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-base truncate">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">₱{item.price.toFixed(2)} each</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 -mr-2 -mt-1 text-destructive"
-                          onClick={() => removeFromCart(item.id!)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10 rounded-xl border-2 border-red-200 text-red-600 hover:bg-red-50"
-                            onClick={() => updateQuantity(item.id!, item.quantity - 1)}
-                          >
-                            <Minus className="h-5 w-5" />
-                          </Button>
-                          <CartQuantityInput
-                            item={item}
-                            onUpdate={updateQuantity}
-                            onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.id!]: q }))}
-                            className="h-10 w-16 text-center p-0 text-xl font-bold rounded-xl border-2"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10 rounded-xl border-2 border-green-200 text-green-600 hover:bg-green-50"
-                            onClick={() => updateQuantity(item.id!, item.quantity + 1)}
-                          >
-                            <Plus className="h-5 w-5" />
-                          </Button>
-                        </div>
-                        <div className="text-lg font-bold text-primary">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
-                      </div>
+                      <p className="text-[14px] font-medium truncate">{item.name}</p>
+                      <p className="text-[12px] text-muted-foreground">₱{item.price.toFixed(2)} × {item.quantity}</p>
                     </div>
+                    <div className="text-[14px] font-semibold text-emerald-700 ml-2">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 text-destructive/60" onClick={() => removeFromCart(item.id!)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                </MobileCard>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-md border-red-200 text-red-500"
+                      onClick={() => updateQuantity(item.id!, item.quantity - 1)}
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <CartQuantityInput
+                      item={item}
+                      onUpdate={updateQuantity}
+                      onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.id!]: q }))}
+                      className="h-8 w-12 text-center p-0 text-[14px] font-semibold rounded-md border"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-md border-green-200 text-green-600"
+                      onClick={() => updateQuantity(item.id!, item.quantity + 1)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
 
             {/* Summary */}
-            <MobileCard className="p-4 bg-gradient-to-br from-primary/5 to-primary/10">
-              <div className="space-y-3">
-                <div className="flex justify-between text-base">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold">₱{calculateTotal().toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-base">
-                  <span className="text-muted-foreground">Est. Profit</span>
-                  <span className="font-semibold text-green-600">₱{calculateProfit().toFixed(2)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-xl font-bold">
-                  <span>Total</span>
-                  <span className="text-primary">₱{calculateTotal().toFixed(2)}</span>
-                </div>
+            <div className="border-t pt-3 space-y-1.5">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">₱{calculateTotal().toFixed(2)}</span>
               </div>
-            </MobileCard>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-muted-foreground">Est. Profit</span>
+                <span className="font-medium text-teal-600">₱{calculateProfit().toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-[16px] font-bold">
+                <span>Total</span>
+                <span className="text-emerald-700">₱{calculateTotal().toFixed(2)}</span>
+              </div>
+            </div>
 
             {/* Actions */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-2 pt-2">
               <Button
                 size="lg"
-                className="w-full h-14 text-lg rounded-xl shadow-lg"
+                className="w-full h-11 text-[14px] rounded-xl shadow-md"
                 onClick={() => {
                   setShowCartDrawer(false)
                   setShowCheckout(true)
                 }}
               >
-                Proceed to Checkout
+                Checkout
               </Button>
               <Button
                 variant="outline"
-                size="lg"
-                className="w-full h-12 rounded-xl border-2 text-destructive border-destructive/20 hover:bg-destructive/10"
+                size="sm"
+                className="w-full h-9 rounded-xl text-[13px] text-destructive border-destructive/20"
                 onClick={clearCart}
               >
                 Clear Cart

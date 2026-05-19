@@ -211,6 +211,70 @@ export default function InventoryPage() {
   const getBarcodeUrl = (barcode: string) => 
     `https://bwipjs-api.metafloor.com/?bcid=code128&text=${barcode}&scale=3&includetext&backgroundcolor=ffffff`
 
+  const getStoreName = () => localStorage.getItem("storeName") || "MY STORE"
+
+  // Generate a single price tag HTML
+  const priceTagHTML = (product: Product) => {
+    const storeName = getStoreName().toUpperCase()
+    const barcodeImg = getBarcodeUrl(product.barcode)
+    const price = product.onSale && product.salePrice ? product.salePrice : product.price
+    return `
+      <div class="tag">
+        <div class="store-name">${storeName}</div>
+        <div class="product-name">${product.name}</div>
+        <img class="barcode-img" src="${barcodeImg}" />
+        <div class="barcode-num">${product.barcode}</div>
+        <div class="price">PRICE: ₱${price.toFixed(2)}</div>
+      </div>
+    `
+  }
+
+  const tagStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; }
+    .tags-container { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; }
+    .tag {
+      width: 48mm; height: 30mm;
+      border: 1px solid #ccc;
+      padding: 2mm 3mm;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      page-break-inside: avoid;
+      overflow: hidden;
+    }
+    .store-name { font-size: 7px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
+    .product-name { font-size: 8px; font-weight: 600; text-align: center; line-height: 1.2; max-height: 20px; overflow: hidden; margin-bottom: 2px; }
+    .barcode-img { height: 18px; max-width: 90%; object-fit: contain; }
+    .barcode-num { font-size: 7px; font-family: monospace; margin-top: 1px; }
+    .price { font-size: 10px; font-weight: bold; margin-top: 2px; }
+    @media print {
+      body { margin: 0; }
+      .tag { border: 1px dashed #999; }
+      .no-print { display: none; }
+    }
+  `
+
+  const printSingleTag = (product: Product) => {
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`<html><head><style>${tagStyles}</style></head><body>
+      <div class="tags-container">${priceTagHTML(product)}</div>
+      <script>window.onload=()=>{window.print();window.close()}<\/script>
+    </body></html>`)
+    win.document.close()
+  }
+
+  const printBatchTags = (productList: Product[]) => {
+    const win = window.open('', '_blank')
+    if (!win) return
+    const tags = productList.map(p => priceTagHTML(p)).join('')
+    win.document.write(`<html><head><style>${tagStyles}</style></head><body>
+      <div class="tags-container">${tags}</div>
+      <script>window.onload=()=>{window.print();window.close()}<\/script>
+    </body></html>`)
+    win.document.close()
+  }
+
   const downloadBarcode = async (product: Product) => {
     try {
       const response = await fetch(getBarcodeUrl(product.barcode))
@@ -219,22 +283,41 @@ export default function InventoryPage() {
       const img = new Image()
       img.src = barcodeUrl
       img.onload = () => {
-        const padding = 12
-        const fontSize = 16
+        const storeName = getStoreName().toUpperCase()
+        const price = product.onSale && product.salePrice ? product.salePrice : product.price
+        const W = 380, H = 240
         const canvas = document.createElement("canvas")
-        canvas.width = img.width
-        canvas.height = img.height + fontSize + padding * 2
+        canvas.width = W; canvas.height = H
         const ctx = canvas.getContext("2d")!
+        // Background
         ctx.fillStyle = "#ffffff"
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        ctx.font = `bold ${fontSize}px sans-serif`
-        ctx.fillStyle = "#000000"
+        ctx.fillRect(0, 0, W, H)
+        // Border
+        ctx.strokeStyle = "#000"
+        ctx.lineWidth = 2
+        ctx.strokeRect(1, 1, W - 2, H - 2)
+        // Store name
+        ctx.font = "bold 14px Arial"
+        ctx.fillStyle = "#000"
         ctx.textAlign = "center"
-        ctx.fillText(product.name, canvas.width / 2, fontSize + padding)
-        ctx.drawImage(img, 0, fontSize + padding * 2)
+        ctx.fillText(storeName, W / 2, 22)
+        // Product name
+        ctx.font = "bold 16px Arial"
+        ctx.fillText(product.name.length > 30 ? product.name.slice(0, 30) + "..." : product.name, W / 2, 44)
+        // Barcode image
+        const bW = Math.min(img.width, W - 40)
+        const bH = Math.min(img.height, 70)
+        ctx.drawImage(img, (W - bW) / 2, 56, bW, bH)
+        // Barcode number
+        ctx.font = "12px monospace"
+        ctx.fillText(product.barcode, W / 2, 56 + bH + 16)
+        // Price
+        ctx.font = "bold 22px Arial"
+        ctx.fillText(`PRICE: ₱${price.toFixed(2)}`, W / 2, 56 + bH + 44)
+        // Download
         const link = document.createElement("a")
         link.href = canvas.toDataURL("image/png")
-        link.download = `${product.name}-barcode.png`
+        link.download = `${product.name}-pricetag.png`
         link.click()
       }
     } catch (e) {
@@ -242,21 +325,9 @@ export default function InventoryPage() {
     }
   }
 
-  const printBarcode = (product: Product) => {
-    const url = getBarcodeUrl(product.barcode)
-    const win = window.open('', '_blank')
-    if (win) {
-      win.document.write(`
-        <html>
-          <body style="display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;">
-            <p style="font-size:16px;font-weight:bold;margin-bottom:8px;">${product.name}</p>
-            <img src="${url}" onload="window.print();window.close()" />
-          </body>
-        </html>
-      `)
-      win.document.close()
-    }
-  }
+  // For batch print dialog
+  const [showBatchPrint, setShowBatchPrint] = useState(false)
+  const [batchCategory, setBatchCategory] = useState("all")
 
   const handleRestock = async () => {
     if (!restockProduct) return
@@ -892,38 +963,72 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Barcode Generator Dialog */}
+      {/* Barcode Price Tag Dialog */}
       <Dialog open={!!selectedProductForBarcode} onOpenChange={(open) => !open && setSelectedProductForBarcode(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Product Barcode</DialogTitle>
-            <DialogDescription>View, print, or download barcode</DialogDescription>
+            <DialogTitle>Price Tag</DialogTitle>
+            <DialogDescription>Supermarket-style barcode sticker</DialogDescription>
           </DialogHeader>
           {selectedProductForBarcode && (
-            <div className="flex flex-col items-center gap-6 py-4">
-              <div className="text-center">
-                <h3 className="font-bold text-lg">{selectedProductForBarcode.name}</h3>
-                <p className="text-sm text-muted-foreground">{selectedProductForBarcode.barcode}</p>
-              </div>
-              
-              <div className="border p-4 rounded-lg bg-white">
-                <img 
-                  src={getBarcodeUrl(selectedProductForBarcode.barcode)} 
-                  alt="Barcode" 
-                  className="max-w-full h-auto"
-                />
+            <div className="space-y-4 py-2">
+              {/* Preview */}
+              <div className="border-2 border-dashed rounded-lg p-3 bg-white text-center space-y-1">
+                <p className="text-[10px] font-bold tracking-wide uppercase">{(localStorage.getItem("storeName") || "MY STORE").toUpperCase()}</p>
+                <p className="text-[12px] font-semibold truncate">{selectedProductForBarcode.name}</p>
+                <img src={getBarcodeUrl(selectedProductForBarcode.barcode)} alt="Barcode" className="mx-auto h-10 object-contain" />
+                <p className="text-[10px] font-mono">{selectedProductForBarcode.barcode}</p>
+                <p className="text-[14px] font-bold">PRICE: ₱{(selectedProductForBarcode.onSale && selectedProductForBarcode.salePrice ? selectedProductForBarcode.salePrice : selectedProductForBarcode.price).toFixed(2)}</p>
               </div>
 
-              <div className="flex gap-2 w-full">
-                <Button className="flex-1" variant="outline" onClick={() => printBarcode(selectedProductForBarcode)}>
-                  <Printer className="mr-2 h-4 w-4" /> Print
+              <div className="flex gap-2">
+                <Button className="flex-1" variant="outline" size="sm" onClick={() => printSingleTag(selectedProductForBarcode)}>
+                  <Printer className="mr-1.5 h-3.5 w-3.5" /> Print
                 </Button>
-                <Button className="flex-1" onClick={() => downloadBarcode(selectedProductForBarcode)}>
-                  <Download className="mr-2 h-4 w-4" /> Download
+                <Button className="flex-1" size="sm" onClick={() => downloadBarcode(selectedProductForBarcode)}>
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download
                 </Button>
               </div>
+
+              <Button variant="outline" size="sm" className="w-full" onClick={() => { setSelectedProductForBarcode(null); setShowBatchPrint(true) }}>
+                <Printer className="mr-1.5 h-3.5 w-3.5" /> Print All / By Category
+              </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Print Dialog */}
+      <Dialog open={showBatchPrint} onOpenChange={setShowBatchPrint}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Batch Print Price Tags</DialogTitle>
+            <DialogDescription>Print barcode stickers for multiple products (48mm × 30mm size)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={batchCategory} onValueChange={setBatchCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Products ({products.length})</SelectItem>
+                  {[...new Set(products.map(p => p.category))].sort().map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat} ({products.filter(p => p.category === cat).length})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-[12px] text-muted-foreground">
+              This will print {batchCategory === "all" ? products.length : products.filter(p => p.category === batchCategory).length} price tag stickers. Recommended sticker size: 48mm × 30mm.
+            </p>
+            <Button className="w-full" onClick={() => {
+              const list = batchCategory === "all" ? products : products.filter(p => p.category === batchCategory)
+              printBatchTags(list)
+              setShowBatchPrint(false)
+            }}>
+              <Printer className="mr-2 h-4 w-4" /> Print {batchCategory === "all" ? products.length : products.filter(p => p.category === batchCategory).length} Tags
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </MobileAppShell>

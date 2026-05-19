@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -197,7 +197,8 @@ export default function ReportsPage() {
   const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>([])
   const [todayEwallet, setTodayEwallet] = useState<EWalletTransaction[]>([])
   const [products, setProducts] = useState<Product[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const hasLoaded = useRef(false)
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(() => {
     const today = new Date()
     const weekAgo = new Date(today)
@@ -213,7 +214,7 @@ export default function ReportsPage() {
   useEffect(() => { loadData() }, [dateRange])
 
   const loadData = async () => {
-    setIsLoading(true)
+    if (!hasLoaded.current) setIsLoading(true)
     try {
       const today = new Date()
       const todayStart = new Date(today); todayStart.setHours(0, 0, 0, 0)
@@ -233,6 +234,7 @@ export default function ReportsPage() {
     } catch (error) {
       console.error("[v0] Error loading reports data:", error)
     } finally {
+      hasLoaded.current = true
       setIsLoading(false)
     }
   }

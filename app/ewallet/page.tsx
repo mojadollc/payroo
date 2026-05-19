@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Smartphone, Settings, TrendingUp, History, Wallet, ArrowDownToLine, ArrowUpFromLine, Signal, Calendar, Plus } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,7 +23,8 @@ export default function EWalletPage() {
   const [cashinTransactions, setCashinTransactions] = useState<any[]>([])
   const [commissionSettings, setCommissionSettings] = useState<CommissionSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const hasLoaded = useRef(false)
   const [selectedMonth, setSelectedMonth] = useState<string>("all")
   const [showNewTransaction, setShowNewTransaction] = useState(false)
 
@@ -38,7 +39,7 @@ export default function EWalletPage() {
   }, [])
 
   const loadData = async () => {
-    setIsLoading(true)
+    if (!hasLoaded.current) setIsLoading(true)
     try {
       const storeId = getStoreId()
       const [transactionsData, settingsData, cashinData] = await Promise.all([
@@ -52,6 +53,7 @@ export default function EWalletPage() {
     } catch (error) {
       console.error("[v0] Error loading e-wallet data:", error)
     } finally {
+      hasLoaded.current = true
       setIsLoading(false)
     }
   }

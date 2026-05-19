@@ -1,7 +1,7 @@
 ﻿"use client"
 import { FeatureGate } from "@/components/feature-gate"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Brain, RefreshCw, PackagePlus, MapPin, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, CloudSun, Calendar } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -126,7 +126,8 @@ function SuggestionCard({ s, onRestock }: { s: RestockSuggestion; onRestock: () 
 // â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function RestockPageContent() {
   const [report, setReport] = useState<RestockReport | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const hasLoaded = useRef(false)
   const [restockTarget, setRestockTarget] = useState<RestockSuggestion | null>(null)
   const [locationStatus, setLocationStatus] = useState<"idle" | "fetching" | "done" | "denied">("idle")
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null)
@@ -134,7 +135,7 @@ function RestockPageContent() {
   const { toast } = useToast()
 
   const runAnalysis = useCallback(async (lat?: number, lon?: number) => {
-    setLoading(true)
+    if (!hasLoaded.current) setLoading(true)
     try {
       const today = new Date()
       const ninetyDaysAgo = new Date(today); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
@@ -146,7 +147,7 @@ function RestockPageContent() {
       setReport(r)
     } catch (e) {
       toast({ title: "Analysis failed", description: "Could not generate restock report", variant: "destructive" })
-    } finally { setLoading(false) }
+    } finally { hasLoaded.current = true; setLoading(false) }
   }, [toast])
 
   useEffect(() => { runAnalysis() }, [runAnalysis])

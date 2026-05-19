@@ -380,37 +380,37 @@ export default function ReportsPage() {
             <div className="bg-background rounded-xl p-3 border">
               <div className="flex items-center gap-1 mb-1">
                 <Receipt className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Gross Sales</span>
+                <span className="text-[11px] text-muted-foreground">Gross Sales</span>
               </div>
-              <div className="text-xl font-bold text-primary">₱{today.gross.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{today.txCount} transaction{today.txCount !== 1 ? "s" : ""}</div>
+              <div className="text-[15px] font-bold text-primary truncate">₱{today.gross.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{today.txCount} txn{today.txCount !== 1 ? "s" : ""}</div>
             </div>
             
             <div className="bg-background rounded-xl p-3 border">
               <div className="flex items-center gap-1 mb-1">
                 <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Net Profit</span>
+                <span className="text-[11px] text-muted-foreground">Net Profit</span>
               </div>
-              <div className="text-xl font-bold text-green-600">₱{today.profit.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{today.itemsSold} items sold</div>
+              <div className="text-[15px] font-bold text-green-600 truncate">₱{today.profit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{today.itemsSold} items sold</div>
             </div>
             
             <div className="bg-background rounded-xl p-3 border">
               <div className="flex items-center gap-1 mb-1">
                 <Wallet className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">E-Wallet</span>
+                <span className="text-[11px] text-muted-foreground">E-Wallet</span>
               </div>
-              <div className="text-xl font-bold text-blue-600">₱{today.eGross.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">₱{today.eProfit.toFixed(2)} commission</div>
+              <div className="text-[15px] font-bold text-blue-600 truncate">₱{today.eGross.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">₱{today.eProfit.toFixed(2)} comm.</div>
             </div>
             
             <div className="bg-background rounded-xl p-3 border">
               <div className="flex items-center gap-1 mb-1">
                 <CircleDollarSign className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Total Earnings</span>
+                <span className="text-[11px] text-muted-foreground">Total Earnings</span>
               </div>
-              <div className="text-xl font-bold text-orange-600">₱{(today.profit + today.eProfit).toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Sales + E-Wallet</div>
+              <div className="text-[15px] font-bold text-orange-600 truncate">₱{(today.profit + today.eProfit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Sales + E-Wallet</div>
             </div>
           </div>
 
@@ -430,48 +430,48 @@ export default function ReportsPage() {
 
         {/* Period Summary Cards */}
         <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-green-500 rounded-lg">
-                <ArrowUpRight className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-green-500 rounded-md">
+                <ArrowUpRight className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Total Revenue</span>
+              <span className="text-[11px] text-muted-foreground">Total Revenue</span>
             </div>
-            <div className="text-2xl font-bold text-green-600">₱{stats.totalRevenue.toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground mt-1">Sales + E-Wallet</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">₱{stats.totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Sales + E-Wallet</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-emerald-500 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-emerald-500 rounded-md">
+                <TrendingUp className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Net Profit</span>
+              <span className="text-[11px] text-muted-foreground">Net Profit</span>
             </div>
-            <div className="text-2xl font-bold text-emerald-600">₱{stats.totalProfit.toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground mt-1">After cost of goods</div>
+            <div className="text-[15px] font-bold text-emerald-600 truncate">₱{stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">After cost of goods</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <ShoppingCart className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-blue-500 rounded-md">
+                <ShoppingCart className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Sales</span>
+              <span className="text-[11px] text-muted-foreground">Sales</span>
             </div>
-            <div className="text-2xl font-bold text-blue-600">₱{stats.salesRevenue.toFixed(2)}</div>
-            <div className="text-xs text-green-600 font-semibold mt-1">Profit: ₱{stats.salesProfit.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-blue-600 truncate">₱{stats.salesRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[11px] text-green-600 font-medium mt-0.5 truncate">Profit: ₱{stats.salesProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-purple-500 rounded-lg">
-                <Wallet className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-purple-500 rounded-md">
+                <Wallet className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">E-Wallet</span>
+              <span className="text-[11px] text-muted-foreground">E-Wallet</span>
             </div>
-            <div className="text-2xl font-bold text-purple-600">₱{stats.ewalletRevenue.toFixed(2)}</div>
-            <div className="text-xs text-green-600 font-semibold mt-1">Commission: ₱{stats.ewalletProfit.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">₱{stats.ewalletRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[11px] text-green-600 font-medium mt-0.5 truncate">Comm: ₱{stats.ewalletProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
         </div>
 

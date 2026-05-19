@@ -511,37 +511,37 @@ export default function InventoryPage() {
       <div className="md:hidden space-y-4">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-blue-500 rounded-lg"><DollarSign className="h-4 w-4 text-white" /></div>
-              <span className="text-xs font-medium text-muted-foreground">Stock Value</span>
+          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-blue-500 rounded-md"><DollarSign className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Stock Value</span>
             </div>
-            <div className="text-2xl font-bold text-blue-600">₱{totalStockValue.toLocaleString()}</div>
+            <div className="text-[15px] font-bold text-blue-600 truncate">₱{totalStockValue.toLocaleString("en-PH")}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-green-500 rounded-lg"><Package className="h-4 w-4 text-white" /></div>
-              <span className="text-xs font-medium text-muted-foreground">Total Items</span>
+          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-green-500 rounded-md"><Package className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Total Items</span>
             </div>
-            <div className="text-2xl font-bold text-green-600">{totalItems}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">{totalItems.toLocaleString()}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-purple-500 rounded-lg"><LayoutGrid className="h-4 w-4 text-white" /></div>
-              <span className="text-xs font-medium text-muted-foreground">Products</span>
+          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-purple-500 rounded-md"><LayoutGrid className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Products</span>
             </div>
-            <div className="text-2xl font-bold text-purple-600">{products.length}</div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">{products.length.toLocaleString()}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-orange-500 rounded-lg"><AlertTriangle className="h-4 w-4 text-white" /></div>
-              <span className="text-xs font-medium text-muted-foreground">Alerts</span>
+          <MobileCard className="p-3 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-orange-500 rounded-md"><AlertTriangle className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Alerts</span>
             </div>
-            <div className="text-2xl font-bold text-orange-600">{lowStockCount + outOfStockCount}</div>
-            <div className="text-xs text-orange-600/80 mt-1">{lowStockCount} low • {outOfStockCount} out</div>
+            <div className="text-[15px] font-bold text-orange-600 truncate">{lowStockCount + outOfStockCount}</div>
+            <div className="text-[11px] text-orange-600/80 mt-0.5">{lowStockCount} low • {outOfStockCount} out</div>
           </MobileCard>
         </div>
 

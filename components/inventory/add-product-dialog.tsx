@@ -196,8 +196,7 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
                   {imagePreview && <Button type="button" variant="outline" size="sm" onClick={() => { setImageFile(null); setImagePreview(null) }}>Remove</Button>}
                 </div>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" tabIndex={-1} onChange={handleImageChange} />
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" tabIndex={-1} onChange={handleImageChange} />
+
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -340,6 +339,11 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
               <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Adding..." : `Add ${cfg.itemLabel}`}</Button>
             </DialogFooter>
           </form>
+          {/* File inputs OUTSIDE form to prevent file path leaking into form fields */}
+          <div aria-hidden="true" className="absolute -z-10 opacity-0 pointer-events-none overflow-hidden h-0 w-0">
+            <input ref={fileInputRef} type="file" accept="image/*" tabIndex={-1} onChange={handleImageChange} />
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" tabIndex={-1} onChange={handleImageChange} />
+          </div>
         </DialogContent>
       </Dialog>
 

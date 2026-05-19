@@ -165,71 +165,71 @@ export default function EWalletPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-green-500 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-green-500 rounded-md">
+                <TrendingUp className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {selectedMonth === "all" ? "Total Profit" : "Monthly Profit"}
               </span>
             </div>
-            <div className="text-2xl font-bold text-green-600">₱{stats.totalProfit.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">₱{stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <ArrowDownToLine className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-blue-500 rounded-md">
+                <ArrowDownToLine className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {selectedMonth === "all" ? "Cash-In" : "Monthly Cash-In"}
               </span>
             </div>
-            <div className="text-2xl font-bold text-blue-600">₱{stats.grossCashin.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-blue-600 truncate">₱{stats.grossCashin.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-orange-500 rounded-lg">
-                <ArrowUpFromLine className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-orange-500 rounded-md">
+                <ArrowUpFromLine className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {selectedMonth === "all" ? "Cash-Out" : "Monthly Cash-Out"}
               </span>
             </div>
-            <div className="text-2xl font-bold text-orange-600">₱{stats.grossCashout.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-orange-600 truncate">₱{stats.grossCashout.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-purple-500 rounded-lg">
-                <Signal className="h-4 w-4 text-white" />
+          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-purple-500 rounded-md">
+                <Signal className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {selectedMonth === "all" ? "Load" : "Monthly Load"}
               </span>
             </div>
-            <div className="text-2xl font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
         </div>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <History className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Today's Profit</span>
+          <MobileCard className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <History className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">Today's Profit</span>
             </div>
-            <div className="text-xl font-bold text-green-600">₱{stats.todayProfit.toFixed(2)}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
 
-          <MobileCard className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <History className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Transactions</span>
+          <MobileCard className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <History className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">Transactions</span>
             </div>
-            <div className="text-xl font-bold">{stats.totalTransactions}</div>
+            <div className="text-[15px] font-bold truncate">{stats.totalTransactions.toLocaleString()}</div>
           </MobileCard>
         </div>
 

@@ -41,25 +41,25 @@ export function PWAUpdateManager() {
 
   const handleUpdate = () => {
     if (isUpdating) return
+    // Prevent reload loop: only allow one reload per update
+    if (sessionStorage.getItem("sw_reloading")) {
+      setUpdateAvailable(false)
+      return
+    }
     setIsUpdating(true)
+    sessionStorage.setItem("sw_reloading", "1")
 
     navigator.serviceWorker.getRegistration().then(reg => {
       if (!reg?.waiting) {
-        // No waiting worker — just reload to get fresh content
         window.location.reload()
         return
       }
 
-      // Listen for controller change ONCE, then reload exactly once
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.location.reload()
-      }, { once: true })
-
-      // Tell the waiting SW to activate
+      // Tell the waiting SW to activate, then reload once
       reg.waiting.postMessage({ type: "SKIP_WAITING" })
 
-      // Safety fallback: if controllerchange never fires within 4s, reload anyway
-      setTimeout(() => window.location.reload(), 4000)
+      // Give SW time to activate, then reload
+      setTimeout(() => window.location.reload(), 500)
     }).catch(() => window.location.reload())
   }
 

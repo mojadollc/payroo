@@ -1,7 +1,7 @@
 // ── Payroo POS Service Worker ──────────────────────────────────────────────────
 // Strategy: never cache HTML, stale-while-revalidate for JS/CSS, cache-first for images.
 
-const APP_VERSION = "20260519T121426"
+const APP_VERSION = "20260519T123235"
 const CACHE_NAME = "payroo-v" + APP_VERSION
 
 const PRECACHE = [
@@ -20,14 +20,15 @@ self.addEventListener("install", (e) => {
   )
 })
 
-// ── Activate: delete old caches, claim clients ────────────────────────────────
+// ── Activate: delete old caches only — do NOT claim clients ──────────────────
+// clients.claim() causes controllerchange which triggers reload loops in TWA/PWA.
+// The new SW will naturally control pages on next navigation.
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
         keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
       ))
-      .then(() => self.clients.claim())
   )
 })
 

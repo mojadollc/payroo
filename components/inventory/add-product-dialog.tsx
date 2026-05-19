@@ -56,13 +56,14 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const cropped = await cropImageToSquare(file)
-      setImageFile(cropped)
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result as string)
-      reader.readAsDataURL(cropped)
-    }
+    if (!file) return
+    // Prevent file path from leaking into other fields
+    e.target.value = ""
+    const cropped = await cropImageToSquare(file)
+    setImageFile(cropped)
+    const reader = new FileReader()
+    reader.onloadend = () => setImagePreview(reader.result as string)
+    reader.readAsDataURL(cropped)
   }
 
   const generateBarcode = () => {
@@ -75,8 +76,7 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
   const handleBarcodeScanned = async (barcode: string) => {
     setFormData(prev => ({ ...prev, barcode }))
     setShowScanner(false)
-    // Only auto-lookup for retail/pharmacy
-    if (!cfg.barcodeRequired) return
+    // Auto-lookup product info from Open Food Facts
     try {
       const urls = [
         `https://ph.openfoodfacts.org/api/v0/product/${barcode}.json`,
@@ -85,10 +85,18 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
       for (const url of urls) {
         const res = await fetch(url)
         const data = await res.json()
-        const name = data.product?.product_name_en || data.product?.product_name
-        if (data.status === 1 && name) {
-          setFormData(prev => ({ ...prev, barcode, name }))
-          break
+        if (data.status === 1 && data.product) {
+          const name = data.product.product_name_en || data.product.product_name || ""
+          if (name) {
+            setFormData(prev => ({
+              ...prev,
+              barcode,
+              name: prev.name || name,
+              category: prev.category || data.product.categories_tags?.[0]?.replace("en:", "") || prev.category,
+            }))
+            toast({ title: "Product found", description: name })
+            break
+          }
         }
       }
     } catch {}
@@ -188,8 +196,8 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
                   {imagePreview && <Button type="button" variant="outline" size="sm" onClick={() => { setImageFile(null); setImagePreview(null) }}>Remove</Button>}
                 </div>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" tabIndex={-1} onChange={handleImageChange} />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" tabIndex={-1} onChange={handleImageChange} />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

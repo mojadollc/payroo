@@ -109,10 +109,12 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
 
     const video = videoRef.current
     let intervalId: NodeJS.Timeout
+    let lastScanned = ""
+    let lastScanTime = 0
 
     // @ts-ignore - BarcodeDetector is not yet in standard TS lib
     const barcodeDetector = new window.BarcodeDetector({
-      formats: ["qr_code", "ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
+      formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "code_93", "codabar", "itf", "qr_code"],
     })
 
     const beep = () => {
@@ -131,23 +133,27 @@ export function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
     }
 
     const scan = async () => {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        try {
-          const barcodes = await barcodeDetector.detect(video)
-          if (barcodes.length > 0) {
-            const code = barcodes[0].rawValue
-            if (code) {
-              beep()
-              onScan(code)
-            }
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return
+      try {
+        const barcodes = await barcodeDetector.detect(video)
+        if (barcodes.length > 0) {
+          const code = barcodes[0].rawValue
+          const now = Date.now()
+          // Debounce: ignore same barcode within 2 seconds
+          if (code && (code !== lastScanned || now - lastScanTime > 2000)) {
+            lastScanned = code
+            lastScanTime = now
+            beep()
+            onScan(code)
           }
-        } catch (e) {
-          console.error("Barcode detection error:", e)
         }
+      } catch (e) {
+        console.error("Barcode detection error:", e)
       }
     }
 
-    intervalId = setInterval(scan, 500)
+    // Scan every 200ms for faster detection
+    intervalId = setInterval(scan, 200)
 
     return () => clearInterval(intervalId)
   }, [hasCamera, isSupported, onScan])

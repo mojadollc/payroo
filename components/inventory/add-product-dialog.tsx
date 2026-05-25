@@ -57,13 +57,23 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    // Prevent file path from leaking into other fields
     e.target.value = ""
+    // Snapshot current barcode to restore if browser corrupts it
+    const currentBarcode = formData.barcode
     const cropped = await cropImageToSquare(file)
     setImageFile(cropped)
     const reader = new FileReader()
     reader.onloadend = () => setImagePreview(reader.result as string)
     reader.readAsDataURL(cropped)
+    // Restore barcode in case Android WebView injected file path
+    setTimeout(() => {
+      setFormData(prev => {
+        if (prev.barcode.includes("fakepath") || prev.barcode.includes("\\") || prev.barcode.includes("/")) {
+          return { ...prev, barcode: currentBarcode }
+        }
+        return prev
+      })
+    }, 100)
   }
 
   const generateBarcode = () => {
@@ -182,15 +192,15 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
               <div className="flex gap-4">
                 <div
                   className="flex h-32 w-32 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => { (document.activeElement as HTMLElement)?.blur(); setTimeout(() => fileInputRef.current?.click(), 50) }}
                 >
                   {imagePreview
                     ? <img src={imagePreview} alt="Preview" className="h-full w-full object-cover rounded-lg" />
                     : <Camera className="h-8 w-8 text-muted-foreground" />}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>Choose Image</Button>
-                  <Button type="button" variant="outline" size="sm" className="border-blue-300 text-blue-600 hover:bg-blue-50" onClick={() => cameraInputRef.current?.click()}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { (document.activeElement as HTMLElement)?.blur(); setTimeout(() => fileInputRef.current?.click(), 50) }}>Choose Image</Button>
+                  <Button type="button" variant="outline" size="sm" className="border-blue-300 text-blue-600 hover:bg-blue-50" onClick={() => { (document.activeElement as HTMLElement)?.blur(); setTimeout(() => cameraInputRef.current?.click(), 50) }}>
                     <Camera className="h-4 w-4 mr-1" /> Take Photo
                   </Button>
                   {imagePreview && <Button type="button" variant="outline" size="sm" onClick={() => { setImageFile(null); setImagePreview(null) }}>Remove</Button>}
@@ -212,7 +222,11 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
                   <Input
                     id="barcode"
                     value={formData.barcode}
-                    onChange={e => setFormData({ ...formData, barcode: e.target.value })}
+                    onChange={e => {
+                      const val = e.target.value
+                      if (val.includes("fakepath") || val.includes("\\") || val.includes("C:")) return
+                      setFormData({ ...formData, barcode: val })
+                    }}
                     placeholder={cfg.barcodeRequired ? "Scan, type, or generate" : "Optional code"}
                     required={cfg.barcodeRequired}
                   />

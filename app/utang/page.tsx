@@ -354,49 +354,49 @@ function UtangPageContent() {
       <div className="md:hidden space-y-4">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-4 bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-red-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-red-500 rounded-md">
                 <PhilippinePeso className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Total Receivable</span>
+              <span className="text-[11px] text-muted-foreground">Total Receivable</span>
             </div>
-            <div className="text-2xl font-bold text-red-600">₱{totalActive.toLocaleString()}</div>
+            <div className="text-[15px] font-bold text-red-600 truncate">₱{totalActive.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })</div>
             <div className="text-xs text-muted-foreground mt-1">{activeCount} active debts</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-green-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-green-500 rounded-md">
                 <CheckCircle2 className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Settled</span>
+              <span className="text-[11px] text-muted-foreground">Settled</span>
             </div>
-            <div className="text-2xl font-bold text-green-600">{settledCount}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">{settledCount}</div>
             <div className="text-xs text-muted-foreground mt-1">fully paid records</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-yellow-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-yellow-500 rounded-md">
                 <AlertCircle className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Overdue</span>
+              <span className="text-[11px] text-muted-foreground">Overdue</span>
             </div>
-            <div className="text-2xl font-bold text-yellow-600">
+            <div className="text-[15px] font-bold text-yellow-600 truncate">
               {records.filter(r => r.status !== "settled" && r.balance > 500).length}
             </div>
             <div className="text-xs text-muted-foreground mt-1">balances over ₱500</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-purple-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-purple-500 rounded-md">
                 <User className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Customers</span>
+              <span className="text-[11px] text-muted-foreground">Customers</span>
             </div>
-            <div className="text-2xl font-bold text-purple-600">{customerMap.size}</div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">{customerMap.size}</div>
             <div className="text-xs text-muted-foreground mt-1">unique customers</div>
           </MobileCard>
         </div>
@@ -483,7 +483,7 @@ function UtangPageContent() {
               <PhilippinePeso className="h-3 w-3 text-red-500" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl font-bold text-red-600">₱{totalActive.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+              <div className="text-[15px] font-bold text-red-600 truncate">₱{totalActive.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
               <p className="text-xs text-muted-foreground">{activeCount} active debts</p>
             </CardContent>
           </Card>
@@ -493,7 +493,7 @@ function UtangPageContent() {
               <CheckCircle2 className="h-3 w-3 text-green-500" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl font-bold text-green-600">{settledCount}</div>
+              <div className="text-[15px] font-bold text-green-600 truncate">{settledCount}</div>
               <p className="text-xs text-muted-foreground">fully paid records</p>
             </CardContent>
           </Card>
@@ -503,7 +503,7 @@ function UtangPageContent() {
               <Clock className="h-3 w-3 text-yellow-500" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl font-bold text-yellow-600">
+              <div className="text-[15px] font-bold text-yellow-600 truncate">
                 {records.filter(r => r.status !== "settled" && r.balance > 500).length}
               </div>
               <p className="text-xs text-muted-foreground">balances over ₱500</p>

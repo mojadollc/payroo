@@ -372,45 +372,45 @@ function LoyaltyPageContent() {
       <div className="md:hidden space-y-4">
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-blue-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-blue-500 rounded-md">
                 <Users className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Members</span>
+              <span className="text-[11px] text-muted-foreground">Members</span>
             </div>
-            <div className="text-2xl font-bold text-blue-600">{customers.length}</div>
+            <div className="text-[15px] font-bold text-blue-600 truncate">{customers.length}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-yellow-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-yellow-500 rounded-md">
                 <Coins className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Coins Outstanding</span>
+              <span className="text-[11px] text-muted-foreground">Coins Outstanding</span>
             </div>
-            <div className="text-2xl font-bold text-yellow-600">🪙 {totalCoinsOutstanding}</div>
+            <div className="text-[15px] font-bold text-yellow-600 truncate">🪙 {totalCoinsOutstanding}</div>
             <div className="text-xs text-muted-foreground mt-1">≈ ₱{(totalCoinsOutstanding * settings.coinValuePeso).toFixed(2)}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-green-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-green-500 rounded-md">
                 <Gift className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Total Redeemed</span>
+              <span className="text-[11px] text-muted-foreground">Total Redeemed</span>
             </div>
-            <div className="text-2xl font-bold text-green-600">🪙 {totalRedeemed}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">🪙 {totalRedeemed}</div>
           </MobileCard>
 
-          <MobileCard className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-purple-500 rounded-lg">
+          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-purple-500 rounded-md">
                 <Coins className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">Coin Value</span>
+              <span className="text-[11px] text-muted-foreground">Coin Value</span>
             </div>
-            <div className="text-2xl font-bold text-purple-600">₱{settings.coinValuePeso}</div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">₱{settings.coinValuePeso}</div>
             <div className="text-xs text-muted-foreground mt-1">per coin</div>
           </MobileCard>
         </div>
@@ -484,7 +484,7 @@ function LoyaltyPageContent() {
               <Users className="h-3 w-3 text-blue-500" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl font-bold text-blue-600">{customers.length}</div>
+              <div className="text-[15px] font-bold text-blue-600 truncate">{customers.length}</div>
               <p className="text-xs text-muted-foreground">loyalty members</p>
             </CardContent>
           </Card>
@@ -494,7 +494,7 @@ function LoyaltyPageContent() {
               <Coins className="h-3 w-3 text-yellow-500" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl font-bold text-yellow-600">🪙 {totalCoinsOutstanding}</div>
+              <div className="text-[15px] font-bold text-yellow-600 truncate">🪙 {totalCoinsOutstanding}</div>
               <p className="text-xs text-muted-foreground">≈ ₱{(totalCoinsOutstanding * settings.coinValuePeso).toFixed(2)} value</p>
             </CardContent>
           </Card>
@@ -504,7 +504,7 @@ function LoyaltyPageContent() {
               <Gift className="h-3 w-3 text-green-500" />
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              <div className="text-xl font-bold text-green-600">🪙 {totalRedeemed}</div>
+              <div className="text-[15px] font-bold text-green-600 truncate">🪙 {totalRedeemed}</div>
               <p className="text-xs text-muted-foreground">coins used by customers</p>
             </CardContent>
           </Card>

@@ -254,7 +254,7 @@ function RestockPageContent() {
                     <div className="flex justify-center mb-1">
                       <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
                     </div>
-                    <div className="text-xl font-bold">{count}</div>
+                    <div className="text-[15px] font-bold truncate">{count}</div>
                     <div className="text-[10px] text-muted-foreground capitalize">{u}</div>
                   </button>
                 )
@@ -390,7 +390,7 @@ function RestockPageContent() {
                       <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
                       <span className="text-xs font-medium capitalize">{u}</span>
                     </div>
-                    <div className="text-2xl font-bold mt-1">{counts[u]}</div>
+                    <div className="text-[15px] font-bold mt-1 truncate">{counts[u]}</div>
                     <div className="text-xs text-muted-foreground">items</div>
                   </button>
                 )

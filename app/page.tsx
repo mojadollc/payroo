@@ -142,7 +142,7 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════════════════════════════
           FEATURES — Clean grid with icons
       ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 px-4">
+      <section className="py-24 px-4" id="features">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16 space-y-4">
             <Badge className="bg-yellow-50 text-yellow-800 border-yellow-200 hover:bg-yellow-50">Features</Badge>
@@ -326,6 +326,73 @@ export default function HomePage() {
               <Shield className="h-4 w-4" />
               <span>Cancel anytime</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          BUSINESS TYPES
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-4 bg-slate-50" id="business-types">
+        <div className="container mx-auto max-w-5xl">
+          <div className="text-center mb-16 space-y-4">
+            <Badge className="bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-50">Business Types</Badge>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">Built for every Filipino store</h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">Whether you run a sari-sari store, pharmacy, or online shop — Payroo adapts to your business.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {[
+              { emoji: "🏪", name: "Sari-Sari Store", desc: "Retail & general merchandise" },
+              { emoji: "💊", name: "Pharmacy", desc: "Drugstore & health products" },
+              { emoji: "🔧", name: "Hardware", desc: "Construction & tools" },
+              { emoji: "🍜", name: "Carinderia", desc: "Food stall & eatery" },
+              { emoji: "💇", name: "Salon", desc: "Barbershop & beauty" },
+              { emoji: "🧺", name: "Laundry", desc: "Laundry & dry cleaning" },
+              { emoji: "🏍️", name: "Motorshop", desc: "Auto parts & repair" },
+              { emoji: "🖨️", name: "Printing", desc: "Tarpaulin & documents" },
+              { emoji: "🛒", name: "Online Shop", desc: "E-commerce & delivery" },
+              { emoji: "🥖", name: "Bakery", desc: "Bread & pastries" },
+              { emoji: "📱", name: "Cellphone Shop", desc: "Gadgets & accessories" },
+              { emoji: "🌾", name: "Agri Supply", desc: "Farm & garden supplies" },
+            ].map((biz) => (
+              <div key={biz.name} className="bg-white rounded-xl border p-4 hover:shadow-md transition-shadow text-center">
+                <div className="text-3xl mb-2">{biz.emoji}</div>
+                <div className="font-semibold text-sm text-slate-900">{biz.name}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{biz.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          FAQ
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-4" id="faq">
+        <div className="container mx-auto max-w-3xl">
+          <div className="text-center mb-16 space-y-4">
+            <Badge className="bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-50">FAQ</Badge>
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">Frequently Asked Questions</h2>
+          </div>
+          <div className="space-y-4">
+            {[
+              { q: "Is Payroo free to use?", a: "Yes! We offer a free Basic plan with core POS features. Upgrade to Gold or Enterprise for advanced features like AI restock, multi-user, and data export." },
+              { q: "Do I need internet to use it?", a: "Payroo works offline for scanning and selling. Sales sync automatically when you're back online. Perfect for areas with unstable connection." },
+              { q: "Can I use it on my phone?", a: "Absolutely! Payroo is a PWA (Progressive Web App) that works like a native app on Android and iOS. Install it from your browser — no Play Store needed." },
+              { q: "Does it support barcode scanning?", a: "Yes — use your phone camera or a USB/Bluetooth barcode scanner. We support EAN-13, UPC, Code 128, and more." },
+              { q: "How do I accept GCash/Maya payments?", a: "Enable E-Wallet in your dashboard. You can record cash-in, cash-out, and load transactions with automatic commission tracking." },
+              { q: "Can multiple staff use it?", a: "Yes! Gold and Enterprise plans support multiple users with role-based access (Owner, Manager, Cashier)." },
+              { q: "How do I print barcode stickers?", a: "Go to Inventory → tap any product → Barcode. You can print single tags or batch print by category. Standard 48mm × 30mm sticker size." },
+              { q: "Is my data safe?", a: "Your data is stored securely on Google Firebase with encryption. Only you and your authorized staff can access it." },
+            ].map((item, i) => (
+              <details key={i} className="group bg-white border rounded-xl overflow-hidden">
+                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors">
+                  <span className="font-semibold text-sm text-slate-900 pr-4">{item.q}</span>
+                  <ChevronRight className="h-4 w-4 text-slate-400 group-open:rotate-90 transition-transform flex-shrink-0" />
+                </summary>
+                <div className="px-4 pb-4 text-sm text-slate-600 leading-relaxed">{item.a}</div>
+              </details>
+            ))}
           </div>
         </div>
       </section>

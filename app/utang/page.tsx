@@ -361,7 +361,7 @@ function UtangPageContent() {
               </div>
               <span className="text-[11px] text-muted-foreground">Total Receivable</span>
             </div>
-            <div className="text-[15px] font-bold text-red-600 truncate">₱{totalActive.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })</div>
+            <div className="text-[15px] font-bold text-red-600 truncate">₱{totalActive.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="text-xs text-muted-foreground mt-1">{activeCount} active debts</div>
           </MobileCard>
 

@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import {
   Store, Package, TrendingUp, HandCoins, Star,
-  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone,
+  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
@@ -45,6 +45,7 @@ const MORE_GROUPS: NavGroup[] = [
     label: "Operations",
     items: [
       { href: "/elista", label: "e-Lista", icon: FileText, ownerOnly: true },
+      { href: "/checklist", label: "Checklist", icon: ListChecks },
       { href: "/restock", label: "AI Restock", icon: Brain, feature: "aiRestock", ownerOnly: true },
       { href: "/delivery-manage", label: "Delivery", icon: Truck, feature: "delivery", ownerOnly: true },
     ],

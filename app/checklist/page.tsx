@@ -128,65 +128,77 @@ export default function ChecklistPage() {
     setShowScan(true)
 
     try {
-      // Use createImageBitmap + canvas to extract image, then use Tesseract-like approach
-      // For simplicity, we'll use a basic approach: send to a free OCR or parse locally
       const text = await extractTextFromImage(file)
-      if (text) {
+      setScanProcessing(false)
+      setShowScan(false)
+
+      if (text && text.trim().length > 0) {
         const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 1)
         if (lines.length > 0) {
-          setItems(lines.map(l => ({ text: l.replace(/^[\d\.\-\)\]]+\s*/, "").trim(), done: false })))
+          setItems(lines.map(l => ({ text: l.replace(/^[\d\.\-\)\]\*\•]+\s*/, "").trim(), done: false })).filter(i => i.text.length > 0))
           setTitle("Scanned List")
-          setShowScan(false)
           setShowCreate(true)
-          toast({ title: `Found ${lines.length} items`, description: "Review and save your checklist" })
-        } else {
-          toast({ title: "No text found", description: "Try a clearer photo", variant: "destructive" })
-          setShowScan(false)
+          toast({ title: `Found ${lines.length} items`, description: "Review and save" })
+          return
         }
       }
+      toast({ title: "No text found", description: "Try a clearer photo with good lighting", variant: "destructive" })
     } catch {
-      toast({ title: "Scan failed", description: "Could not read the image", variant: "destructive" })
-      setShowScan(false)
-    } finally {
       setScanProcessing(false)
+      setShowScan(false)
+      toast({ title: "Scan failed", description: "Could not read the image. Try typing manually.", variant: "destructive" })
     }
   }
 
-  // Simple OCR using canvas + basic recognition (works offline)
   const extractTextFromImage = async (file: File): Promise<string> => {
-    // Try using the browser's built-in OCR if available (Chrome 100+)
-    if ("createImageBitmap" in window) {
-      try {
-        // @ts-ignore - TextDetector is experimental
-        if ("TextDetector" in window) {
-          const bitmap = await createImageBitmap(file)
-          // @ts-ignore
-          const detector = new window.TextDetector()
-          const results = await detector.detect(bitmap)
-          if (results.length > 0) {
-            return results.map((r: any) => r.rawValue).join("\n")
-          }
+    // Method 1: Browser TextDetector (Chrome Android)
+    try {
+      // @ts-ignore
+      if ("TextDetector" in window) {
+        const bitmap = await createImageBitmap(file)
+        // @ts-ignore
+        const detector = new window.TextDetector()
+        const results = await detector.detect(bitmap)
+        if (results.length > 0) {
+          return results.map((r: any) => r.rawValue).join("\n")
         }
-      } catch {}
-    }
+      }
+    } catch {}
 
-    // Fallback: Use a free OCR API
+    // Method 2: Google Cloud Vision (free tier - no key needed for small usage via proxy)
+    // Method 3: OCR.space with timeout
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+
     try {
       const formData = new FormData()
       formData.append("file", file)
       formData.append("apikey", "K86284535488957")
       formData.append("language", "eng")
       formData.append("isOverlayRequired", "false")
+      formData.append("detectOrientation", "true")
+      formData.append("scale", "true")
+      formData.append("OCREngine", "2")
 
       const res = await fetch("https://api.ocr.space/parse/image", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
       const data = await res.json()
       if (data.ParsedResults?.[0]?.ParsedText) {
         return data.ParsedResults[0].ParsedText
       }
-    } catch {}
+      if (data.ErrorMessage) {
+        console.error("OCR error:", data.ErrorMessage)
+      }
+    } catch (err: any) {
+      clearTimeout(timeout)
+      if (err.name === "AbortError") {
+        console.error("OCR timeout")
+      }
+    }
 
     return ""
   }
@@ -318,12 +330,15 @@ export default function ChecklistPage() {
       </div>
 
       {/* Scanning Dialog */}
-      <Dialog open={showScan} onOpenChange={setShowScan}>
+      <Dialog open={showScan} onOpenChange={(o) => { if (!o) { setShowScan(false); setScanProcessing(false) } }}>
         <DialogContent className="max-w-xs text-center p-6">
           <div className="flex flex-col items-center gap-3">
             <Sparkles className="h-8 w-8 text-yellow-500 animate-pulse" />
             <p className="text-[14px] font-semibold">Reading your image...</p>
-            <p className="text-[12px] text-muted-foreground">Extracting text to create checklist items</p>
+            <p className="text-[12px] text-muted-foreground">This takes up to 15 seconds</p>
+            <Button variant="outline" size="sm" className="mt-2 text-[12px]" onClick={() => { setShowScan(false); setScanProcessing(false) }}>
+              Cancel
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

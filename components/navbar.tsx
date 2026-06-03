@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Store, Package, Smartphone, TrendingUp, Menu, Settings, Download,
   HandCoins, Star, Brain, Users, LogOut, BarChart2, RefreshCw, Truck, FileText,
-  ChevronDown,
+  ChevronDown, ListChecks,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -62,6 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Operations",
     items: [
       { href: "/elista", label: "e-Lista", icon: FileText, ownerOnly: true },
+      { href: "/checklist", label: "Checklist", icon: ListChecks },
       { href: "/restock", label: "AI Restock", icon: Brain, feature: "aiRestock", ownerOnly: true },
       { href: "/delivery-manage", label: "Delivery", icon: Truck, feature: "delivery", ownerOnly: true },
     ],

@@ -47,7 +47,12 @@ export default function ELoadPage() {
 
   useEffect(() => {
     fetch("/api/eload")
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const ct = r.headers.get("content-type") || ""
+        if (!ct.includes("application/json")) throw new Error("API not deployed yet")
+        return r.json()
+      })
       .then(data => {
         const prods: Product[] = data.products || []
         setProducts(prods)
@@ -55,7 +60,7 @@ export default function ELoadPage() {
         setNetworks(nets)
         if (nets.length > 0) setSelectedNetwork(nets[0])
       })
-      .catch(() => {})
+      .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
   }, [])
 
@@ -214,7 +219,18 @@ export default function ELoadPage() {
                   <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No products available</div>
+                <div className="flex flex-col items-center justify-center h-40 text-center px-4">
+                  {error ? (
+                    <>
+                      <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
+                      <p className="text-sm font-medium text-gray-600">E-Load not available</p>
+                      <p className="text-xs text-gray-400 mt-1">{error}</p>
+                      <p className="text-xs text-gray-400 mt-2">Deploy Cloud Functions: <span className="font-mono">firebase deploy --only functions</span></p>
+                    </>
+                  ) : (
+                    <p className="text-gray-400 text-sm">No products available</p>
+                  )}
+                </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2.5">
                   {filtered.map(p => (

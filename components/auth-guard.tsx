@@ -22,6 +22,8 @@ const PUBLIC_PREFIXES = ["/delivery"]
 const ROUTE_FEATURE_MAP: Record<string, keyof SubscriptionFeatures> = {
   "/inventory":          "inventory",
   "/ewallet":            "ewallet",
+  "/ewallet/load":       "ewallet",
+  "/ewallet/cashin":     "ewallet",
   "/reports":            "reports",
   "/loyalty":            "loyalty",
   "/utang":              "utang",

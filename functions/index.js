@@ -99,7 +99,7 @@ exports.eloadApi = onRequest(fnOpts, (req, res) => {
         const txnId = generateTxnId();
         const params = new URLSearchParams({ promoId: String(promoId), address, transactionId: txnId });
         if (amount) params.append('amount', String(amount));
-        const r = await axios.post(`${GBITS_API_URL}/eload/buy?${params.toString()}`, null, {
+        const r = await axios.post(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {}, {
           headers: { Authorization: token, Accept: 'application/json', 'User-Agent': UA }
         });
         const result = r.data;
@@ -114,7 +114,7 @@ exports.eloadApi = onRequest(fnOpts, (req, res) => {
       res.status(405).json({ error: 'Method not allowed' });
     } catch (error) {
       console.error('eloadApi error:', error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });
@@ -142,7 +142,7 @@ exports.xenditCashin = onRequest(fnOpts, (req, res) => {
       res.json({ invoiceUrl: response.data.invoice_url });
     } catch (error) {
       console.error("xenditCashin error:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });
@@ -220,7 +220,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;l
       res.json({ success: true, storeId, ownerPin });
     } catch (error) {
       console.error("sendWelcome error:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });
@@ -288,7 +288,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;l
       res.json({ success: true });
     } catch (error) {
       console.error("sendExpiryNotice error:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });
@@ -343,7 +343,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;l
       res.json({ success: true });
     } catch (error) {
       console.error("sendPaymentFollowup error:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });
@@ -499,7 +499,7 @@ exports.createFreeSubscription = onRequest(fnOpts, (req, res) => {
       res.json({ success: true, externalId, message: "FREE subscription created successfully" });
     } catch (error) {
       console.error("createFreeSubscription error:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });
@@ -544,7 +544,7 @@ exports.xenditWebhook = onRequest(fnOpts, (req, res) => {
       res.json({ success: true, message: "Webhook processed" });
     } catch (error) {
       console.error("xenditWebhook error:", error.message);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error.response && error.response.data && error.response.data.message) || error.message });
     }
   });
 });

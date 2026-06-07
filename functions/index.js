@@ -31,6 +31,94 @@ const getXenditHeaders = () => ({
 const corsHandler = cors({ origin: true });
 const fnOpts = { region: "us-central1", cors: true };
 
+// ── 0. eloadApi ─────────────────────────────────────────────────────────
+exports.eloadApi = onRequest(fnOpts, (req, res) => {
+  corsHandler(req, res, async () => {
+    const GBITS_API_URL = process.env.GBITS_API_URL || 'https://api.gbits.ph';
+    const GBITS_BUSINESS_ID = process.env.GBITS_BUSINESS_ID;
+    const GBITS_BUSINESS_CODE = process.env.GBITS_BUSINESS_CODE;
+    const GBITS_USERNAME = process.env.GBITS_USERNAME;
+    const GBITS_PASSWORD = process.env.GBITS_PASSWORD;
+    const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+
+    let token = null;
+    const authenticate = async () => {
+      const r = await axios.post(`${GBITS_API_URL}/auth`,
+        { username: GBITS_USERNAME, password: GBITS_PASSWORD },
+        { headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'User-Agent': UA } }
+      );
+      if (r.data.errorCode !== 0) throw new Error(r.data.message || 'Gbits auth failed');
+      return r.data.content.accessToken;
+    };
+
+    const gbitsGet = async (path) => {
+      if (!token) token = await authenticate();
+      const r = await axios.get(`${GBITS_API_URL}${path}`, {
+        headers: { Authorization: token, Accept: 'application/json', 'User-Agent': UA }
+      });
+      return r.data;
+    };
+
+    const generateTxnId = () => {
+      const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let rand = '';
+      for (let i = 0; i < 6; i++) rand += chars[Math.floor(Math.random() * chars.length)];
+      return `${GBITS_BUSINESS_CODE}${date}${rand}`;
+    };
+
+    const mapSkus = (skus) => skus
+      .filter(s => s.skuStatus === true)
+      .map(s => ({
+        promoId: s.promoId, name: s.skuName, network: s.serviceGroup,
+        service: s.service, category: s.category, amount: s.amount,
+        description: s.description, validity: s.validity,
+        addressType: s.addressType, addressMin: s.addressMin, addressMax: s.addressMax,
+      }))
+      .sort((a, b) => a.amount - b.amount);
+
+    try {
+      if (req.method === 'GET') {
+        const { action, txnId } = req.query;
+        if (action === 'status' && txnId) {
+          const data = await gbitsGet(`/eload/status/${txnId}`);
+          const status = data.content?.status;
+          if (status === 'success') return res.json({ status: 'completed', txnId });
+          if (status === 'failed') return res.json({ status: 'failed', error: data.content?.description || 'Failed' });
+          return res.json({ status: 'pending', txnId });
+        }
+        const data = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`);
+        const products = mapSkus(data.content || []);
+        return res.json({ products });
+      }
+
+      if (req.method === 'POST') {
+        const { promoId, address, amount } = req.body;
+        if (!promoId || !address) return res.status(400).json({ error: 'promoId and address are required' });
+        if (!token) token = await authenticate();
+        const txnId = generateTxnId();
+        const params = new URLSearchParams({ promoId: String(promoId), address, transactionId: txnId });
+        if (amount) params.append('amount', String(amount));
+        const r = await axios.post(`${GBITS_API_URL}/eload/buy?${params.toString()}`, null, {
+          headers: { Authorization: token, Accept: 'application/json', 'User-Agent': UA }
+        });
+        const result = r.data;
+        if (result.errorCode === 0) {
+          const gbitsRef = result.content?.referenceId || result.content?.transactionId || txnId;
+          return res.json({ status: 'completed', txnId: gbitsRef, localTxnId: txnId });
+        }
+        if (result.errorCode === 105) return res.json({ status: 'pending', txnId });
+        return res.status(422).json({ status: 'failed', txnId, error: result.content?.description || result.message || 'Failed' });
+      }
+
+      res.status(405).json({ error: 'Method not allowed' });
+    } catch (error) {
+      console.error('eloadApi error:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+});
+
 // ── 1. xenditCashin ──────────────────────────────────────────────────────
 exports.xenditCashin = onRequest(fnOpts, (req, res) => {
   corsHandler(req, res, async () => {

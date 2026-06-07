@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Smartphone, Settings, TrendingUp, History, Wallet, ArrowDownToLine, ArrowUpFromLine, Signal, Calendar, Plus } from "lucide-react"
+import { Smartphone, Settings, TrendingUp, History, Wallet, ArrowDownToLine, ArrowUpFromLine, Signal, Calendar, Plus, Zap } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -135,9 +135,15 @@ export default function EWalletPage() {
             <span className="hidden sm:inline">Settings</span>
           </Button>
           <Button
-            onClick={() => router.push("/ewallet/cashin")}
+            onClick={() => router.push("/ewallet/load")}
             size="sm"
-            className="h-9 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+            className="h-9 gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+          >
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Load</span>
+          </Button>
+          <Button
+            onClick={() => router.push("/ewallet/cashin")}
           >
             <Wallet className="h-4 w-4" />
             <span className="hidden sm:inline">Kiosk</span>

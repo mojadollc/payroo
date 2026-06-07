@@ -300,69 +300,169 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
     const storeAddress = storeSettings?.address || ""
     const storePhone = storeSettings?.phone || ""
     const date = new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })
-    const itemRows = snap.cart.map(item =>
-      `<tr>
-        <td>${item.name}</td>
-        <td style="text-align:center">${item.quantity}</td>
-        <td style="text-align:right">&#8369;${item.price.toFixed(2)}</td>
-        <td style="text-align:right">&#8369;${item.subtotal.toFixed(2)}</td>
-      </tr>`
-    ).join("")
-    const win = window.open("", "_blank")
+
+    const itemRows = snap.cart.map(item => {
+      const name = item.name.length > 16 ? item.name.substring(0, 15) + "." : item.name
+      return `<tr>
+        <td class="item-name">${name}</td>
+        <td class="item-qty">${item.quantity}</td>
+        <td class="item-total">&#8369;${item.subtotal.toFixed(2)}</td>
+      </tr>
+      <tr><td class="item-price" colspan="3">  @ &#8369;${item.price.toFixed(2)} each</td></tr>`
+    }).join("")
+
+    const win = window.open("", "_blank", "width=300,height=600")
     if (!win) return
-    win.document.write(`
-      <html><head><title>Receipt</title><style>
-        @page { size: 80mm auto; margin: 4mm; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Courier New', monospace; width: 72mm; margin: 0 auto; padding: 0; font-size: 11px; color: #000; }
-        h2 { text-align: center; font-size: 15px; margin: 0 0 2px; letter-spacing: 1px; text-transform: uppercase; }
-        .center { text-align: center; }
-        .divider { border: none; border-top: 1px dashed #000; margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; }
-        th { font-size: 10px; border-bottom: 1px dashed #000; padding: 2px 0; text-align: left; }
-        th:nth-child(2) { text-align: center; }
-        th:nth-child(3), th:nth-child(4) { text-align: right; }
-        td { padding: 2px 0; font-size: 11px; vertical-align: top; }
-        td:nth-child(1) { width: 40%; word-break: break-word; }
-        td:nth-child(2) { width: 10%; text-align: center; }
-        td:nth-child(3) { width: 22%; text-align: right; }
-        td:nth-child(4) { width: 28%; text-align: right; }
-        .summary td { padding: 1px 0; }
-        .summary td:last-child { text-align: right; }
-        .bold { font-weight: bold; }
-        .footer { text-align: center; margin-top: 8px; font-size: 11px; }
-        .footer-thanks { font-size: 13px; font-weight: bold; margin: 4px 0 2px; }
-      </style></head><body>
-        <h2>${storeName}</h2>
-        ${storeAddress ? `<p class="center" style="margin:2px 0;font-size:10px">${storeAddress}</p>` : ""}
-        ${storePhone ? `<p class="center" style="margin:2px 0;font-size:10px">Tel: ${storePhone}</p>` : ""}
-        <hr class="divider">
-        <p class="center" style="margin:2px 0;font-size:10px">${date}</p>
-        <p class="center" style="margin:2px 0;font-size:10px">Payment: ${snap.paymentMethod.toUpperCase()}</p>
-        <hr class="divider">
-        <table>
-          <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-          <tbody>${itemRows}</tbody>
-        </table>
-        <hr class="divider">
-        <table class="summary">
-          <tr><td>Subtotal</td><td>&#8369;${snap.total.toFixed(2)}</td></tr>
-          ${snap.paymentMethod !== "utang" ? `
-          <tr><td>Amount Paid</td><td>&#8369;${Number.parseFloat(amountReceived || "0").toFixed(2)}</td></tr>
-          <tr class="bold"><td>Change</td><td>&#8369;${snap.change.toFixed(2)}</td></tr>
-          ` : `<tr class="bold"><td>Balance (Utang)</td><td>&#8369;${snap.total.toFixed(2)}</td></tr>`}
-        </table>
-        <hr class="divider">
-        <div class="footer">
-          <p class="footer-thanks">Thank you for buying from us! 😊🛍️</p>
-          <p style="margin:2px 0">We appreciate your business!</p>
-          <p style="margin:4px 0;font-size:10px">Please come again 😄</p>
-          <hr class="divider">
-          <p style="margin:2px 0;font-size:9px">Powered by Payroo POS</p>
-        </div>
-        <script>window.onload=()=>{window.print();}<\/script>
-      </body></html>
-    `)
+    win.document.write(`<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>Receipt</title>
+<style>
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  html, body {
+    width: 58mm;
+    margin: 0 auto;
+    padding: 2mm 2mm 4mm 2mm;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9pt;
+    color: #000;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: bold; }
+  .store-name {
+    font-size: 11pt;
+    font-weight: bold;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 1mm;
+  }
+  .store-info {
+    font-size: 7.5pt;
+    text-align: center;
+    margin: 0.5mm 0;
+  }
+  .divider {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 1.5mm 0;
+    width: 100%;
+  }
+  .meta {
+    font-size: 7.5pt;
+    margin: 0.5mm 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .item-name {
+    font-size: 8.5pt;
+    width: 48%;
+    padding: 0.5mm 0 0 0;
+    word-break: break-word;
+  }
+  .item-qty {
+    font-size: 8.5pt;
+    width: 12%;
+    text-align: center;
+    padding: 0.5mm 0 0 0;
+  }
+  .item-total {
+    font-size: 8.5pt;
+    width: 40%;
+    text-align: right;
+    padding: 0.5mm 0 0 0;
+  }
+  .item-price {
+    font-size: 7.5pt;
+    color: #444;
+    padding-bottom: 0.5mm;
+  }
+  .summary-row td {
+    font-size: 8.5pt;
+    padding: 0.4mm 0;
+  }
+  .summary-row td:last-child {
+    text-align: right;
+  }
+  .total-row td {
+    font-size: 10pt;
+    font-weight: bold;
+    padding: 1mm 0;
+    border-top: 1px solid #000;
+  }
+  .total-row td:last-child {
+    text-align: right;
+  }
+  .change-row td {
+    font-size: 9.5pt;
+    font-weight: bold;
+    padding: 0.5mm 0;
+  }
+  .change-row td:last-child {
+    text-align: right;
+  }
+  .footer {
+    text-align: center;
+    margin-top: 2mm;
+    font-size: 8pt;
+  }
+  .footer-thanks {
+    font-size: 9.5pt;
+    font-weight: bold;
+    margin: 1.5mm 0 1mm;
+  }
+  .powered {
+    font-size: 7pt;
+    margin-top: 2mm;
+  }
+  @media print {
+    html, body { width: 58mm; }
+  }
+</style>
+</head><body>
+  <div class="store-name">${storeName}</div>
+  ${storeAddress ? `<div class="store-info">${storeAddress}</div>` : ""}
+  ${storePhone ? `<div class="store-info">Tel: ${storePhone}</div>` : ""}
+  <hr class="divider">
+  <div class="meta center">${date}</div>
+  <div class="meta center">Payment: ${snap.paymentMethod.toUpperCase()}</div>
+  <hr class="divider">
+  <table>
+    <tbody>${itemRows}</tbody>
+  </table>
+  <hr class="divider">
+  <table>
+    <tr class="summary-row"><td>Subtotal</td><td>&#8369;${snap.total.toFixed(2)}</td></tr>
+    ${snap.paymentMethod !== "utang"
+      ? `<tr class="summary-row"><td>Amount Paid</td><td>&#8369;${Number.parseFloat(amountReceived || "0").toFixed(2)}</td></tr>
+         <tr class="change-row"><td>Change</td><td>&#8369;${snap.change.toFixed(2)}</td></tr>`
+      : `<tr class="change-row"><td>Balance (Utang)</td><td>&#8369;${snap.total.toFixed(2)}</td></tr>`
+    }
+    <tr class="total-row"><td>TOTAL</td><td>&#8369;${snap.total.toFixed(2)}</td></tr>
+  </table>
+  <hr class="divider">
+  <div class="footer">
+    <div class="footer-thanks">Thank you! 😊</div>
+    <div>Please come again!</div>
+    <hr class="divider">
+    <div class="powered">Powered by Payroo POS</div>
+  </div>
+  <script>window.onload = function() { window.print(); }<\/script>
+</body></html>`)
     win.document.close()
   }
 

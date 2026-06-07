@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ChevronLeft, CheckCircle, XCircle, AlertTriangle,
-  Loader2, Delete, ChevronRight, RotateCcw, Search, X,
+  Loader2, Delete, RotateCcw, Search, X, Signal,
 } from "lucide-react"
 
 type Step = "browse" | "phone" | "confirm" | "processing" | "success" | "failed"
@@ -34,17 +34,14 @@ export default function ELoadPage() {
   const [step, setStep] = useState<Step>("browse")
   const [products, setProducts] = useState<Product[]>([])
   const [networks, setNetworks] = useState<string[]>([])
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("")
-  const [filter, setFilter] = useState("all")
-  const [search, setSearch] = useState("")
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("ALL")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [phone, setPhone] = useState("")
+  const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
-  const [processing, setProcessing] = useState(false)
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
   useEffect(() => {
     fetch("/api/eload")
@@ -59,7 +56,6 @@ export default function ELoadPage() {
         setProducts(prods)
         const nets = [...new Set(prods.map(p => p.network))]
         setNetworks(nets)
-        if (nets.length > 0) setSelectedNetwork(nets[0])
       })
       .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
@@ -67,28 +63,24 @@ export default function ELoadPage() {
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
 
-  const isSearching = search.trim().length >= 2
-  const searchResults = isSearching
-    ? products.filter(p => {
-        const q = search.toLowerCase()
-        return p.name.toLowerCase().includes(q) ||
-          p.network.toLowerCase().includes(q) ||
-          p.category?.toLowerCase().includes(q) ||
-          p.description?.toLowerCase().includes(q) ||
-          String(p.amount).includes(q)
-      })
-    : []
+  // Filter products
+  const displayProducts = (() => {
+    let list = products
+    if (selectedNetwork !== "ALL") list = list.filter(p => p.network === selectedNetwork)
+    if (search.trim().length >= 2) {
+      const q = search.toLowerCase()
+      list = list.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.network.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        String(p.amount).includes(q)
+      )
+    }
+    return list
+  })()
 
-  const filtered = products
-    .filter(p => p.network === selectedNetwork)
-    .filter(p => filter === "all" || p.category === filter)
-  const categories = [...new Set(products.filter(p => p.network === selectedNetwork).map(p => p.category).filter(Boolean))]
-
-  const handleBuy = (p: Product) => {
-    setSelectedProduct(p)
-    setPhone("")
-    setStep("phone")
-  }
+  const handleBuy = (p: Product) => { setSelectedProduct(p); setPhone(""); setStep("phone") }
 
   const handlePhoneInput = (val: string) => {
     if (val === "C") { setPhone(""); return }
@@ -100,7 +92,6 @@ export default function ELoadPage() {
   const handleConfirm = async () => {
     if (!selectedProduct) return
     setStep("processing")
-    setProcessing(true)
     try {
       const res = await fetch("/api/eload", {
         method: "POST",
@@ -108,22 +99,12 @@ export default function ELoadPage() {
         body: JSON.stringify({ promoId: selectedProduct.promoId, address: phone, amount: selectedProduct.amount }),
       })
       const data = await res.json()
-
-      if (data.status === "completed") {
-        setTxnId(data.txnId || "")
-        setStep("success")
-      } else if (data.status === "pending") {
-        // Poll for status
-        await pollStatus(data.txnId)
-      } else {
-        setError(data.error || "Transaction failed.")
-        setStep("failed")
-      }
+      if (data.status === "completed") { setTxnId(data.txnId || ""); setStep("success") }
+      else if (data.status === "pending") { await pollStatus(data.txnId) }
+      else { setError(data.error || "Transaction failed."); setStep("failed") }
     } catch {
       setError("Network error. Please try again.")
       setStep("failed")
-    } finally {
-      setProcessing(false)
     }
   }
 
@@ -138,427 +119,353 @@ export default function ELoadPage() {
         if (data.status === "failed") { setError(data.error || "Failed"); setStep("failed"); return }
       } catch {}
     }
-    setError("Still processing. Please check back shortly.")
+    setError("Still processing. Check back shortly.")
     setStep("failed")
   }
 
-  const reset = () => {
-    setStep("browse")
-    setSelectedProduct(null)
-    setPhone("")
-    setTxnId("")
-    setError("")
-    setFilter("all")
-  }
+  const reset = () => { setStep("browse"); setSelectedProduct(null); setPhone(""); setTxnId(""); setError("") }
 
   const networkColor = selectedProduct ? (NETWORK_COLORS[selectedProduct.network] || "#6366F1") : "#6366F1"
 
-  // ── BROWSE ──────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // BROWSE — GCash-style layout
+  // ════════════════════════════════════════════════════════════════════════════
   if (step === "browse") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
-        <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-20">
-          <button onClick={() => router.push("/ewallet")} className="flex items-center gap-1 text-gray-400 hover:text-gray-600 text-sm font-medium">
-            <ChevronLeft className="h-5 w-5" /> Back
-          </button>
-          <div className="text-center">
-            <p className="font-bold text-gray-800 text-lg">E-Load</p>
-            <p className="text-[10px] text-gray-400">{storeName}</p>
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Blue header like GCash */}
+        <div className="bg-gradient-to-b from-indigo-600 to-indigo-500 text-white px-4 pb-5 pt-4 rounded-b-3xl shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => router.push("/ewallet")} className="flex items-center gap-1 text-white/80 text-sm">
+              <ChevronLeft className="h-5 w-5" /> Back
+            </button>
+            <h1 className="font-bold text-lg">Buy Load</h1>
+            <div className="w-14" />
           </div>
-          <div className="w-14" />
-        </div>
 
-        {/* Search Bar */}
-        <div className="bg-white border-b border-gray-100 px-3 py-2 sticky top-[52px] z-10">
+          {/* Search bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-300 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search promos across all networks..."
+              placeholder="Search promos, networks, amounts..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full h-10 pl-9 pr-9 rounded-xl bg-gray-100 border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+              className="w-full h-11 pl-10 pr-10 rounded-xl bg-white/15 border border-white/20 text-white placeholder:text-white/50 text-sm focus:outline-none focus:bg-white/25 focus:border-white/40 backdrop-blur-sm"
             />
             {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                <X className="h-4 w-4 text-gray-400" />
+              <button onClick={() => setSearch("")} className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                <X className="h-4 w-4 text-white/60" />
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Search Results (overlays network/products when searching) */}
-          {isSearching ? (
-            <div className="flex-1 overflow-y-auto p-3">
-              <p className="text-xs text-gray-400 mb-2 px-1">{searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for "{search}"</p>
-              {searchResults.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 text-center">
-                  <Search className="h-8 w-8 text-gray-300 mb-2" />
-                  <p className="text-sm text-gray-400">No promos found for "{search}"</p>
+        {/* Network pills — horizontal scroll like GCash */}
+        <div className="px-4 py-3 -mt-3">
+          <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-3">
+            <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              <button
+                onClick={() => setSelectedNetwork("ALL")}
+                className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl shrink-0 transition-all min-w-[60px] ${
+                  selectedNetwork === "ALL" ? "bg-indigo-50 ring-2 ring-indigo-400" : "hover:bg-gray-50"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+                  <Signal className="h-5 w-5 text-white" />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  {searchResults.map(p => (
-                    <button
-                      key={`${p.promoId}-${p.network}`}
-                      onClick={() => handleBuy(p)}
-                      className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left flex items-center gap-3"
+                <span className={`text-[10px] font-bold ${selectedNetwork === "ALL" ? "text-indigo-600" : "text-gray-500"}`}>All</span>
+              </button>
+              {networks.map(net => {
+                const color = NETWORK_COLORS[net] || "#6366F1"
+                const active = selectedNetwork === net
+                return (
+                  <button
+                    key={net}
+                    onClick={() => setSelectedNetwork(net)}
+                    className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl shrink-0 transition-all min-w-[60px] ${
+                      active ? "bg-indigo-50 ring-2 ring-indigo-400" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[9px] font-black"
+                      style={{ backgroundColor: color }}
                     >
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[8px] font-black shrink-0"
-                        style={{ backgroundColor: NETWORK_COLORS[p.network] || "#6366F1" }}
-                      >
-                        {p.network.length > 5 ? p.network.slice(0, 4) : p.network}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-gray-800 truncate">{p.name}</p>
-                        <p className="text-[10px] text-gray-400">{p.network} · {p.category || "Load"}{p.validity ? " · " + p.validity.replace("Valid for ", "") : ""}</p>
-                      </div>
-                      <span className="text-base font-black shrink-0" style={{ color: NETWORK_COLORS[p.network] || "#6366F1" }}>
-                        ₱{p.amount}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                      {net.length > 4 ? net.slice(0, 3) : net}
+                    </div>
+                    <span className={`text-[10px] font-bold ${active ? "text-indigo-600" : "text-gray-500"}`}>
+                      {net.length > 6 ? net.slice(0, 6) : net}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Product List */}
+        <div className="flex-1 px-4 pb-6 overflow-y-auto">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+              <p className="text-sm text-gray-400">Loading promos...</p>
+            </div>
+          ) : error && displayProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-center px-4">
+              <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
+              <p className="text-sm font-medium text-gray-600">E-Load not available</p>
+              <p className="text-xs text-gray-400 mt-1">{error}</p>
+            </div>
+          ) : displayProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-center">
+              <Search className="h-8 w-8 text-gray-300 mb-2" />
+              <p className="text-sm text-gray-400">
+                {search ? `No results for "${search}"` : "No promos available"}
+              </p>
             </div>
           ) : (
-          <>
-          {/* Network sidebar */}
-          <aside className="w-[76px] bg-white border-r border-gray-100 flex flex-col overflow-y-auto shrink-0">
-            {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
-              </div>
-            ) : (
-              <div className="py-2 px-1.5 space-y-1">
-                {networks.map(net => {
-                  const color = NETWORK_COLORS[net] || "#6366F1"
-                  const active = selectedNetwork === net
-                  return (
-                    <button
-                      key={net}
-                      onClick={() => { setSelectedNetwork(net); setFilter("all") }}
-                      className={`w-full p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${
-                        active ? "bg-indigo-50 ring-1 ring-indigo-300" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[9px] font-black"
-                        style={{ backgroundColor: color }}
-                      >
-                        {net.length > 5 ? net.slice(0, 4) : net}
-                      </div>
-                      <span className={`text-[9px] font-semibold text-center leading-tight ${active ? "text-indigo-600" : "text-gray-400"}`}>
-                        {net.length > 7 ? net.slice(0, 7) : net}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </aside>
-
-          {/* Products */}
-          <main className="flex-1 flex flex-col overflow-hidden">
-            {/* Category tabs */}
-            {categories.length > 0 && (
-              <div className="bg-white border-b border-gray-100 px-3 py-2 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-                {["all", ...categories].map(c => (
+            <>
+              <p className="text-xs text-gray-400 mb-3 font-medium">
+                {search ? `${displayProducts.length} result${displayProducts.length !== 1 ? "s" : ""}` : `${displayProducts.length} promos available`}
+              </p>
+              <div className="space-y-2.5">
+                {displayProducts.map(p => (
                   <button
-                    key={c}
-                    onClick={() => setFilter(c)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
-                      filter === c ? "text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                    style={filter === c ? { backgroundColor: NETWORK_COLORS[selectedNetwork] || "#6366F1" } : {}}
+                    key={`${p.promoId}-${p.network}`}
+                    onClick={() => handleBuy(p)}
+                    className="w-full bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left flex items-center gap-3"
                   >
-                    {c === "all" ? "All" : c}
+                    {/* Network badge */}
+                    <div
+                      className="w-11 h-11 rounded-2xl flex items-center justify-center text-white text-[9px] font-black shrink-0 shadow-sm"
+                      style={{ backgroundColor: NETWORK_COLORS[p.network] || "#6366F1" }}
+                    >
+                      {p.network.length > 4 ? p.network.slice(0, 3) : p.network}
+                    </div>
+
+                    {/* Product info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{p.name}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                        {p.description || p.category || p.network}
+                      </p>
+                      {p.validity && (
+                        <span className="inline-block mt-1 text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full font-medium">
+                          {p.validity.replace("Valid for ", "")}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Price */}
+                    <div className="text-right shrink-0">
+                      <p className="text-lg font-black text-gray-800">₱{p.amount}</p>
+                    </div>
                   </button>
                 ))}
               </div>
-            )}
-
-            {/* Product grid */}
-            <div className="flex-1 overflow-y-auto p-3">
-              {loading ? (
-                <div className="flex items-center justify-center h-40">
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-                  {error ? (
-                    <>
-                      <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
-                      <p className="text-sm font-medium text-gray-600">E-Load not available</p>
-                      <p className="text-xs text-gray-400 mt-1">{error}</p>
-                      <p className="text-xs text-gray-400 mt-2">Deploy Cloud Functions: <span className="font-mono">firebase deploy --only functions</span></p>
-                    </>
-                  ) : (
-                    <p className="text-gray-400 text-sm">No products available</p>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2.5">
-                  {filtered.map(p => (
-                    <button
-                      key={p.promoId}
-                      onClick={() => handleBuy(p)}
-                      className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 active:scale-[0.97] transition-all text-left flex flex-col"
-                    >
-                      <p className="text-xs font-bold text-gray-800 leading-tight flex-1">{p.name}</p>
-                      {p.description && (
-                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{p.description}</p>
-                      )}
-                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-50">
-                        <span className="text-base font-black" style={{ color: NETWORK_COLORS[p.network] || "#6366F1" }}>
-                          ₱{p.amount}
-                        </span>
-                        {p.validity && (
-                          <span className="text-[9px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">
-                            {p.validity.replace("Valid for ", "")}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </main>
-          </>
+            </>
           )}
         </div>
       </div>
     )
   }
 
-  // ── PHONE INPUT ──────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // PHONE INPUT
+  // ════════════════════════════════════════════════════════════════════════════
   if (step === "phone") {
     const minLen = selectedProduct?.addressMin || 10
     const maxLen = selectedProduct?.addressMax || 11
     const isAN = selectedProduct?.addressType === "AN"
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setStep("browse")} className="flex items-center gap-1 text-gray-400 text-sm font-medium">
-            <ChevronLeft className="h-5 w-5" /> Back
-          </button>
-          <p className="font-bold text-gray-800">Enter {isAN ? "Account No." : "Mobile No."}</p>
-          <div className="w-14" />
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Header */}
+        <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
+          <button onClick={() => setStep("browse")} className="text-gray-400"><ChevronLeft className="h-6 w-6" /></button>
+          <div className="flex-1">
+            <p className="font-bold text-gray-800 text-base">Enter {isAN ? "Account" : "Number"}</p>
+            <p className="text-[11px] text-gray-400">{selectedProduct?.network} · {selectedProduct?.name}</p>
+          </div>
+          <p className="text-lg font-black" style={{ color: networkColor }}>₱{selectedProduct?.amount}</p>
         </div>
 
-        {/* Progress */}
-        <div className="px-5 pt-4 pb-2">
-          <div className="flex gap-1">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="h-1 flex-1 rounded-full" style={{ backgroundColor: i <= 0 ? networkColor : "#E5E7EB" }} />
-            ))}
-          </div>
-          <div className="flex justify-between mt-1">
-            {["Number", "Review", "Done"].map(l => <p key={l} className="text-[10px] text-gray-400">{l}</p>)}
-          </div>
-        </div>
-
-        <div className="flex-1 px-4 pb-6 space-y-4">
-          {/* Product summary */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400">{selectedProduct?.network}</p>
-              <p className="font-bold text-gray-800 text-sm">{selectedProduct?.name}</p>
-              {selectedProduct?.validity && <p className="text-[10px] text-gray-400">{selectedProduct.validity}</p>}
-            </div>
-            <p className="text-xl font-black" style={{ color: networkColor }}>₱{selectedProduct?.amount}</p>
-          </div>
-
+        <div className="flex-1 px-5 pt-6 pb-4 flex flex-col">
           {/* Number display */}
-          <div className="bg-white rounded-2xl shadow-sm p-5 text-center border border-gray-100">
-            <p className="text-3xl font-extrabold text-gray-800 min-h-[40px] tracking-widest">
-              {phone || <span className="text-gray-300">{isAN ? "Account #" : "09XX XXX XXXX"}</span>}
+          <div className="text-center mb-6">
+            <p className="text-4xl font-black text-gray-800 tracking-wider min-h-[48px]">
+              {phone || <span className="text-gray-300">{isAN ? "Account #" : "09XXXXXXXXX"}</span>}
             </p>
-            {phone.length > 0 && <p className="text-xs text-gray-400 mt-1">{phone.length} / {maxLen} digits</p>}
+            <p className="text-xs text-gray-400 mt-2">{phone.length} / {maxLen} digits</p>
           </div>
 
           {/* Numpad */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3 flex-1 max-h-[360px]">
             {["1","2","3","4","5","6","7","8","9","C","0","⌫"].map(key => (
               <button
                 key={key}
                 onClick={() => handlePhoneInput(key)}
-                className={`h-14 rounded-2xl text-xl font-bold transition-all active:scale-90 active:opacity-70 ${
-                  key === "C" ? "bg-red-50 text-red-500 border border-red-100" :
+                className={`rounded-2xl text-2xl font-bold transition-all active:scale-90 ${
+                  key === "C" ? "bg-red-50 text-red-500" :
                   key === "⌫" ? "bg-gray-100 text-gray-500 flex items-center justify-center" :
-                  "bg-white text-gray-800 shadow-sm border border-gray-100 hover:bg-gray-50"
+                  "bg-gray-50 text-gray-800 hover:bg-gray-100 active:bg-indigo-100"
                 }`}
               >
-                {key === "⌫" ? <Delete className="h-5 w-5" /> : key}
+                {key === "⌫" ? <Delete className="h-6 w-6" /> : key}
               </button>
             ))}
           </div>
 
-          <div className="grid grid-cols-5 gap-2">
-            <button onClick={() => setStep("browse")}
-              className="col-span-2 h-13 py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm flex items-center justify-center gap-1">
-              <ChevronLeft className="h-4 w-4" /> Back
-            </button>
-            <button
-              onClick={() => setStep("confirm")}
-              disabled={phone.length < minLen}
-              className="col-span-3 h-13 py-3.5 rounded-2xl text-white font-bold text-base disabled:opacity-40 disabled:cursor-not-allowed shadow-lg transition-all active:scale-[0.98]"
-              style={{ backgroundColor: phone.length >= minLen ? networkColor : undefined }}
-            >
-              Next →
-            </button>
-          </div>
+          {/* Action */}
+          <button
+            onClick={() => setStep("confirm")}
+            disabled={phone.length < minLen}
+            className="mt-4 w-full py-4 rounded-2xl text-white font-bold text-lg disabled:opacity-40 disabled:bg-gray-300 shadow-lg active:scale-[0.98] transition-all"
+            style={{ backgroundColor: phone.length >= minLen ? networkColor : undefined }}
+          >
+            Continue
+          </button>
         </div>
       </div>
     )
   }
 
-  // ── CONFIRM ──────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // CONFIRM
+  // ════════════════════════════════════════════════════════════════════════════
   if (step === "confirm") {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setStep("phone")} className="flex items-center gap-1 text-gray-400 text-sm font-medium">
-            <ChevronLeft className="h-5 w-5" /> Back
-          </button>
-          <p className="font-bold text-gray-800">Review & Confirm</p>
-          <div className="w-14" />
+        <div className="px-4 py-3 flex items-center gap-3 bg-white border-b border-gray-100">
+          <button onClick={() => setStep("phone")} className="text-gray-400"><ChevronLeft className="h-6 w-6" /></button>
+          <p className="font-bold text-gray-800 text-base flex-1">Confirm Load</p>
         </div>
 
-        <div className="px-5 pt-4 pb-2">
-          <div className="flex gap-1">
-            {[0,1,2].map(i => (
-              <div key={i} className="h-1 flex-1 rounded-full" style={{ backgroundColor: i <= 1 ? networkColor : "#E5E7EB" }} />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 px-4 pb-6 space-y-4 pt-2">
-          {/* Amount hero */}
-          <div className="rounded-2xl overflow-hidden shadow-sm">
-            <div className="py-6 text-center text-white" style={{ backgroundColor: networkColor }}>
-              <p className="text-sm opacity-80 mb-1">{selectedProduct?.network} · {selectedProduct?.name}</p>
-              <p className="text-5xl font-black">₱{selectedProduct?.amount}</p>
-              {selectedProduct?.validity && <p className="text-xs opacity-70 mt-1">{selectedProduct.validity}</p>}
-            </div>
-            <div className="bg-white p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Mobile Number</span>
-                <span className="font-black text-gray-800 tracking-widest text-base">{phone}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Network</span>
-                <span className="font-bold text-gray-800">{selectedProduct?.network}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Product</span>
-                <span className="font-bold text-gray-800 text-right max-w-[60%] text-sm">{selectedProduct?.name}</span>
-              </div>
+        <div className="flex-1 px-4 py-5 space-y-4">
+          {/* Hero card */}
+          <div className="rounded-3xl overflow-hidden shadow-md">
+            <div className="py-8 text-center text-white" style={{ backgroundColor: networkColor }}>
+              <p className="text-sm opacity-80">{selectedProduct?.network}</p>
+              <p className="text-5xl font-black mt-1">₱{selectedProduct?.amount}</p>
+              <p className="text-xs opacity-70 mt-2">{selectedProduct?.name}</p>
+              {selectedProduct?.validity && (
+                <p className="text-xs opacity-60 mt-1">{selectedProduct.validity}</p>
+              )}
             </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700 text-center">
-            ⚠️ Double-check the mobile number. Load cannot be reversed.
+          {/* Details */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-400">Send to</span>
+              <span className="font-black text-gray-800 tracking-widest">{phone}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-400">Network</span>
+              <span className="font-bold text-gray-800">{selectedProduct?.network}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-400">Product</span>
+              <span className="font-medium text-gray-800 text-right max-w-[55%] text-sm">{selectedProduct?.name}</span>
+            </div>
+            <div className="border-t pt-3 flex justify-between">
+              <span className="text-sm font-bold text-gray-800">Total</span>
+              <span className="text-xl font-black" style={{ color: networkColor }}>₱{selectedProduct?.amount}</span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setStep("phone")}
-              className="h-13 py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm flex items-center justify-center gap-1">
-              ✏️ Edit
-            </button>
-            <button onClick={reset}
-              className="h-13 py-3.5 rounded-2xl bg-red-50 text-red-500 font-bold text-sm border border-red-100">
-              Cancel
-            </button>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-sm text-amber-700 text-center">
+            ⚠️ Double-check the number. Load cannot be reversed.
           </div>
+        </div>
 
+        {/* Bottom buttons */}
+        <div className="px-4 pb-6 space-y-3">
           <button
             onClick={handleConfirm}
-            className="w-full py-4 rounded-2xl text-white font-extrabold text-lg shadow-xl transition-all active:scale-[0.98]"
+            className="w-full py-4 rounded-2xl text-white font-bold text-lg shadow-xl active:scale-[0.98] transition-all"
             style={{ backgroundColor: networkColor }}
           >
-            ✅ Send Load Now
+            Send Load
+          </button>
+          <button onClick={reset} className="w-full py-3 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm">
+            Cancel
           </button>
         </div>
       </div>
     )
   }
 
-  // ── PROCESSING ───────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // PROCESSING
+  // ════════════════════════════════════════════════════════════════════════════
   if (step === "processing") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-center space-y-5 px-6">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-center px-6 space-y-6">
         <div className="relative">
           <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ backgroundColor: networkColor }} />
-          <div className="relative w-24 h-24 rounded-full flex items-center justify-center" style={{ backgroundColor: networkColor }}>
+          <div className="relative w-24 h-24 rounded-full flex items-center justify-center shadow-xl" style={{ backgroundColor: networkColor }}>
             <Loader2 className="h-12 w-12 text-white animate-spin" />
           </div>
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Processing Load</h2>
-          <p className="text-gray-400 mt-1">{selectedProduct?.network} · ₱{selectedProduct?.amount}</p>
-          <p className="text-gray-400 text-sm">{phone}</p>
-          <p className="text-xs text-gray-300 mt-4">Please wait... do not close this screen</p>
+          <h2 className="text-2xl font-bold text-gray-800">Sending Load</h2>
+          <p className="text-gray-400 mt-2">{selectedProduct?.network} · ₱{selectedProduct?.amount}</p>
+          <p className="text-gray-500 font-bold tracking-widest">{phone}</p>
+          <p className="text-xs text-gray-300 mt-6">Please wait...</p>
         </div>
       </div>
     )
   }
 
-  // ── SUCCESS ──────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // SUCCESS
+  // ════════════════════════════════════════════════════════════════════════════
   if (step === "success") {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-center space-y-5 px-6">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-green-100 animate-pulse" />
-          <div className="relative w-28 h-28 rounded-full bg-green-500 flex items-center justify-center shadow-xl shadow-green-500/30">
-            <CheckCircle className="h-14 w-14 text-white" />
-          </div>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-center px-6 space-y-5">
+        <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center shadow-xl shadow-green-500/30">
+          <CheckCircle className="h-12 w-12 text-white" />
         </div>
         <div>
-          <h2 className="text-3xl font-extrabold text-green-600">Load Sent!</h2>
-          <p className="text-5xl font-extrabold text-gray-800 mt-2">₱{selectedProduct?.amount}</p>
+          <h2 className="text-3xl font-black text-green-600">Load Sent!</h2>
+          <p className="text-4xl font-black text-gray-800 mt-2">₱{selectedProduct?.amount}</p>
           <p className="text-gray-400 mt-1">{selectedProduct?.network} · {selectedProduct?.name}</p>
-          <p className="text-gray-500 font-bold tracking-widest mt-1">{phone}</p>
+          <p className="text-gray-600 font-bold tracking-widest mt-1">{phone}</p>
         </div>
         {txnId && (
-          <div className="bg-white rounded-2xl px-5 py-3 shadow-sm border border-gray-100 w-full max-w-xs">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Gbits Reference No.</p>
-            <p className="text-sm font-black text-gray-800 font-mono tracking-wider break-all">{txnId}</p>
+          <div className="bg-gray-50 rounded-2xl px-5 py-3 w-full max-w-xs">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Reference No.</p>
+            <p className="text-sm font-black text-gray-800 font-mono break-all">{txnId}</p>
           </div>
         )}
         <button
           onClick={reset}
-          className="w-full max-w-xs py-4 rounded-2xl text-white font-bold text-lg shadow-lg flex items-center justify-center gap-2"
+          className="w-full max-w-xs py-4 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 text-white active:scale-[0.98]"
           style={{ backgroundColor: networkColor }}
         >
-          <RotateCcw className="h-5 w-5" /> New Transaction
+          <RotateCcw className="h-5 w-5" /> New Load
         </button>
       </div>
     )
   }
 
-  // ── FAILED ───────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // FAILED
+  // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-center space-y-5 px-6">
-      <div className="relative">
-        <div className="absolute inset-0 rounded-full bg-red-100 animate-pulse" />
-        <div className="relative w-28 h-28 rounded-full bg-red-500 flex items-center justify-center shadow-xl shadow-red-500/30">
-          <XCircle className="h-14 w-14 text-white" />
-        </div>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center text-center px-6 space-y-5">
+      <div className="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center shadow-xl shadow-red-500/30">
+        <XCircle className="h-12 w-12 text-white" />
       </div>
       <div>
-        <h2 className="text-3xl font-extrabold text-red-600">Failed</h2>
-        <p className="text-gray-500 mt-2 max-w-xs">{error || "Transaction failed. Please try again."}</p>
+        <h2 className="text-2xl font-black text-red-600">Failed</h2>
+        <p className="text-gray-500 mt-2 max-w-xs">{error || "Transaction failed."}</p>
       </div>
       <div className="flex gap-3 w-full max-w-xs">
         <button onClick={reset} className="flex-1 py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold">Cancel</button>
         <button
           onClick={() => { setError(""); setStep("confirm") }}
-          className="flex-1 py-3.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2"
+          className="flex-1 py-3.5 rounded-2xl text-white font-bold flex items-center justify-center gap-2 active:scale-[0.98]"
           style={{ backgroundColor: networkColor }}
         >
           <RotateCcw className="h-4 w-4" /> Retry

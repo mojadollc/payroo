@@ -188,6 +188,59 @@ export const addSale = async (sale: Omit<Sale, "id" | "createdAt">, storeLocatio
   return saleRef.id
 }
 
+export const voidSale = async (saleId: string): Promise<void> => {
+  const db = getFirebaseDb()
+  if (!db) throw new Error("Firebase not configured.")
+  const sid = getStoreId()
+
+  // Load the sale
+  const saleSnap = await getDoc(doc(db, "sales", saleId))
+  if (!saleSnap.exists()) throw new Error("Sale not found")
+  const sale = saleSnap.data() as Sale
+  if (sale.status === "voided") throw new Error("Sale is already voided")
+
+  // Fetch all product docs in parallel
+  const productRefs = sale.items.map((item: any) => doc(db, "products", item.productId))
+  const productSnaps = await Promise.all(productRefs.map((r: any) => getDoc(r)))
+
+  const batch = writeBatch(db)
+
+  // Mark sale as voided
+  batch.update(doc(db, "sales", saleId), {
+    status: "voided",
+    voidedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+
+  // Restore stock for each item
+  for (let i = 0; i < sale.items.length; i++) {
+    const item = sale.items[i] as any
+    const productSnap = productSnaps[i]
+    if (!productSnap.exists()) continue
+
+    const currentStock = productSnap.data().stock
+    const restoredStock = currentStock + item.quantity
+
+    batch.update(productRefs[i], { stock: restoredStock, updatedAt: serverTimestamp() })
+
+    // Log inventory transaction for the reversal
+    const invRef = doc(collection(db, "inventoryTransactions"))
+    batch.set(invRef, {
+      productId: item.productId,
+      productName: item.productName,
+      type: "void",
+      quantity: item.quantity,
+      previousStock: currentStock,
+      newStock: restoredStock,
+      storeId: sid,
+      notes: `Sale voided — Ref: ${saleId}`,
+      createdAt: serverTimestamp(),
+    })
+  }
+
+  await batch.commit()
+}
+
 export const getSales = async (startDate?: Date, endDate?: Date) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")

@@ -240,8 +240,9 @@ export default function ReportsPage() {
   }
 
   const calculateStats = () => {
-    const salesGross = sales.reduce((sum, s) => sum + s.total, 0)
-    const salesProfit = sales.reduce((sum, s) =>
+    const activeSales = sales.filter(s => s.status !== "voided")
+    const salesGross = activeSales.reduce((sum, s) => sum + s.total, 0)
+    const salesProfit = activeSales.reduce((sum, s) =>
       sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
     const ewalletGross = ewalletTransactions.reduce((sum, t) => sum + t.amount, 0)
     const ewalletProfit = ewalletTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
@@ -250,21 +251,22 @@ export default function ReportsPage() {
       totalProfit: salesProfit + ewalletProfit,
       salesRevenue: salesGross, salesProfit,
       ewalletRevenue: ewalletGross, ewalletProfit,
-      totalSales: sales.length,
+      totalSales: activeSales.length,
       totalEWalletTransactions: ewalletTransactions.length,
     }
   }
 
   const calculateToday = () => {
-    const gross = todaySales.reduce((sum, s) => sum + s.total, 0)
-    const profit = todaySales.reduce((sum, s) =>
+    const activeTodaySales = todaySales.filter(s => s.status !== "voided")
+    const gross = activeTodaySales.reduce((sum, s) => sum + s.total, 0)
+    const profit = activeTodaySales.reduce((sum, s) =>
       sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
-    const txCount = todaySales.length
-    const itemsSold = todaySales.reduce((sum, s) => sum + s.items.reduce((n, i) => n + i.quantity, 0), 0)
+    const txCount = activeTodaySales.length
+    const itemsSold = activeTodaySales.reduce((sum, s) => sum + s.items.reduce((n, i) => n + i.quantity, 0), 0)
     const eGross = todayEwallet.reduce((sum, t) => sum + t.amount, 0)
     const eProfit = todayEwallet.reduce((sum, t) => sum + Math.abs(t.profit), 0)
     const topItems = Object.values(
-      todaySales.flatMap(s => s.items).reduce((acc, i) => {
+      activeTodaySales.flatMap(s => s.items).reduce((acc, i) => {
         if (!acc[i.productId]) acc[i.productId] = { name: i.productName, qty: 0, revenue: 0 }
         acc[i.productId].qty += i.quantity
         acc[i.productId].revenue += i.subtotal
@@ -506,7 +508,7 @@ export default function ReportsPage() {
               </div>
               <TabsContent value="sales" className="mt-0">
                 <div className="p-3">
-                  <SalesReport sales={sales} isLoading={isLoading} />
+                  <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
                 </div>
               </TabsContent>
               <TabsContent value="ewallet" className="mt-0">
@@ -641,7 +643,7 @@ export default function ReportsPage() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sales">
-            <SalesReport sales={sales} isLoading={isLoading} />
+            <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
           </TabsContent>
           <TabsContent value="ewallet">
             <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />

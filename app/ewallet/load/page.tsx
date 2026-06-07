@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ChevronLeft, CheckCircle, XCircle, AlertTriangle,
-  Loader2, Delete, ChevronRight, RotateCcw,
+  Loader2, Delete, ChevronRight, RotateCcw, Search, X,
 } from "lucide-react"
 
 type Step = "browse" | "phone" | "confirm" | "processing" | "success" | "failed"
@@ -36,6 +36,7 @@ export default function ELoadPage() {
   const [networks, setNetworks] = useState<string[]>([])
   const [selectedNetwork, setSelectedNetwork] = useState<string>("")
   const [filter, setFilter] = useState("all")
+  const [search, setSearch] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(true)
@@ -65,6 +66,18 @@ export default function ELoadPage() {
   }, [])
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
+
+  const isSearching = search.trim().length >= 2
+  const searchResults = isSearching
+    ? products.filter(p => {
+        const q = search.toLowerCase()
+        return p.name.toLowerCase().includes(q) ||
+          p.network.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q) ||
+          String(p.amount).includes(q)
+      })
+    : []
 
   const filtered = products
     .filter(p => p.network === selectedNetwork)
@@ -156,7 +169,63 @@ export default function ELoadPage() {
           <div className="w-14" />
         </div>
 
+        {/* Search Bar */}
+        <div className="bg-white border-b border-gray-100 px-3 py-2 sticky top-[52px] z-10">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search promos across all networks..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full h-10 pl-9 pr-9 rounded-xl bg-gray-100 border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="h-4 w-4 text-gray-400" />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="flex flex-1 overflow-hidden">
+          {/* Search Results (overlays network/products when searching) */}
+          {isSearching ? (
+            <div className="flex-1 overflow-y-auto p-3">
+              <p className="text-xs text-gray-400 mb-2 px-1">{searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for "{search}"</p>
+              {searchResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <Search className="h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-400">No promos found for "{search}"</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2">
+                  {searchResults.map(p => (
+                    <button
+                      key={`${p.promoId}-${p.network}`}
+                      onClick={() => handleBuy(p)}
+                      className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left flex items-center gap-3"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[8px] font-black shrink-0"
+                        style={{ backgroundColor: NETWORK_COLORS[p.network] || "#6366F1" }}
+                      >
+                        {p.network.length > 5 ? p.network.slice(0, 4) : p.network}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-800 truncate">{p.name}</p>
+                        <p className="text-[10px] text-gray-400">{p.network} · {p.category || "Load"}{p.validity ? " · " + p.validity.replace("Valid for ", "") : ""}</p>
+                      </div>
+                      <span className="text-base font-black shrink-0" style={{ color: NETWORK_COLORS[p.network] || "#6366F1" }}>
+                        ₱{p.amount}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+          <>
           {/* Network sidebar */}
           <aside className="w-[76px] bg-white border-r border-gray-100 flex flex-col overflow-y-auto shrink-0">
             {loading ? (
@@ -259,6 +328,8 @@ export default function ELoadPage() {
               )}
             </div>
           </main>
+          </>
+          )}
         </div>
       </div>
     )

@@ -71,22 +71,23 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
     )
   }
 
+  const [showAll, setShowAll] = useState(false)
+
   const activeSales = sales.filter(s => s.status !== "voided")
   const voidedSales = sales.filter(s => s.status === "voided")
+  const displaySales = showAll ? sales : sales.slice(0, 10)
 
   return (
     <>
       {/* Summary bar */}
       <div className="flex items-center justify-between px-1 mb-3">
-        <span className="text-xs text-muted-foreground">{sales.length} transaction{sales.length !== 1 ? "s" : ""}</span>
-        {voidedSales.length > 0 && (
-          <span className="text-xs text-muted-foreground">{voidedSales.length} voided</span>
-        )}
+        <span className="text-[12px] font-medium">Recent Transactions</span>
+        <span className="text-[11px] text-muted-foreground">{sales.length} total</span>
       </div>
 
       {/* Sale cards */}
       <div className="space-y-2 max-h-[60vh] overflow-y-auto -mx-1 px-1">
-        {sales.map(sale => {
+        {displaySales.map(sale => {
           const isVoided = sale.status === "voided"
           const isVoiding = voidingId === sale.id
           const isExpanded = expandedId === sale.id
@@ -99,10 +100,9 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                 isVoided ? "bg-muted/30 opacity-60" : "bg-card active:scale-[0.99]"
               }`}
             >
-              {/* Header row - always visible */}
+              {/* Header row */}
               <div
-                className="flex items-center gap-3 p-3 cursor-pointer"
-                onClick={() => setExpandedId(isExpanded ? null : sale.id!)}
+                className="flex items-center gap-3 p-3"
               >
                 {/* Left: payment icon */}
                 <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
@@ -136,7 +136,7 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                   </p>
                 </div>
 
-                {/* Right: amount + expand */}
+                {/* Right: amount */}
                 <div className="text-right shrink-0">
                   <div className={`text-[15px] font-bold ${isVoided ? "line-through text-muted-foreground" : ""}`}>
                     ₱{sale.total.toFixed(2)}
@@ -145,56 +145,53 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                     +₱{sale.profit.toFixed(2)}
                   </div>
                 </div>
-
-                <div className="shrink-0">
-                  {isExpanded
-                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  }
-                </div>
               </div>
 
-              {/* Expanded details */}
-              {isExpanded && (
-                <div className="px-3 pb-3 border-t mx-3 pt-2 space-y-1.5">
-                  {sale.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[13px]">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-muted-foreground w-5 text-right shrink-0">{item.quantity}×</span>
-                        <span className={`truncate ${isVoided ? "line-through text-muted-foreground" : ""}`}>
-                          {item.productName}
-                        </span>
-                      </div>
-                      <span className={`font-medium shrink-0 ml-2 ${isVoided ? "line-through text-muted-foreground" : ""}`}>
-                        ₱{item.subtotal.toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+              {/* Item details - always visible */}
+              <div className="px-3 pb-2 space-y-0.5">
+                {sale.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-[12px]">
+                    <span className="text-muted-foreground truncate flex-1">
+                      {item.quantity}× {item.productName}
+                    </span>
+                    <span className={`font-medium shrink-0 ml-2 ${isVoided ? "line-through text-muted-foreground" : ""}`}>
+                      ₱{item.subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-                  {/* Void button */}
-                  {isOwner && !isVoided && (
-                    <div className="pt-2 border-t mt-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-full text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
-                        disabled={isVoiding}
-                        onClick={(e) => { e.stopPropagation(); setVoidTarget(sale) }}
-                      >
-                        {isVoiding
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Ban className="h-3.5 w-3.5" />
-                        }
-                        Void Sale
-                      </Button>
-                    </div>
-                  )}
+              {/* Void button for owner */}
+              {isOwner && !isVoided && (
+                <div className="px-3 pb-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-full text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+                    disabled={isVoiding}
+                    onClick={(e) => { e.stopPropagation(); setVoidTarget(sale) }}
+                  >
+                    {isVoiding
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Ban className="h-3 w-3" />
+                    }
+                    Void
+                  </Button>
                 </div>
               )}
             </div>
           )
         })}
       </div>
+
+      {/* Show more / less */}
+      {sales.length > 10 && (
+        <div className="pt-2 text-center">
+          <Button variant="ghost" size="sm" className="text-[12px] text-muted-foreground" onClick={() => setShowAll(!showAll)}>
+            {showAll ? "Show Less" : `Show All ${sales.length} Transactions`}
+          </Button>
+        </div>
+      )}
 
       {/* Footer summary */}
       {activeSales.length > 0 && (

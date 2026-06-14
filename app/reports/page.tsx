@@ -489,35 +489,29 @@ export default function ReportsPage() {
           </MobileCard>
         </div>
 
-        {/* Detailed Reports Tabs */}
+        {/* Recent Transactions */}
         <div>
-          <MobileSectionHeader title="Detailed Reports" />
-          <MobileCard>
-            <Tabs defaultValue="sales" className="w-full">
-              <div className="px-4 pt-4">
-                <TabsList className="w-full grid grid-cols-2">
-                  <TabsTrigger value="sales" className="gap-2 text-xs">
-                    <ShoppingCart className="h-3.5 w-3.5" />
-                    Sales
-                  </TabsTrigger>
-                  <TabsTrigger value="ewallet" className="gap-2 text-xs">
-                    <Wallet className="h-3.5 w-3.5" />
-                    E-Wallet
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="sales" className="mt-0">
-                <div className="p-3">
-                  <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
-                </div>
-              </TabsContent>
-              <TabsContent value="ewallet" className="mt-0">
-                <div className="p-3">
-                  <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
-                </div>
-              </TabsContent>
-            </Tabs>
-          </MobileCard>
+          <MobileSectionHeader title="Recent Transactions" />
+          <Tabs defaultValue="sales" className="w-full">
+            <div className="sticky top-[52px] z-30 bg-background pb-2">
+              <TabsList className="w-full grid grid-cols-2 h-10">
+                <TabsTrigger value="sales" className="gap-1.5 text-[13px]">
+                  <ShoppingCart className="h-3.5 w-3.5" />
+                  Sales
+                </TabsTrigger>
+                <TabsTrigger value="ewallet" className="gap-1.5 text-[13px]">
+                  <Wallet className="h-3.5 w-3.5" />
+                  E-Wallet
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="sales" className="mt-0">
+              <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
+            </TabsContent>
+            <TabsContent value="ewallet" className="mt-0">
+              <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
 

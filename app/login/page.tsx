@@ -19,9 +19,7 @@ export default function LoginPage() {
   const { toast } = useToast()
   const { login } = useAuth()
 
-  const [storeId, setStoreId] = useState(() =>
-    typeof window !== "undefined" ? (localStorage.getItem("pos_ext_id") ?? "") : ""
-  )
+  const [storeId, setStoreId] = useState("")
   const [pin, setPin] = useState("")
   const [showPin, setShowPin] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -33,6 +31,10 @@ export default function LoginPage() {
       return
     }
 
+    if (storeId.length < 4 || storeId.length > 6) {
+      toast({ title: "Store ID must be 4-6 digits", variant: "destructive" })
+      return
+    }
     if (pin.length !== 6) {
       toast({ title: "PIN must be 6 digits", variant: "destructive" })
       return
@@ -127,32 +129,32 @@ export default function LoginPage() {
                 <Label htmlFor="storeId">Store ID</Label>
                 <Input
                   id="storeId"
-                  placeholder="Enter 4-digit Store ID"
+                  placeholder="Enter Store ID"
                   value={storeId}
-                  onChange={e => setStoreId(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onChange={e => setStoreId(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   disabled={loading}
                   autoComplete="off"
-                  maxLength={4}
+                  maxLength={6}
                   inputMode="numeric"
-                  className="text-center text-lg tracking-widest font-mono"
+                  className="text-center text-2xl tracking-[0.3em] font-mono h-14"
                 />
-                <p className="text-xs text-muted-foreground">Ask your store owner for the Store ID</p>
+                <p className="text-xs text-muted-foreground">Enter your Store ID (4-6 digits)</p>
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="pin">Your PIN</Label>
+                <Label htmlFor="pin">PIN</Label>
                 <div className="relative">
                   <Input
                     id="pin"
                     type={showPin ? "text" : "password"}
-                    placeholder="Enter your 6-digit PIN"
+                    placeholder="••••••"
                     value={pin}
                     onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     disabled={loading}
                     autoComplete="current-password"
                     maxLength={6}
                     inputMode="numeric"
-                    className="text-center text-lg tracking-widest font-mono pr-10"
+                    className="text-center text-2xl tracking-[0.3em] font-mono h-14 pr-12"
                   />
                   <button
                     type="button"
@@ -160,10 +162,9 @@ export default function LoginPage() {
                     onClick={() => setShowPin(v => !v)}
                     tabIndex={-1}
                   >
-                    {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPin ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">Each staff member has their own PIN</p>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>

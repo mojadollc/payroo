@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Edit2, Save, FileText } from "lucide-react"
+import { Plus, Minus, Trash2, Edit2, Save, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { db } from "@/lib/firebase/config"
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, serverTimestamp } from "firebase/firestore"
+import { offlineGetElistas, offlineAddElista, offlineUpdateElista, offlineDeleteElista } from "@/lib/offline/services"
+import { isOnline } from "@/lib/offline/sync-engine"
 
 interface ListaItem {
   id?: string
@@ -43,6 +45,14 @@ export default function EListaPage() {
 
   useEffect(() => {
     if (!user?.id) return
+
+    // Load from IndexedDB first (works offline)
+    offlineGetElistas(user.id).then(data => {
+      if (data.length > 0) setListas(data as Lista[])
+    })
+
+    // If online, also subscribe to real-time updates
+    if (!db || !isOnline()) return
     const q = query(collection(db, "elistas"), where("userId", "==", user.id))
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lista))
@@ -88,14 +98,21 @@ export default function EListaPage() {
       return
     }
     try {
-      await addDoc(collection(db, "elistas"), {
-        title: title.trim(),
-        items: validItems,
-        userId: user.id,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-      toast({ title: "Success", description: "e-Lista created" })
+      if (isOnline() && db) {
+        await addDoc(collection(db, "elistas"), {
+          title: title.trim(),
+          items: validItems,
+          userId: user.id,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        await offlineAddElista({ title: title.trim(), items: validItems, userId: user.id })
+        // Update local state immediately
+        const fresh = await offlineGetElistas(user.id)
+        setListas(fresh as Lista[])
+      }
+      toast({ title: "Success", description: isOnline() ? "e-Lista created" : "e-Lista saved offline" })
       setIsCreateOpen(false)
       resetForm()
     } catch (error) {
@@ -118,12 +135,20 @@ export default function EListaPage() {
       return
     }
     try {
-      await updateDoc(doc(db, "elistas", editingLista.id), {
-        title: title.trim(),
-        items: validItems,
-        updatedAt: serverTimestamp(),
-      })
-      toast({ title: "Success", description: "e-Lista updated" })
+      if (isOnline() && db) {
+        await updateDoc(doc(db, "elistas", editingLista.id), {
+          title: title.trim(),
+          items: validItems,
+          updatedAt: serverTimestamp(),
+        })
+      } else {
+        await offlineUpdateElista(editingLista.id, { title: title.trim(), items: validItems })
+        if (user?.id) {
+          const fresh = await offlineGetElistas(user.id)
+          setListas(fresh as Lista[])
+        }
+      }
+      toast({ title: "Success", description: isOnline() ? "e-Lista updated" : "e-Lista updated offline" })
       setEditingLista(null)
       resetForm()
     } catch (error) {
@@ -135,7 +160,15 @@ export default function EListaPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this e-Lista?")) return
     try {
-      await deleteDoc(doc(db, "elistas", id))
+      if (isOnline() && db) {
+        await deleteDoc(doc(db, "elistas", id))
+      } else {
+        await offlineDeleteElista(id)
+        if (user?.id) {
+          const fresh = await offlineGetElistas(user.id)
+          setListas(fresh as Lista[])
+        }
+      }
       toast({ title: "Deleted", description: "e-Lista removed" })
     } catch (error) {
       console.error(error)
@@ -239,28 +272,29 @@ export default function EListaPage() {
 
             {/* Items table */}
             <div className="space-y-1">
-              <div className="grid grid-cols-[1fr_50px_70px_28px] gap-1.5 text-[11px] text-muted-foreground font-medium px-0.5">
+              <div className="grid grid-cols-[1fr_90px_70px_28px] gap-1.5 text-[11px] text-muted-foreground font-medium px-0.5">
                 <span>Item</span>
-                <span className="text-center">Pcs</span>
+                <span className="text-center">Qty</span>
                 <span className="text-right">Price</span>
                 <span></span>
               </div>
               {items.map((item, index) => (
-                <div key={index} className="grid grid-cols-[1fr_50px_70px_28px] gap-1.5 items-center">
+                <div key={index} className="grid grid-cols-[1fr_90px_70px_28px] gap-1.5 items-center">
                   <Input
                     placeholder="Item name"
                     value={item.name}
                     onChange={(e) => handleItemChange(index, "name", e.target.value)}
                     className="h-9 text-[14px]"
                   />
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="1"
-                    value={item.qty || ""}
-                    onChange={(e) => handleItemChange(index, "qty", e.target.value ? parseInt(e.target.value) : 1)}
-                    className="h-9 text-[14px] text-center px-1"
-                  />
+                  <div className="flex items-center justify-center gap-0.5">
+                    <Button type="button" size="icon" variant="outline" className="h-7 w-7 shrink-0" onClick={() => handleItemChange(index, "qty", Math.max(1, (item.qty || 1) - 1))}>
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="w-7 text-center text-[14px] font-medium">{item.qty || 1}</span>
+                    <Button type="button" size="icon" variant="outline" className="h-7 w-7 shrink-0" onClick={() => handleItemChange(index, "qty", (item.qty || 1) + 1)}>
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <Input
                     type="number"
                     inputMode="decimal"

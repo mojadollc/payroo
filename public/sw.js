@@ -1,7 +1,7 @@
 // ── Payroo POS Service Worker ──────────────────────────────────────────────────
 // Strategy: never cache HTML, stale-while-revalidate for JS/CSS, cache-first for images.
 
-const APP_VERSION = "20260607T123633"
+const APP_VERSION = "20260614T012640"
 const CACHE_NAME = "payroo-v" + APP_VERSION
 
 const PRECACHE = [
@@ -51,13 +51,16 @@ self.addEventListener("fetch", (e) => {
   // NEVER intercept API calls
   if (url.pathname.startsWith("/api/")) return
 
-  // NEVER cache HTML — always network, offline fallback only
+  // NEVER cache HTML — always network, offline fallback with app shell
   if (e.request.mode === "navigate" || e.request.headers.get("accept")?.includes("text/html")) {
     e.respondWith(
       fetch(e.request).catch(() =>
-        new Response("<html><body><h1>You are offline</h1><p>Please check your connection and try again.</p></body></html>", {
-          status: 503,
-          headers: { "Content-Type": "text/html" },
+        caches.match(e.request).then(cached => {
+          if (cached) return cached
+          return new Response(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payroo POS - Offline</title><style>body{font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;text-align:center;padding:1rem}.c{max-width:320px}h1{font-size:1.5rem;margin-bottom:0.5rem}p{color:#6b7280;font-size:0.875rem}button{margin-top:1rem;padding:0.75rem 1.5rem;background:#eab308;color:#fff;border:none;border-radius:0.5rem;font-weight:600;cursor:pointer}</style></head><body><div class="c"><h1>📴 You're Offline</h1><p>Don't worry — your data is saved locally. Everything will sync when you reconnect.</p><button onclick="location.reload()">Try Again</button></div></body></html>`, {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          })
         })
       )
     )

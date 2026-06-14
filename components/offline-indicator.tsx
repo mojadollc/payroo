@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Wifi, WifiOff, CloudUpload } from "lucide-react"
 import { getOfflineQueue, syncOfflineQueue, isOnline as checkOnline } from "@/lib/offline-sync"
+import { getPendingWriteCount, pushPendingWrites } from "@/lib/offline/sync-engine"
 
 export function OfflineIndicator() {
   const [online, setOnline] = useState(true)
@@ -11,26 +12,25 @@ export function OfflineIndicator() {
 
   useEffect(() => {
     setOnline(checkOnline())
-    setPendingCount(getOfflineQueue().length)
+    updatePendingCount()
 
     const goOnline = () => {
       setOnline(true)
-      setPendingCount(getOfflineQueue().length)
+      updatePendingCount()
     }
     const goOffline = () => {
       setOnline(false)
-      setPendingCount(getOfflineQueue().length)
+      updatePendingCount()
     }
     const onSyncComplete = (e: Event) => {
       const { synced } = (e as CustomEvent).detail
-      setPendingCount(getOfflineQueue().length)
+      updatePendingCount()
       if (synced > 0) {
         setJustSynced(synced)
         setTimeout(() => setJustSynced(0), 4000)
       }
     }
-    // Refresh pending count periodically
-    const interval = setInterval(() => setPendingCount(getOfflineQueue().length), 5000)
+    const interval = setInterval(updatePendingCount, 5000)
 
     window.addEventListener("online", goOnline)
     window.addEventListener("offline", goOffline)
@@ -42,6 +42,12 @@ export function OfflineIndicator() {
       clearInterval(interval)
     }
   }, [])
+
+  const updatePendingCount = async () => {
+    const legacyCount = getOfflineQueue().length
+    const idbCount = await getPendingWriteCount().catch(() => 0)
+    setPendingCount(legacyCount + idbCount)
+  }
 
   // Show sync success toast
   if (justSynced > 0) {
@@ -66,7 +72,7 @@ export function OfflineIndicator() {
     return (
       <div
         className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-blue-500 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg cursor-pointer"
-        onClick={() => syncOfflineQueue()}
+        onClick={() => { syncOfflineQueue(); pushPendingWrites() }}
       >
         <CloudUpload className="h-3.5 w-3.5 animate-pulse" />
         Syncing {pendingCount} sale{pendingCount > 1 ? "s" : ""}...

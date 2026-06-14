@@ -177,7 +177,7 @@ export function Navbar() {
             <div className="flex flex-col leading-tight">
               <span className="font-bold text-sm">{storeName}</span>
               <span className="text-[9px] text-muted-foreground tracking-wide">
-                {typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") ?? "" : ""}
+                ID: {typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") ?? "" : ""}
               </span>
             </div>
           </Link>

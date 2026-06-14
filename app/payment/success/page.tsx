@@ -182,16 +182,12 @@ function SuccessContent() {
                 <p className="font-semibold text-sm flex items-center gap-2">
                   <LogIn className="h-4 w-4 text-primary" /> Your Login Credentials
                 </p>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Store ID</span>
-                    <span className="font-mono font-medium text-xs break-all text-right max-w-[60%]">{ext}</span>
+                    <span className="font-mono font-bold text-lg tracking-widest">{ext}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Username</span>
-                    <span className="font-mono font-medium">{ownerUsername}</span>
-                  </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">PIN</span>
                     <span className="font-mono font-medium">(check your email)</span>
                   </div>

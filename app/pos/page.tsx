@@ -17,6 +17,7 @@ import type { Product } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
 import { isFirebaseConfigured } from "@/lib/firebase/config"
 import { cacheProducts, getCachedProducts, isOnline } from "@/lib/offline-sync"
+import { localPutMany, localGetByStoreId } from "@/lib/offline/store"
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 import { useHardwareScanner } from "@/hooks/use-hardware-scanner"
@@ -138,6 +139,16 @@ export default function POSPage() {
       setShuffledProducts(shuffleArray(cached as Product[]))
       productsRef.current = cached as Product[]
       gotData = true
+    } else {
+      // Try IndexedDB (larger storage, works offline)
+      localGetByStoreId<Product>("products").then(idbProducts => {
+        if (idbProducts.length > 0 && !gotData) {
+          setProducts(idbProducts)
+          setShuffledProducts(shuffleArray(idbProducts))
+          productsRef.current = idbProducts
+          gotData = true
+        }
+      }).catch(() => {})
     }
 
     // Subscribe to real-time Firestore updates
@@ -147,6 +158,8 @@ export default function POSPage() {
       setShuffledProducts(shuffleArray(data))
       productsRef.current = data
       cacheProducts(data)
+      // Also save to IndexedDB for offline
+      localPutMany("products", data.map(d => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
     })
 
     // Fallback: if snapshot hasn't fired after 3s (fresh install, slow connection),

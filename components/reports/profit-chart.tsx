@@ -60,26 +60,26 @@ export function ProfitChart({ sales, ewalletTransactions, isLoading }: ProfitCha
   }, [sales, ewalletTransactions])
 
   if (!mounted) {
-    return <div className="min-h-[300px] bg-muted rounded-lg animate-pulse" />
+    return <div className="min-h-[200px] md:min-h-[300px] bg-muted rounded-lg animate-pulse" />
   }
 
   if (isLoading) {
-    return <div className="min-h-[300px] bg-muted rounded-lg animate-pulse" />
+    return <div className="min-h-[200px] md:min-h-[300px] bg-muted rounded-lg animate-pulse" />
   }
 
   if (chartData.length === 0) {
     return (
-      <div className="min-h-[300px] flex items-center justify-center text-muted-foreground">
+      <div className="min-h-[200px] md:min-h-[300px] flex items-center justify-center text-muted-foreground text-sm">
         No data available for selected date range
       </div>
     )
   }
 
   return (
-    <div className="min-h-[300px] w-full">
-      <ChartContainer config={chartConfig} className="h-[300px] w-full min-h-[300px]">
+    <div className="min-h-[200px] md:min-h-[300px] w-full">
+      <ChartContainer config={chartConfig} className="h-[200px] md:h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="fillSales" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="var(--color-sales)" stopOpacity={0.4} />

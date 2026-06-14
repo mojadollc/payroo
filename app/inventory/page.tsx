@@ -37,6 +37,8 @@ import {
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { getProducts, deleteProduct, getCategories, updateProduct, bulkAddProducts } from "@/lib/firebase/services"
+import { offlineGetProducts, offlineGetCategories, offlineDeleteProduct, offlineUpdateProduct } from "@/lib/offline/services"
+import { isOnline } from "@/lib/offline/sync-engine"
 import { Label } from "@/components/ui/label"
 import type { Product, Category } from "@/lib/firebase/types"
 import { AddProductDialog } from "@/components/inventory/add-product-dialog"
@@ -168,8 +170,13 @@ export default function InventoryPage() {
 
   const loadProducts = async () => {
     try {
-      const data = await getProducts()
-      setProducts(data)
+      // Try IndexedDB first (works offline), then Firestore
+      const offline = await offlineGetProducts()
+      if (offline.length > 0) setProducts(offline)
+      if (isOnline()) {
+        const data = await getProducts()
+        if (data.length > 0) setProducts(data)
+      }
     } catch (error) {
       console.error("Error loading products:", error)
     }
@@ -177,8 +184,12 @@ export default function InventoryPage() {
 
   const loadCategories = async () => {
     try {
-      const data = await getCategories()
-      setCategories(data)
+      const offline = await offlineGetCategories()
+      if (offline.length > 0) setCategories(offline)
+      if (isOnline()) {
+        const data = await getCategories()
+        if (data.length > 0) setCategories(data)
+      }
     } catch (error) {
       console.error("Error loading categories:", error)
     }
@@ -187,7 +198,11 @@ export default function InventoryPage() {
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
     try {
-      await deleteProduct(id)
+      if (isOnline()) {
+        await deleteProduct(id)
+      } else {
+        await offlineDeleteProduct(id)
+      }
       toast({ title: "Product deleted" })
       loadProducts()
     } catch (error) {
@@ -334,7 +349,11 @@ export default function InventoryPage() {
     const qty = parseInt(restockQty)
     if (isNaN(qty)) return
     try {
-      await updateProduct(restockProduct.id!, { stock: restockProduct.stock + qty })
+      if (isOnline()) {
+        await updateProduct(restockProduct.id!, { stock: restockProduct.stock + qty })
+      } else {
+        await offlineUpdateProduct(restockProduct.id!, { stock: restockProduct.stock + qty })
+      }
       toast({ title: "Stock updated", description: `${restockProduct.name}: ${restockProduct.stock} → ${restockProduct.stock + qty}` })
       setRestockProduct(null)
       setRestockQty("")

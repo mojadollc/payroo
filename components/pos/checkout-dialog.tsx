@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { addSale, addUtang, searchUtangByName, getStoreSettings, getLoyaltyCustomerByQR, getLoyaltyRules, getLoyaltySettings, earnLoyaltyCoins } from "@/lib/firebase/services"
 import { enqueueOfflineSale, enqueueOfflineUtang, isOnline } from "@/lib/offline-sync"
+import { offlineAddSale, offlineAddUtang } from "@/lib/offline/services"
 import type { Product, UtangRecord, LoyaltyCustomer } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
 
@@ -86,7 +87,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         }
 
         if (!isOnline()) {
-          // Queue utang offline
+          // Queue utang offline (both legacy localStorage + IndexedDB)
           const storeId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "unknown-store"
           const storeName = localStorage.getItem("storeName") || "My Store"
           enqueueOfflineUtang({
@@ -95,6 +96,16 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
             storeName,
             items: cart.map(item => ({ productName: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
             totalAmount: total,
+          })
+          offlineAddUtang({
+            customerName: utangCustomer.trim(),
+            storeId,
+            storeName,
+            items: cart.map(item => ({ productName: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
+            totalAmount: total,
+            amountPaid: 0,
+            balance: total,
+            status: "active",
           })
           toast({ title: "📴 Utang saved offline", description: "Will sync when internet returns" })
           setSaleSnapshot({ cart: [...cart], total, change: 0, paymentMethod: "utang" })
@@ -133,7 +144,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
 
       // ── Regular sale (cash / gcash / maya) ──
       if (!isOnline()) {
-        // Queue sale offline
+        // Queue sale offline (both legacy localStorage + IndexedDB)
         enqueueOfflineSale({
           items: cart.map(item => ({
             productId: item.id!,
@@ -146,6 +157,20 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           total,
           profit,
           paymentMethod: paymentMethod as "cash" | "gcash" | "maya",
+        })
+        offlineAddSale({
+          items: cart.map(item => ({
+            productId: item.id!,
+            productName: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            cost: item.cost,
+            subtotal: item.subtotal,
+          })),
+          total,
+          profit,
+          paymentMethod: paymentMethod as "cash" | "gcash" | "maya",
+          status: "completed",
         })
         toast({ title: "📴 Sale saved offline", description: "Will sync when internet returns" })
         setSaleSnapshot({ cart: [...cart], total, change, paymentMethod })

@@ -27,6 +27,7 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null)
   const [voidingId, setVoidingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   const formatDate = (timestamp: Timestamp) => {
     const d = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp as any)
@@ -70,8 +71,6 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
       </div>
     )
   }
-
-  const [showAll, setShowAll] = useState(false)
 
   const activeSales = sales.filter(s => s.status !== "voided")
   const voidedSales = sales.filter(s => s.status === "voided")

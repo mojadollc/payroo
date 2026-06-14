@@ -43,6 +43,7 @@ export default function ELoadPage() {
   const [processing, setProcessing] = useState(false)
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
+  const [balance, setBalance] = useState<number | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -63,6 +64,12 @@ export default function ELoadPage() {
       })
       .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
+
+    // Fetch balance
+    fetch("/api/eload?action=balance")
+      .then(r => r.json())
+      .then(data => { if (data.balance !== null && data.balance !== undefined) setBalance(Number(data.balance)) })
+      .catch(() => {})
   }, [])
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
@@ -159,7 +166,9 @@ export default function ELoadPage() {
           </button>
           <div className="text-center">
             <p className="font-bold text-gray-800 text-lg">E-Load</p>
-            <p className="text-[10px] text-gray-400">{storeName}</p>
+            {balance !== null && (
+              <p className="text-[10px] font-semibold text-green-600">Balance: ₱{balance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</p>
+            )}
           </div>
           <div className="w-14" />
         </div>

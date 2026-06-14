@@ -87,6 +87,11 @@ exports.eloadApi = onRequest(fnOpts, (req, res) => {
           if (status === 'failed') return res.json({ status: 'failed', error: data.content?.description || 'Failed' });
           return res.json({ status: 'pending', txnId });
         }
+        if (action === 'balance') {
+          const data = await gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`);
+          const balance = data.content?.balance ?? data.content?.availableBalance ?? null;
+          return res.json({ balance });
+        }
         const data = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`);
         const products = mapSkus(data.content || []);
         return res.json({ products });

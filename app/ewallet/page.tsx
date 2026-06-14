@@ -27,6 +27,7 @@ export default function EWalletPage() {
   const hasLoaded = useRef(false)
   const [selectedMonth, setSelectedMonth] = useState<string>("all")
   const [showNewTransaction, setShowNewTransaction] = useState(false)
+  const [eloadBalance, setEloadBalance] = useState<number | null>(null)
 
   // Check Firebase configuration synchronously on mount
   if (!isFirebaseConfigured) {
@@ -36,6 +37,11 @@ export default function EWalletPage() {
 
   useEffect(() => {
     loadData()
+    // Fetch GBITS e-load balance
+    fetch("/api/eload?action=balance")
+      .then(r => r.json())
+      .then(data => { if (data.balance != null) setEloadBalance(Number(data.balance)) })
+      .catch(() => {})
   }, [])
 
   const loadData = async () => {
@@ -168,6 +174,21 @@ export default function EWalletPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* E-Load Balance */}
+        {eloadBalance !== null && (
+          <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] opacity-80">GBITS E-Load Balance</p>
+                <p className="text-[22px] font-bold mt-0.5">₱{eloadBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="p-2.5 bg-white/20 rounded-xl">
+                <Signal className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">

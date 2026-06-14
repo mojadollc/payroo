@@ -36,6 +36,7 @@ export default function ELoadPage() {
   const [networks, setNetworks] = useState<string[]>([])
   const [selectedNetwork, setSelectedNetwork] = useState<string>("")
   const [filter, setFilter] = useState("all")
+  const [search, setSearch] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [phone, setPhone] = useState("")
   const [loading, setLoading] = useState(true)
@@ -69,11 +70,17 @@ export default function ELoadPage() {
   const filtered = products
     .filter(p => p.network === selectedNetwork)
     .filter(p => filter === "all" || p.category === filter)
+    .filter(p => {
+      if (!search.trim()) return true
+      const q = search.toLowerCase()
+      return p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q) || String(p.amount).includes(q)
+    })
   const categories = [...new Set(products.filter(p => p.network === selectedNetwork).map(p => p.category).filter(Boolean))]
 
   const handleBuy = (p: Product) => {
     setSelectedProduct(p)
     setPhone("")
+    setSearch("")
     setStep("phone")
   }
 
@@ -136,6 +143,7 @@ export default function ELoadPage() {
     setTxnId("")
     setError("")
     setFilter("all")
+    setSearch("")
   }
 
   const networkColor = selectedProduct ? (NETWORK_COLORS[selectedProduct.network] || "#6366F1") : "#6366F1"
@@ -194,6 +202,17 @@ export default function ELoadPage() {
 
           {/* Products */}
           <main className="flex-1 flex flex-col overflow-hidden">
+            {/* Search bar */}
+            <div className="bg-white px-3 pt-2.5 pb-1.5">
+              <input
+                type="text"
+                placeholder={`Search ${selectedNetwork} promos...`}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full h-9 px-3 rounded-xl bg-gray-100 text-[13px] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              />
+            </div>
+
             {/* Category tabs */}
             {categories.length > 0 && (
               <div className="bg-white border-b border-gray-100 px-3 py-2 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>

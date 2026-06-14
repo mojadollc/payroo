@@ -74,19 +74,30 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
 
   const activeSales = sales.filter(s => s.status !== "voided")
   const voidedSales = sales.filter(s => s.status === "voided")
-  const displaySales = showAll ? sales : sales.slice(0, 10)
+
+  // Show only today's transactions as "Recent"
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const recentSales = sales.filter(s => {
+    const d = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt as any)
+    return d >= today
+  })
 
   return (
     <>
       {/* Summary bar */}
       <div className="flex items-center justify-between px-1 mb-3">
-        <span className="text-[12px] font-medium">Recent Transactions</span>
-        <span className="text-[11px] text-muted-foreground">{sales.length} total</span>
+        <span className="text-[12px] font-medium">Today's Transactions</span>
+        <span className="text-[11px] text-muted-foreground">{recentSales.length} sale{recentSales.length !== 1 ? "s" : ""}</span>
       </div>
 
-      {/* Sale cards */}
-      <div className="space-y-2 max-h-[60vh] overflow-y-auto -mx-1 px-1">
-        {displaySales.map(sale => {
+      {recentSales.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-[13px] text-muted-foreground">No sales today yet</p>
+        </div>
+      ) : (
+      <div className="space-y-2 -mx-1 px-1">
+        {recentSales.map(sale => {
           const isVoided = sale.status === "voided"
           const isVoiding = voidingId === sale.id
           const isExpanded = expandedId === sale.id
@@ -182,14 +193,6 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
           )
         })}
       </div>
-
-      {/* Show more / less */}
-      {sales.length > 10 && (
-        <div className="pt-2 text-center">
-          <Button variant="ghost" size="sm" className="text-[12px] text-muted-foreground" onClick={() => setShowAll(!showAll)}>
-            {showAll ? "Show Less" : `Show All ${sales.length} Transactions`}
-          </Button>
-        </div>
       )}
 
       {/* Footer summary */}

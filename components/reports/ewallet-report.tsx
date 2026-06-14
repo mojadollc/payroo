@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Wallet, ArrowDownToLine, ArrowUpFromLine, Signal, ChevronDown, ChevronUp } from "lucide-react"
+import { Wallet, ArrowDownToLine, ArrowUpFromLine, Signal } from "lucide-react"
 import type { EWalletTransaction } from "@/lib/firebase/types"
 import type { Timestamp } from "firebase/firestore"
 
@@ -12,8 +11,6 @@ interface EWalletReportProps {
 }
 
 export function EWalletReport({ transactions, isLoading }: EWalletReportProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-
   const formatDate = (timestamp: Timestamp) => {
     const d = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp as any)
     return new Intl.DateTimeFormat("en-PH", {
@@ -39,21 +36,31 @@ export function EWalletReport({ transactions, isLoading }: EWalletReportProps) {
     )
   }
 
-  const totalAmount = transactions.reduce((s, t) => s + t.amount, 0)
-  const totalProfit = transactions.reduce((s, t) => s + Math.abs(t.profit), 0)
+  // Show only today's transactions as "Recent"
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const recentTxns = transactions.filter(t => {
+    const d = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt as any)
+    return d >= today
+  })
+
+  const totalProfit = recentTxns.reduce((s, t) => s + Math.abs(t.profit), 0)
 
   return (
     <>
       {/* Summary bar */}
       <div className="flex items-center justify-between px-1 mb-3">
-        <span className="text-xs text-muted-foreground">{transactions.length} transaction{transactions.length !== 1 ? "s" : ""}</span>
-        <span className="text-xs font-medium text-green-600">+₱{totalProfit.toFixed(2)} comm.</span>
+        <span className="text-[12px] font-medium">Today's Transactions</span>
+        <span className="text-[11px] text-muted-foreground">{recentTxns.length} txn{recentTxns.length !== 1 ? "s" : ""}</span>
       </div>
 
-      {/* Transaction cards */}
-      <div className="space-y-2 max-h-[60vh] overflow-y-auto -mx-1 px-1">
-        {transactions.map(txn => {
-          const isExpanded = expandedId === txn.id
+      {recentTxns.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-[13px] text-muted-foreground">No e-wallet transactions today yet</p>
+        </div>
+      ) : (
+      <div className="space-y-2 -mx-1 px-1">
+        {recentTxns.map(txn => {
           const icon = txn.type === "cashin"
             ? <ArrowDownToLine className="h-4 w-4 text-green-600" />
             : txn.type === "load"
@@ -62,12 +69,9 @@ export function EWalletReport({ transactions, isLoading }: EWalletReportProps) {
           const iconBg = txn.type === "cashin" ? "bg-green-100" : txn.type === "load" ? "bg-purple-100" : "bg-blue-100"
 
           return (
-            <div key={txn.id} className="rounded-xl border bg-card transition-all active:scale-[0.99]">
+            <div key={txn.id} className="rounded-xl border bg-card">
               {/* Header row */}
-              <div
-                className="flex items-center gap-3 p-3 cursor-pointer"
-                onClick={() => setExpandedId(isExpanded ? null : txn.id!)}
-              >
+              <div className="flex items-center gap-3 p-3">
                 <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>
                   {icon}
                 </div>
@@ -88,56 +92,46 @@ export function EWalletReport({ transactions, isLoading }: EWalletReportProps) {
                   <div className="text-[15px] font-bold">₱{txn.amount.toFixed(2)}</div>
                   <div className="text-[11px] font-medium text-green-600">+₱{Math.abs(txn.profit).toFixed(2)}</div>
                 </div>
-
-                <div className="shrink-0">
-                  {isExpanded
-                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  }
-                </div>
               </div>
 
-              {/* Expanded details */}
-              {isExpanded && (
-                <div className="px-3 pb-3 border-t mx-3 pt-2 space-y-1.5 text-[13px]">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Commission Rate</span>
-                    <span className="font-medium">{(txn.commissionRate * 100).toFixed(2)}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Commission</span>
-                    <span className="font-medium text-green-600">₱{txn.commission.toFixed(2)}</span>
-                  </div>
-                  {txn.customerName && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Customer</span>
-                      <span className="font-medium truncate ml-4 text-right">{txn.customerName}</span>
-                    </div>
-                  )}
-                  {txn.customerNumber && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Number</span>
-                      <span className="font-mono text-[12px]">{txn.customerNumber}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Reference</span>
-                    <span className="font-mono text-[11px] text-muted-foreground">{txn.referenceNumber}</span>
-                  </div>
+              {/* Details - always visible */}
+              <div className="px-3 pb-2.5 space-y-0.5">
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-muted-foreground">Commission</span>
+                  <span className="font-medium text-green-600">₱{txn.commission.toFixed(2)} ({(txn.commissionRate * 100).toFixed(1)}%)</span>
                 </div>
-              )}
+                {txn.customerName && (
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-muted-foreground">Customer</span>
+                    <span className="font-medium truncate ml-4">{txn.customerName}</span>
+                  </div>
+                )}
+                {txn.customerNumber && (
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-muted-foreground">Number</span>
+                    <span className="font-mono text-[11px]">{txn.customerNumber}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-muted-foreground">Ref#</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{txn.referenceNumber}</span>
+                </div>
+              </div>
             </div>
           )
         })}
       </div>
+      )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 mt-3 border-t text-[12px] text-muted-foreground px-1">
-        <span>Volume: ₱{totalAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
-        <span className="font-semibold text-green-600">
-          Profit: ₱{totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-        </span>
-      </div>
+      {recentTxns.length > 0 && (
+        <div className="flex items-center justify-between pt-3 mt-3 border-t text-[12px] text-muted-foreground px-1">
+          <span>Today's volume: ₱{recentTxns.reduce((s, t) => s + t.amount, 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+          <span className="font-semibold text-green-600">
+            Profit: ₱{totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+          </span>
+        </div>
+      )}
     </>
   )
 }

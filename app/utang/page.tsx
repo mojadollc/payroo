@@ -311,11 +311,7 @@ function UtangPageContent() {
     load()
     getStoreSettings().then(s => { if (s?.name) setStoreName(s.name) })
     const sid = getStoreId()
-    setStoreId(sid || "default-store")
-    // If no storeId set, use a default so data can still be saved/loaded
-    if (!sid) {
-      localStorage.setItem("pos_ext_id", "default-store")
-    }
+    setStoreId(sid || "")
   }, [load])
 
   const handleDelete = async (id: string) => {

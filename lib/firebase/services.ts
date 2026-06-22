@@ -320,6 +320,8 @@ export const getCommissionSettings = async () => {
       gcashCashoutRate: 0.02,
       mayaCashinRate: 0.02,
       mayaCashoutRate: 0.02,
+      eloadFeeType: "flat" as const,
+      eloadFeeValue: 5,
       storeId: sid,
       updatedAt: serverTimestamp(),
     }

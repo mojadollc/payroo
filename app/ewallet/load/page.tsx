@@ -6,6 +6,8 @@ import {
   ChevronLeft, CheckCircle, XCircle, AlertTriangle,
   Loader2, Delete, ChevronRight, RotateCcw,
 } from "lucide-react"
+import { addEWalletTransaction, getCommissionSettings } from "@/lib/firebase/services"
+import type { CommissionSettings } from "@/lib/firebase/types"
 
 type Step = "browse" | "phone" | "confirm" | "processing" | "success" | "failed"
 
@@ -43,6 +45,7 @@ export default function ELoadPage() {
   const [processing, setProcessing] = useState(false)
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
+  const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -63,6 +66,9 @@ export default function ELoadPage() {
       })
       .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
+
+    // Load commission settings for e-load fee
+    getCommissionSettings().then(s => setCommSettings(s)).catch(() => {})
   }, [])
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
@@ -105,6 +111,7 @@ export default function ELoadPage() {
 
       if (data.status === "completed") {
         setTxnId(data.txnId || "")
+        await recordEloadTransaction(data.txnId || "")
         setStep("success")
       } else if (data.status === "pending") {
         // Poll for status
@@ -121,6 +128,31 @@ export default function ELoadPage() {
     }
   }
 
+  const recordEloadTransaction = async (refId: string) => {
+    if (!selectedProduct) return
+    try {
+      const feeType = commSettings?.eloadFeeType || "flat"
+      const feeValue = commSettings?.eloadFeeValue ?? 5
+      const fee = feeType === "flat" ? feeValue : selectedProduct.amount * feeValue
+      const rate = feeType === "percentage" ? feeValue : feeValue / selectedProduct.amount
+
+      await addEWalletTransaction({
+        type: "load",
+        provider: "gcash" as const, // stored as gcash but represents e-load via GBITS
+        amount: selectedProduct.amount,
+        commission: fee,
+        commissionRate: rate,
+        profit: fee,
+        customerName: phone,
+        customerNumber: phone,
+        referenceNumber: refId,
+        status: "completed",
+      })
+    } catch (e) {
+      console.error("Failed to record e-load transaction:", e)
+    }
+  }
+
   const pollStatus = async (id: string) => {
     const start = Date.now()
     while (Date.now() - start < 60000) {
@@ -128,7 +160,7 @@ export default function ELoadPage() {
       try {
         const res = await fetch(`/api/eload?action=status&txnId=${id}`)
         const data = await res.json()
-        if (data.status === "completed") { setTxnId(data.txnId || id); setStep("success"); return }
+        if (data.status === "completed") { setTxnId(data.txnId || id); await recordEloadTransaction(data.txnId || id); setStep("success"); return }
         if (data.status === "failed") { setError(data.error || "Failed"); setStep("failed"); return }
       } catch {}
     }

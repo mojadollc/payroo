@@ -82,6 +82,9 @@ export interface CommissionSettings {
   gcashCashoutRate: number
   mayaCashinRate: number
   mayaCashoutRate: number
+  // E-Load service fee
+  eloadFeeType: "flat" | "percentage"  // flat = fixed ₱ amount, percentage = % of load amount
+  eloadFeeValue: number                // e.g. 5 for ₱5 flat or 0.05 for 5%
   updatedAt: Timestamp
 }
 

@@ -31,6 +31,8 @@ export function CommissionSettingsDialog({ settings, open, onOpenChange, onSucce
     gcashCashoutRate: String((settings.gcashCashoutRate * 100)),
     mayaCashinRate: String((settings.mayaCashinRate * 100)),
     mayaCashoutRate: String((settings.mayaCashoutRate * 100)),
+    eloadFeeType: (settings as any).eloadFeeType || "flat",
+    eloadFeeValue: String((settings as any).eloadFeeValue ?? 5),
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,6 +64,8 @@ export function CommissionSettingsDialog({ settings, open, onOpenChange, onSucce
         gcashCashoutRate: gcashCashout / 100,
         mayaCashinRate: mayaCashin / 100,
         mayaCashoutRate: mayaCashout / 100,
+        eloadFeeType: formData.eloadFeeType as "flat" | "percentage",
+        eloadFeeValue: formData.eloadFeeType === "percentage" ? parseFloat(formData.eloadFeeValue) / 100 : parseFloat(formData.eloadFeeValue),
       })
       toast({ title: "Commission settings saved" })
       onSuccess()
@@ -170,6 +174,50 @@ export function CommissionSettingsDialog({ settings, open, onOpenChange, onSucce
                   value={formData.mayaCashoutRate}
                   onChange={e => setFormData({ ...formData, mayaCashoutRate: e.target.value })} required />
               </div>
+            </div>
+          </div>
+
+          {/* ── E-Load Service Fee ── */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm">E-Load Service Fee (GBITS)</h3>
+            <p className="text-xs text-muted-foreground">Fee charged to customers per e-load transaction. This becomes your profit.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="eload-fee-type">Fee Type</Label>
+                <select
+                  id="eload-fee-type"
+                  value={formData.eloadFeeType || "flat"}
+                  onChange={e => setFormData({ ...formData, eloadFeeType: e.target.value })}
+                  className="w-full h-10 rounded-md border px-3 text-sm"
+                >
+                  <option value="flat">Flat Amount (₱)</option>
+                  <option value="percentage">Percentage (%)</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="eload-fee-value">
+                  {(formData.eloadFeeType || "flat") === "flat" ? "Fee Amount (₱)" : "Fee Rate (%)"}
+                </Label>
+                <Input
+                  id="eload-fee-value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.eloadFeeValue ?? 5}
+                  onChange={e => setFormData({ ...formData, eloadFeeValue: e.target.value })}
+                  placeholder={(formData.eloadFeeType || "flat") === "flat" ? "e.g. 5" : "e.g. 5"}
+                  required
+                />
+              </div>
+            </div>
+            <div className="bg-muted rounded-lg p-3 text-xs space-y-1">
+              <p className="font-medium">Example: ₱100 load</p>
+              <p className="text-muted-foreground">
+                Fee: {(formData.eloadFeeType || "flat") === "flat"
+                  ? `₱${Number(formData.eloadFeeValue || 5).toFixed(2)} (flat)`
+                  : `₱${(100 * Number(formData.eloadFeeValue || 5) / 100).toFixed(2)} (${formData.eloadFeeValue || 5}%)`
+                } → Your profit per transaction
+              </p>
             </div>
           </div>
 

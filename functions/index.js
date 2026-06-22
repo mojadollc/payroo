@@ -576,6 +576,23 @@ exports.fixSales = onRequest(fnOpts, async (req, res) => {
     return res.json({ count: all.size, sales });
   }
 
+  if (action === "inventory") {
+    // Check inventory transactions after 09:51 AM Jun 22 UTC (01:51 UTC)
+    const after = new Date("2026-06-22T01:51:29Z");
+    const snap = await db.collection("inventoryTransactions")
+      .where("type", "==", "sale")
+      .where("createdAt", ">", after)
+      .orderBy("createdAt", "desc")
+      .get();
+    const txns = snap.docs.map(d => ({
+      id: d.id,
+      productName: d.data().productName,
+      quantity: d.data().quantity,
+      date: d.data().createdAt?.toDate?.()?.toISOString(),
+    }));
+    return res.json({ count: snap.size, transactions: txns });
+  }
+
   let fixed = 0;
 
   // Fix sales with storeId = 'default-store'

@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { addUtang, getUtangList, addUtangPayment, deleteUtang, searchUtangByName, getUtangPayments } from "@/lib/firebase/services"
 import { getStoreSettings } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import type { UtangRecord, UtangPayment } from "@/lib/firebase/types"
 import { Timestamp } from "firebase/firestore"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
@@ -300,7 +301,8 @@ function UtangPageContent() {
     try {
       const data = await getUtangList()
       setRecords(data)
-    } catch {
+    } catch (e) {
+      console.error("Utang load error:", e)
       toast({ title: "Error loading utang records", variant: "destructive" })
     }
   }, [toast])
@@ -308,16 +310,22 @@ function UtangPageContent() {
   useEffect(() => {
     load()
     getStoreSettings().then(s => { if (s?.name) setStoreName(s.name) })
-    setStoreId(localStorage.getItem("pos_ext_id") || "unknown-store")
+    const sid = getStoreId()
+    setStoreId(sid || "default-store")
+    // If no storeId set, use a default so data can still be saved/loaded
+    if (!sid) {
+      localStorage.setItem("pos_ext_id", "default-store")
+    }
   }, [load])
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this utang record?")) return
+    setRecords(prev => prev.filter(r => r.id !== id))
     try {
       await deleteUtang(id)
       toast({ title: "Deleted" })
-      load()
     } catch {
+      load()
       toast({ title: "Error deleting", variant: "destructive" })
     }
   }

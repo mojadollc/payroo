@@ -52,6 +52,7 @@ export interface SaleItem {
   price: number
   cost: number
   subtotal: number
+  selectedVariants?: Record<string, string>
 }
 
 export interface EWalletTransaction {

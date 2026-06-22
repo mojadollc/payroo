@@ -159,19 +159,22 @@ export default function EListaPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this e-Lista?")) return
+    // Immediately remove from UI
+    setListas(prev => prev.filter(l => l.id !== id))
     try {
       if (isOnline() && db) {
         await deleteDoc(doc(db, "elistas", id))
       } else {
         await offlineDeleteElista(id)
-        if (user?.id) {
-          const fresh = await offlineGetElistas(user.id)
-          setListas(fresh as Lista[])
-        }
       }
       toast({ title: "Deleted", description: "e-Lista removed" })
     } catch (error) {
       console.error(error)
+      // Restore on failure
+      if (user?.id) {
+        const fresh = await offlineGetElistas(user.id)
+        setListas(fresh as Lista[])
+      }
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" })
     }
   }

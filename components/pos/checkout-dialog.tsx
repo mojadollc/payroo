@@ -197,11 +197,14 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
       const salePayload = {
         items: cart.map((item) => ({
           productId: item.id!,
-          productName: item.name,
+          productName: item.selectedVariants
+            ? `${item.name} (${Object.values(item.selectedVariants).join(", ")})`
+            : item.name,
           quantity: item.quantity,
           price: item.price,
           cost: item.cost,
           subtotal: item.subtotal,
+          selectedVariants: item.selectedVariants || undefined,
         })),
         total,
         profit,
@@ -327,7 +330,9 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
     const date = new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })
 
     const itemRows = snap.cart.map(item => {
-      const name = item.name.length > 16 ? item.name.substring(0, 15) + "." : item.name
+      let displayName = item.name
+      if (item.selectedVariants) displayName += ` (${Object.values(item.selectedVariants).join(", ")})`
+      const name = displayName.length > 20 ? displayName.substring(0, 19) + "." : displayName
       return `<tr>
         <td class="item-name">${name}</td>
         <td class="item-qty">${item.quantity}</td>

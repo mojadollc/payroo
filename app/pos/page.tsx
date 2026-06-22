@@ -28,6 +28,7 @@ import Link from "next/link"
 interface CartItem extends Product {
   quantity: number
   subtotal: number
+  selectedVariants?: Record<string, string> // e.g. { Color: "Red", Size: "M" }
 }
 
 function CartQuantityInput({
@@ -98,6 +99,7 @@ export default function POSPage() {
   const [showCartDrawer, setShowCartDrawer] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
+  const [variantPicker, setVariantPicker] = useState<{ product: Product; selections: Record<string, string> } | null>(null)
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
   const stockBlockedRef = useRef(false)
@@ -390,19 +392,35 @@ export default function POSPage() {
   const effectivePrice = (product: Product) =>
     product.onSale && product.salePrice ? product.salePrice : product.price
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, selectedVariants?: Record<string, string>) => {
     // Use latest real-time stock from productsRef
     const liveProduct = productsRef.current.find(p => p.id === product.id) || product
     const price = effectivePrice(liveProduct)
     stockBlockedRef.current = false
+
+    // If product has variants and none selected, show picker
+    if (liveProduct.variants && liveProduct.variants.length > 0 && !selectedVariants) {
+      setVariantPicker({ product: liveProduct, selections: {} })
+      return
+    }
 
     if (liveProduct.stock <= 0) {
       toast({ title: "Out of stock", description: `${liveProduct.name} is currently out of stock`, variant: "destructive" })
       return
     }
 
+    // Build a unique cart key that includes variant selections
+    const variantKey = selectedVariants ? Object.values(selectedVariants).join("-") : ""
+    const cartId = variantKey ? `${liveProduct.id}_${variantKey}` : liveProduct.id
+
     setCart(prev => {
-      const existingItem = prev.find((item) => item.id === liveProduct.id)
+      const existingItem = prev.find((item) => {
+        if (variantKey) {
+          const itemVariantKey = item.selectedVariants ? Object.values(item.selectedVariants).join("-") : ""
+          return item.id === liveProduct.id && itemVariantKey === variantKey
+        }
+        return item.id === liveProduct.id && !item.selectedVariants
+      })
 
       if (existingItem) {
         if (existingItem.quantity >= liveProduct.stock) {
@@ -410,7 +428,7 @@ export default function POSPage() {
           return prev
         }
         return prev.map((item) =>
-          item.id === liveProduct.id
+          item === existingItem
             ? {
                 ...item,
                 stock: liveProduct.stock,
@@ -428,6 +446,7 @@ export default function POSPage() {
           price,
           quantity: 1,
           subtotal: price,
+          selectedVariants: selectedVariants || undefined,
         },
       ]
     })
@@ -614,9 +633,12 @@ export default function POSPage() {
                   )}
                 </div>
                 <div className="p-3">
-                  <div className="font-semibold text-sm truncate mb-1" title={product.name}>
+                  <div className="font-semibold text-sm truncate mb-0.5" title={product.name}>
                     {product.name}
                   </div>
+                  {product.variants && product.variants.length > 0 && (
+                    <p className="text-[10px] text-primary font-medium mb-0.5">{product.variants.map(v => v.name).join(", ")}</p>
+                  )}
                   {product.onSale && product.salePrice ? (
                     <div className="flex items-center gap-2">
                       <div className="text-base font-bold text-orange-600">₱{product.salePrice.toFixed(2)}</div>
@@ -779,6 +801,9 @@ export default function POSPage() {
                           <div className="font-semibold text-xs truncate" title={product.name}>
                             {product.name}
                           </div>
+                          {product.variants && product.variants.length > 0 && (
+                            <p className="text-[9px] text-primary font-medium truncate">{product.variants.map(v => v.name).join(", ")}</p>
+                          )}
                           <div className="flex justify-between items-center mt-1">
                             {product.onSale && product.salePrice ? (
                               <div className="flex flex-col">
@@ -829,6 +854,9 @@ export default function POSPage() {
                             <div className="flex justify-between items-start">
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">{item.name}</p>
+                                {item.selectedVariants && (
+                                  <p className="text-[11px] text-primary font-medium">{Object.values(item.selectedVariants).join(" · ")}</p>
+                                )}
                                 <p className="text-xs text-muted-foreground">₱{item.price.toFixed(2)} each</p>
                               </div>
                               <Button
@@ -919,11 +947,14 @@ export default function POSPage() {
           <div className="space-y-3 pb-6">
             {/* Cart Items */}
             <div className="divide-y divide-border/50">
-              {cart.map((item) => (
-                <div key={item.id} className="py-2.5 first:pt-0">
+              {cart.map((item, idx) => (
+                <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-2.5 first:pt-0">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-medium truncate">{item.name}</p>
+                      {item.selectedVariants && (
+                        <p className="text-[11px] text-primary font-medium">{Object.values(item.selectedVariants).join(" · ")}</p>
+                      )}
                       <p className="text-[12px] text-muted-foreground">₱{item.price.toFixed(2)} × {item.quantity}</p>
                     </div>
                     <div className="text-[14px] font-semibold text-emerald-700 ml-2">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
@@ -1020,6 +1051,60 @@ export default function POSPage() {
             onSuccess={handleCheckoutSuccess}
           />
         )}
+
+        {/* Variant Picker */}
+        <BottomSheet
+          open={!!variantPicker}
+          onClose={() => setVariantPicker(null)}
+          title={variantPicker?.product.name ?? "Select Options"}
+          description="Choose your preferences"
+        >
+          {variantPicker && (
+            <div className="space-y-4 pb-6">
+              {variantPicker.product.variants!.map((variant) => (
+                <div key={variant.name} className="space-y-2">
+                  <p className="text-sm font-medium">{variant.name}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {variant.options.map((option) => {
+                      const isSelected = variantPicker.selections[variant.name] === option
+                      return (
+                        <Button
+                          key={option}
+                          type="button"
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          className={`rounded-full px-4 h-9 ${isSelected ? "" : ""}`}
+                          onClick={() => setVariantPicker(prev => prev ? {
+                            ...prev,
+                            selections: { ...prev.selections, [variant.name]: option }
+                          } : null)}
+                        >
+                          {option}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+              <Button
+                className="w-full h-12 mt-4 text-[15px]"
+                disabled={variantPicker.product.variants!.some(v => !variantPicker.selections[v.name])}
+                onClick={() => {
+                  addToCart(variantPicker.product, variantPicker.selections)
+                  setVariantPicker(null)
+                }}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Add to Cart
+                {Object.keys(variantPicker.selections).length > 0 && (
+                  <span className="ml-2 text-xs opacity-80">
+                    ({Object.values(variantPicker.selections).join(", ")})
+                  </span>
+                )}
+              </Button>
+            </div>
+          )}
+        </BottomSheet>
       </MobileAppShell>
   )
 }

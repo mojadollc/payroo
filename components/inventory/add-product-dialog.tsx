@@ -322,31 +322,32 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
                   </div>
                 </div>
 
-                {/* Variants */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Product Variants (e.g. Size, Color)</Label>
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs border-blue-300 text-blue-700"
-                      onClick={() => setVariants(v => [...v, { name: "", options: "" }])}>
-                      <Plus className="h-3 w-3 mr-1" /> Add Variant
-                    </Button>
-                  </div>
-                  {variants.map((v, i) => (
-                    <div key={i} className="flex gap-2 items-center">
-                      <Input placeholder="Variant name (e.g. Size)" value={v.name}
-                        onChange={e => setVariants(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-                      <Input placeholder="Options, comma-separated (e.g. S,M,L,XL)" value={v.options}
-                        onChange={e => setVariants(prev => prev.map((x, j) => j === i ? { ...x, options: e.target.value } : x))} />
-                      <Button type="button" variant="ghost" size="icon" className="shrink-0 text-destructive"
-                        onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  {variants.length === 0 && <p className="text-xs text-muted-foreground">No variants added. Add if product comes in different sizes, colors, etc.</p>}
-                </div>
               </div>
             )}
+
+            {/* Variants — always visible for all business types */}
+            <div className="space-y-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Product Variants <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs"
+                  onClick={() => setVariants(v => [...v, { name: "", options: "" }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Add
+                </Button>
+              </div>
+              {variants.map((v, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <Input placeholder="e.g. Color" value={v.name} className="flex-[2]"
+                    onChange={e => setVariants(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                  <Input placeholder="e.g. Red,Blue,Black" value={v.options} className="flex-[3]"
+                    onChange={e => setVariants(prev => prev.map((x, j) => j === i ? { ...x, options: e.target.value } : x))} />
+                  <Button type="button" variant="ghost" size="icon" className="shrink-0 text-destructive h-8 w-8"
+                    onClick={() => setVariants(prev => prev.filter((_, j) => j !== i))}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              {variants.length === 0 && <p className="text-[12px] text-muted-foreground">Add if product has different colors, sizes, flavors, etc.</p>}
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>

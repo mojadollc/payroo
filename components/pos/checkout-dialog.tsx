@@ -212,17 +212,21 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         status: "completed" as const,
       }
 
+      // Write to Firestore FIRST, then show success
+      try {
+        await addSale(salePayload, storeLocation)
+      } catch (error) {
+        console.error("[checkout] Sale write failed:", error)
+        toast({ title: "❌ Sale failed to save!", description: "Please try again. " + (error instanceof Error ? error.message : ""), variant: "destructive" })
+        setIsProcessing(false)
+        return
+      }
+
       setSaleSnapshot(snap)
       onSuccess()
       setSaleComplete(true)
       setLoyaltyStep(true)
       setIsProcessing(false)
-
-      // Fire-and-forget Firestore write in background
-      addSale(salePayload, storeLocation).catch((error) => {
-        console.error("[checkout] Background sale write failed:", error)
-        toast({ title: "⚠️ Sale may not have saved", description: "Check your connection and verify in reports", variant: "destructive" })
-      })
       return
     } catch (error) {
       console.error("[v0] Error processing sale:", error)

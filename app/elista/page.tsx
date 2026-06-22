@@ -98,21 +98,35 @@ export default function EListaPage() {
       return
     }
     try {
+      const newLista: Lista = {
+        title: title.trim(),
+        items: validItems,
+        userId: user.id,
+        createdAt: { toMillis: () => Date.now() } as any,
+        updatedAt: { toMillis: () => Date.now() } as any,
+      }
+
       if (isOnline() && db) {
-        await addDoc(collection(db, "elistas"), {
+        const docRef = await addDoc(collection(db, "elistas"), {
           title: title.trim(),
           items: validItems,
           userId: user.id,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
+        newLista.id = docRef.id
       } else {
         await offlineAddElista({ title: title.trim(), items: validItems, userId: user.id })
-        // Update local state immediately
         const fresh = await offlineGetElistas(user.id)
         setListas(fresh as Lista[])
+        toast({ title: "Success", description: "e-Lista saved offline" })
+        setIsCreateOpen(false)
+        resetForm()
+        return
       }
-      toast({ title: "Success", description: isOnline() ? "e-Lista created" : "e-Lista saved offline" })
+      // Optimistic: add to state immediately
+      setListas(prev => [newLista, ...prev])
+      toast({ title: "Success", description: "e-Lista created" })
       setIsCreateOpen(false)
       resetForm()
     } catch (error) {
@@ -143,12 +157,10 @@ export default function EListaPage() {
         })
       } else {
         await offlineUpdateElista(editingLista.id, { title: title.trim(), items: validItems })
-        if (user?.id) {
-          const fresh = await offlineGetElistas(user.id)
-          setListas(fresh as Lista[])
-        }
       }
-      toast({ title: "Success", description: isOnline() ? "e-Lista updated" : "e-Lista updated offline" })
+      // Optimistic: update state immediately
+      setListas(prev => prev.map(l => l.id === editingLista.id ? { ...l, title: title.trim(), items: validItems, updatedAt: { toMillis: () => Date.now() } as any } : l))
+      toast({ title: "Success", description: "e-Lista updated" })
       setEditingLista(null)
       resetForm()
     } catch (error) {

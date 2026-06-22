@@ -553,3 +553,33 @@ exports.xenditWebhook = onRequest(fnOpts, (req, res) => {
     }
   });
 });
+
+
+// ── One-time fix: migrate orphaned sales to correct storeId ───────────────────
+exports.fixSales = onRequest(fnOpts, async (req, res) => {
+  const secret = req.query.secret;
+  if (secret !== "fix8807") return res.status(401).json({ error: "unauthorized" });
+
+  const db = admin.firestore();
+  let fixed = 0;
+
+  // Fix sales with storeId = 'default-store'
+  const snap1 = await db.collection("sales").where("storeId", "==", "default-store").get();
+  if (snap1.size > 0) {
+    const batch = db.batch();
+    snap1.docs.forEach(doc => batch.update(doc.ref, { storeId: "8807" }));
+    await batch.commit();
+    fixed += snap1.size;
+  }
+
+  // Fix sales with empty storeId
+  const snap2 = await db.collection("sales").where("storeId", "==", "").get();
+  if (snap2.size > 0) {
+    const batch = db.batch();
+    snap2.docs.forEach(doc => batch.update(doc.ref, { storeId: "8807" }));
+    await batch.commit();
+    fixed += snap2.size;
+  }
+
+  res.json({ fixed, defaultStore: snap1.size, empty: snap2.size });
+});

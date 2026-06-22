@@ -245,39 +245,22 @@ export const getSales = async (startDate?: Date, endDate?: Date) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")
   const sid = getStoreId()
-  
-  // Query with current storeId
-  const storeIds = [sid]
-  // Also check 'default-store' in case sales were saved during a bug
-  if (sid && sid !== "default-store") storeIds.push("default-store")
-  // Also check empty string
-  if (sid) storeIds.push("")
+  let q = query(collection(db, "sales"), where("storeId", "==", sid), orderBy("createdAt", "desc"))
 
-  let allSales: Sale[] = []
-
-  for (const id of storeIds) {
-    let q;
-    if (startDate && endDate) {
-      const start = new Date(startDate); start.setHours(0, 0, 0, 0)
-      const end = new Date(endDate); end.setHours(23, 59, 59, 999)
-      q = query(
-        collection(db, "sales"),
-        where("storeId", "==", id),
-        where("createdAt", ">=", Timestamp.fromDate(start)),
-        where("createdAt", "<=", Timestamp.fromDate(end)),
-        orderBy("createdAt", "desc"),
-      )
-    } else {
-      q = query(collection(db, "sales"), where("storeId", "==", id), orderBy("createdAt", "desc"))
-    }
-    const snap = await getDocs(q)
-    allSales.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Sale))
+  if (startDate && endDate) {
+    const start = new Date(startDate); start.setHours(0, 0, 0, 0)
+    const end = new Date(endDate); end.setHours(23, 59, 59, 999)
+    q = query(
+      collection(db, "sales"),
+      where("storeId", "==", sid),
+      where("createdAt", ">=", Timestamp.fromDate(start)),
+      where("createdAt", "<=", Timestamp.fromDate(end)),
+      orderBy("createdAt", "desc"),
+    )
   }
 
-  // Deduplicate and sort
-  const seen = new Set<string>()
-  return allSales.filter(s => { if (seen.has(s.id!)) return false; seen.add(s.id!); return true })
-    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+  const querySnapshot = await getDocs(q)
+  return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Sale)
 }
 
 // E-Wallet Services

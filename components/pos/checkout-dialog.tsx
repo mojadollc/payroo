@@ -195,17 +195,20 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
       // Optimistic UI — show success immediately, write to Firestore in background
       const snap = { cart: [...cart], total, change, paymentMethod }
       const salePayload = {
-        items: cart.map((item) => ({
-          productId: item.id!,
-          productName: item.selectedVariants
-            ? `${item.name} (${Object.values(item.selectedVariants).join(", ")})`
-            : item.name,
-          quantity: item.quantity,
-          price: item.price,
-          cost: item.cost,
-          subtotal: item.subtotal,
-          selectedVariants: item.selectedVariants || undefined,
-        })),
+        items: cart.map((item) => {
+          const itemData: any = {
+            productId: item.id!,
+            productName: item.selectedVariants
+              ? `${item.name} (${Object.values(item.selectedVariants).join(", ")})`
+              : item.name,
+            quantity: item.quantity,
+            price: item.price,
+            cost: item.cost,
+            subtotal: item.subtotal,
+          }
+          if (item.selectedVariants) itemData.selectedVariants = item.selectedVariants
+          return itemData
+        }),
         total,
         profit,
         paymentMethod: paymentMethod as "cash" | "gcash" | "maya",

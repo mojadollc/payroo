@@ -561,6 +561,21 @@ exports.fixSales = onRequest(fnOpts, async (req, res) => {
   if (secret !== "fix8807") return res.status(401).json({ error: "unauthorized" });
 
   const db = admin.firestore();
+  const action = req.query.action || "fix";
+
+  if (action === "check") {
+    // List all recent sales regardless of storeId
+    const all = await db.collection("sales").orderBy("createdAt", "desc").limit(20).get();
+    const sales = all.docs.map(d => ({
+      id: d.id,
+      storeId: d.data().storeId,
+      total: d.data().total,
+      items: d.data().items?.length,
+      date: d.data().createdAt?.toDate?.()?.toISOString(),
+    }));
+    return res.json({ count: all.size, sales });
+  }
+
   let fixed = 0;
 
   // Fix sales with storeId = 'default-store'

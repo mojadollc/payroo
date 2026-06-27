@@ -8,6 +8,7 @@ import type { SubscriptionFeatures } from "@/lib/firebase/types"
 export interface SubscriptionState {
   loading: boolean
   isActive: boolean
+  isDeactivated: boolean
   tier: string | null
   features: SubscriptionFeatures
   storeName: string | null
@@ -66,13 +67,13 @@ function readCache(): SubscriptionState | null {
 export function useSubscription(): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>(() => {
     if (typeof window === "undefined") {
-      return { loading: true, isActive: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
+      return { loading: true, isActive: false, isDeactivated: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
     }
     // If cache exists, use it immediately — no loading spinner, no blocking
     const cached = readCache()
     if (cached) return cached
     // No cache — show loading until Firestore responds
-    return { loading: true, isActive: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
+    return { loading: true, isActive: false, isDeactivated: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
   })
 
   const refresh = useCallback(async () => {
@@ -102,9 +103,10 @@ export function useSubscription(): SubscriptionState {
 
       const data = snap.docs[0].data()
       const isPaid = data.status === "active"
+      const isDeactivated = data.deactivated === true
       const endDate = data.endDate?.toDate?.() ?? null
       const expired = endDate ? endDate < new Date() : false
-      const active = isPaid && !expired
+      const active = isPaid && !expired && !isDeactivated
 
       // Merge Firestore features on top of defaults so newly added feature keys
       // (e.g. delivery) that don't exist yet in the stored doc default to false
@@ -117,6 +119,7 @@ export function useSubscription(): SubscriptionState {
       const newState: SubscriptionState = {
         loading: false,
         isActive: active,
+        isDeactivated,
         tier: data.tier ?? null,
         features: freshFeatures,
         storeName: data.storeName ?? null,

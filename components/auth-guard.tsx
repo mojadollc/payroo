@@ -48,7 +48,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, loading: authLoading, hasPermission } = useAuth()
-  const { isActive, features, loading: subLoading } = useSubscription()
+  const { isActive, isDeactivated, features, loading: subLoading } = useSubscription()
 
   const isPublic = PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
   const isSuperadmin = SUPERADMIN_ROUTES.includes(pathname)
@@ -131,6 +131,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   // Show branded loader during initial auth load on protected routes
   if (!isPublic && !isSuperadmin && authLoading) {
     return loadingUI
+  }
+
+  // System is Down — admin deactivated the store
+  if (!isPublic && !subLoading && isDeactivated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="max-w-sm w-full text-center space-y-4">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
+            <span className="text-4xl">⚠️</span>
+          </div>
+          <h1 className="text-xl font-bold text-red-600">System is Down</h1>
+          <p className="text-sm text-muted-foreground">This store has been temporarily deactivated by the administrator. Please contact support.</p>
+        </div>
+      </div>
+    )
   }
 
   // Block render while redirecting unauthenticated users

@@ -128,12 +128,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     </div>
   )
 
-  // Show branded loader during initial auth load on protected routes
-  if (!isPublic && !isSuperadmin && authLoading) {
-    return loadingUI
-  }
-
-  // System is Down — admin deactivated the store
+  // System is Down — admin deactivated the store. Blocks EVERYONE.
   if (!isPublic && !subLoading && isDeactivated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -146,6 +141,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     )
+  }
+
+  // Show branded loader during initial auth load on protected routes
+  if (!isPublic && !isSuperadmin && authLoading) {
+    return loadingUI
   }
 
   // Block render while redirecting unauthenticated users

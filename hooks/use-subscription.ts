@@ -103,7 +103,7 @@ export function useSubscription(): SubscriptionState {
 
       const data = snap.docs[0].data()
       const isPaid = data.status === "active"
-      const isDeactivated = data.deactivated === true
+      const isDeactivated = data.deactivated === true || data.status === "suspended"
       const endDate = data.endDate?.toDate?.() ?? null
       const expired = endDate ? endDate < new Date() : false
       const active = isPaid && !expired && !isDeactivated

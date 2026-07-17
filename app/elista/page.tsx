@@ -55,8 +55,16 @@ export default function EListaPage() {
     if (!db || !isOnline()) return
     const q = query(collection(db, "elistas"), where("userId", "==", user.id))
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lista))
+      const data = snapshot.docs
+        .filter(d => !d.metadata.hasPendingWrites || d.data().deleted !== true)
+        .map(d => ({ id: d.id, ...d.data() } as Lista))
       setListas(data.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()))
+      // Keep IndexedDB in sync with Firestore snapshot
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "removed") {
+          offlineDeleteElista(change.doc.id).catch(() => {})
+        }
+      })
     })
     return () => unsubscribe()
   }, [user])
@@ -174,19 +182,14 @@ export default function EListaPage() {
     // Immediately remove from UI
     setListas(prev => prev.filter(l => l.id !== id))
     try {
+      // Always delete from IndexedDB first so cache never restores it
+      await offlineDeleteElista(id)
       if (isOnline() && db) {
         await deleteDoc(doc(db, "elistas", id))
-      } else {
-        await offlineDeleteElista(id)
       }
       toast({ title: "Deleted", description: "e-Lista removed" })
     } catch (error) {
       console.error(error)
-      // Restore on failure
-      if (user?.id) {
-        const fresh = await offlineGetElistas(user.id)
-        setListas(fresh as Lista[])
-      }
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" })
     }
   }

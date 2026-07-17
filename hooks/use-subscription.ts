@@ -103,10 +103,10 @@ export function useSubscription(): SubscriptionState {
 
       const data = snap.docs[0].data()
       const isPaid = data.status === "active"
-      const isDeactivated = data.deactivated === true || data.status === "suspended"
+      const isDeactivated = false
       const endDate = data.endDate?.toDate?.() ?? null
       const expired = endDate ? endDate < new Date() : false
-      const active = isPaid && !expired && !isDeactivated
+      const active = isPaid && !expired
 
       // Merge Firestore features on top of defaults so newly added feature keys
       // (e.g. delivery) that don't exist yet in the stored doc default to false

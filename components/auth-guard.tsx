@@ -128,21 +128,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     </div>
   )
 
-  // System is Down — admin deactivated the store. Blocks EVERYONE.
-  if (!isPublic && !subLoading && isDeactivated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="max-w-sm w-full text-center space-y-4">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
-            <span className="text-4xl">⚠️</span>
-          </div>
-          <h1 className="text-xl font-bold text-red-600">System is Down</h1>
-          <p className="text-sm text-muted-foreground">This store has been temporarily deactivated by the administrator. Please contact support.</p>
-        </div>
-      </div>
-    )
-  }
-
   // Show branded loader during initial auth load on protected routes
   if (!isPublic && !isSuperadmin && authLoading) {
     return loadingUI

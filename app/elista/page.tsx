@@ -42,6 +42,8 @@ export default function EListaPage() {
 
   const [title, setTitle] = useState("")
   const [items, setItems] = useState<ListaItem[]>([{ name: "", qty: 1, price: undefined, notes: "" }])
+  const [submitting, setSubmitting] = useState(false)
+  const deletedIds = useState<Set<string>>(() => new Set())[0]
 
   useEffect(() => {
     if (!user?.id) return
@@ -56,7 +58,7 @@ export default function EListaPage() {
     const q = query(collection(db, "elistas"), where("userId", "==", user.id))
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs
-        .filter(d => !d.metadata.hasPendingWrites || d.data().deleted !== true)
+        .filter(d => !deletedIds.has(d.id))
         .map(d => ({ id: d.id, ...d.data() } as Lista))
       setListas(data.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()))
       // Keep IndexedDB in sync with Firestore snapshot
@@ -90,6 +92,7 @@ export default function EListaPage() {
   }
 
   const handleCreate = async () => {
+    if (submitting) return
     if (!user?.id || !title.trim()) {
       toast({ title: "Error", description: !user?.id ? "Please sign in" : "Title is required", variant: "destructive" })
       return
@@ -105,6 +108,7 @@ export default function EListaPage() {
       toast({ title: "Error", description: "Add at least one item", variant: "destructive" })
       return
     }
+    setSubmitting(true)
     try {
       const newLista: Lista = {
         title: title.trim(),
@@ -130,6 +134,7 @@ export default function EListaPage() {
         toast({ title: "Success", description: "e-Lista saved offline" })
         setIsCreateOpen(false)
         resetForm()
+        setSubmitting(false)
         return
       }
       // Optimistic: add to state immediately
@@ -140,11 +145,13 @@ export default function EListaPage() {
     } catch (error) {
       console.error(error)
       toast({ title: "Error", description: "Failed to create e-Lista", variant: "destructive" })
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleUpdate = async () => {
-    if (!editingLista?.id || !title.trim()) return
+    if (submitting || !editingLista?.id || !title.trim()) return
     const validItems = items.filter(item => item.name.trim()).map(item => ({
       name: item.name,
       qty: item.qty || 1,
@@ -156,6 +163,7 @@ export default function EListaPage() {
       toast({ title: "Error", description: "Add at least one item", variant: "destructive" })
       return
     }
+    setSubmitting(true)
     try {
       if (isOnline() && db) {
         await updateDoc(doc(db, "elistas", editingLista.id), {
@@ -174,11 +182,15 @@ export default function EListaPage() {
     } catch (error) {
       console.error(error)
       toast({ title: "Error", description: "Failed to update e-Lista", variant: "destructive" })
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this e-Lista?")) return
+    // Track deleted ID so snapshot never re-adds it
+    deletedIds.add(id)
     // Immediately remove from UI
     setListas(prev => prev.filter(l => l.id !== id))
     try {
@@ -341,7 +353,7 @@ export default function EListaPage() {
 
           <DialogFooter className="mt-4 gap-2">
             <Button variant="outline" size="sm" onClick={() => { setIsCreateOpen(false); setEditingLista(null); resetForm() }} className="text-[13px]">Cancel</Button>
-            <Button size="sm" onClick={editingLista ? handleUpdate : handleCreate} className="bg-yellow-500 hover:bg-yellow-600 text-[13px]">
+            <Button size="sm" onClick={editingLista ? handleUpdate : handleCreate} disabled={submitting} className="bg-yellow-500 hover:bg-yellow-600 text-[13px] disabled:opacity-60">
               <Save className="h-3.5 w-3.5 mr-1" /> {editingLista ? "Update" : "Create"}
             </Button>
           </DialogFooter>

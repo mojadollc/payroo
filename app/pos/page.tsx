@@ -29,6 +29,13 @@ interface CartItem extends Product {
   quantity: number
   subtotal: number
   selectedVariants?: Record<string, string> // e.g. { Color: "Red", Size: "M" }
+  /** Stable line id: productId or productId_variantKey */
+  cartLineId?: string
+}
+
+function getCartLineId(productId: string, selectedVariants?: Record<string, string>) {
+  if (!selectedVariants || Object.keys(selectedVariants).length === 0) return productId
+  return `${productId}_${Object.values(selectedVariants).join("-")}`
 }
 
 function CartQuantityInput({
@@ -50,7 +57,8 @@ function CartQuantityInput({
     editing.current = false
     const val = parseInt(raw)
     if (!isNaN(val) && val > 0) {
-      onUpdate(item.id!, val)
+      const lineId = item.cartLineId || item.id!
+      onUpdate(lineId, val)
     } else {
       setLocalVal(String(item.quantity))
       onLiveChange?.(item.quantity)
@@ -105,10 +113,13 @@ export default function POSPage() {
   const stockBlockedRef = useRef(false)
   const productsRef = useRef<Product[]>([])
 
+  // Keep latest barcode handler without stale closures
+  const handleBarcodeSubmitRef = useRef<(barcode: string) => void>(() => {})
+
   // Hardware barcode scanner support (USB OTG)
   const handleHardwareScan = useCallback((barcode: string) => {
     setLastHwScan(barcode)
-    handleBarcodeSubmit(barcode)
+    handleBarcodeSubmitRef.current(barcode)
     setBarcodeInput("")
     setTimeout(() => setLastHwScan(null), 2000)
   }, [])
@@ -154,11 +165,22 @@ export default function POSPage() {
     }
 
     // Subscribe to real-time Firestore updates
+    // IMPORTANT: do NOT re-shuffle the full catalog on every stock change (kills POS performance)
     const unsubscribe = onProductsSnapshot((data) => {
       gotData = true
       setProducts(data)
-      setShuffledProducts(shuffleArray(data))
       productsRef.current = data
+      setShuffledProducts(prev => {
+        if (prev.length === 0) return shuffleArray(data)
+        // Preserve display order; refresh stock/price in place; append new products
+        const map = new Map(data.map(p => [p.id, p]))
+        const kept = prev
+          .map(p => map.get(p.id))
+          .filter((p): p is Product => !!p)
+        const existingIds = new Set(kept.map(p => p.id))
+        const added = data.filter(p => !existingIds.has(p.id))
+        return [...kept, ...added]
+      })
       cacheProducts(data)
       // Also save to IndexedDB for offline
       localPutMany("products", data.map(d => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
@@ -389,6 +411,9 @@ export default function POSPage() {
     }
   }
 
+  // Keep hardware scanner callback up to date
+  handleBarcodeSubmitRef.current = handleBarcodeSubmit
+
   const effectivePrice = (product: Product) =>
     product.onSale && product.salePrice ? product.salePrice : product.price
 
@@ -439,6 +464,7 @@ export default function POSPage() {
         )
       }
 
+      const lineId = getCartLineId(liveProduct.id!, selectedVariants)
       return [
         ...prev,
         {
@@ -447,6 +473,7 @@ export default function POSPage() {
           quantity: 1,
           subtotal: price,
           selectedVariants: selectedVariants || undefined,
+          cartLineId: lineId,
         },
       ]
     })
@@ -467,17 +494,20 @@ export default function POSPage() {
     }, 0)
   }
 
-  const updateQuantity = (productId: string, newQuantity: number) => {
-    const product = cart.find((item) => item.id === productId)
+  /** Update quantity by cart line id (supports variants). Falls back to product id. */
+  const updateQuantity = (lineOrProductId: string, newQuantity: number) => {
+    const product = cart.find(
+      (item) => (item.cartLineId || item.id) === lineOrProductId || item.id === lineOrProductId
+    )
     if (!product) return
 
     if (newQuantity <= 0) {
-      removeFromCart(productId)
+      removeFromCart(lineOrProductId)
       return
     }
 
-    // Use real-time stock
-    const liveStock = productsRef.current.find(p => p.id === productId)?.stock ?? product.stock
+    // Use real-time stock (stock is per product, not per variant)
+    const liveStock = productsRef.current.find(p => p.id === product.id)?.stock ?? product.stock
     if (newQuantity > liveStock) {
       toast({
         title: "Stock limit reached",
@@ -487,22 +517,29 @@ export default function POSPage() {
       return
     }
 
-    setCart(
-      cart.map((item) =>
-        item.id === productId
-          ? {
-              ...item,
-              stock: liveStock,
-              quantity: newQuantity,
-              subtotal: newQuantity * item.price,
-            }
-          : item,
-      ),
+    const lineId = product.cartLineId || getCartLineId(product.id!, product.selectedVariants)
+    setCart(prev =>
+      prev.map((item) => {
+        const itemLine = item.cartLineId || getCartLineId(item.id!, item.selectedVariants)
+        if (itemLine !== lineId) return item
+        return {
+          ...item,
+          stock: liveStock,
+          quantity: newQuantity,
+          subtotal: newQuantity * item.price,
+          cartLineId: lineId,
+        }
+      }),
     )
   }
 
-  const removeFromCart = (productId: string) => {
-    setCart(cart.filter((item) => item.id !== productId))
+  const removeFromCart = (lineOrProductId: string) => {
+    setCart(prev =>
+      prev.filter((item) => {
+        const itemLine = item.cartLineId || getCartLineId(item.id!, item.selectedVariants)
+        return itemLine !== lineOrProductId
+      })
+    )
   }
 
   const calculateTotal = () => {
@@ -617,6 +654,8 @@ export default function POSPage() {
                       src={product.imageUrl}
                       alt={product.name}
                       className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <DefaultProductImage />
@@ -863,7 +902,7 @@ export default function POSPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 -mr-1"
-                                onClick={() => removeFromCart(item.id!)}
+                                onClick={() => removeFromCart(item.cartLineId || item.id!)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -874,16 +913,16 @@ export default function POSPage() {
                                   variant="outline"
                                   size="sm"
                                   className="h-9 w-9 p-0 rounded-lg border-red-300 text-red-600 hover:bg-red-50 text-lg font-bold"
-                                  onClick={() => updateQuantity(item.id!, item.quantity - 1)}
+                                  onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
                                 >
                                   −
                                 </Button>
-                                <CartQuantityInput item={item} onUpdate={updateQuantity} onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.id!]: q }))} />
+                                <CartQuantityInput item={item} onUpdate={updateQuantity} onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.cartLineId || item.id!]: q }))} />
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="h-9 w-9 p-0 rounded-lg border-green-300 text-green-600 hover:bg-green-50 text-lg font-bold"
-                                  onClick={() => updateQuantity(item.id!, item.quantity + 1)}
+                                  onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
                                 >
                                   +
                                 </Button>
@@ -958,7 +997,7 @@ export default function POSPage() {
                       <p className="text-[12px] text-muted-foreground">₱{item.price.toFixed(2)} × {item.quantity}</p>
                     </div>
                     <div className="text-[14px] font-semibold text-emerald-700 ml-2">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 text-destructive/60" onClick={() => removeFromCart(item.id!)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 text-destructive/60" onClick={() => removeFromCart(item.cartLineId || item.id!)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -967,21 +1006,21 @@ export default function POSPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 rounded-md border-red-200 text-red-500"
-                      onClick={() => updateQuantity(item.id!, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </Button>
                     <CartQuantityInput
                       item={item}
                       onUpdate={updateQuantity}
-                      onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.id!]: q }))}
+                      onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.cartLineId || item.id!]: q }))}
                       className="h-8 w-12 text-center p-0 text-[14px] font-semibold rounded-md border"
                     />
                     <Button
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 rounded-md border-green-200 text-green-600"
-                      onClick={() => updateQuantity(item.id!, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </Button>

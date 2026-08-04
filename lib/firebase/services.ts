@@ -395,20 +395,40 @@ export const getInventoryTransactions = async (productId?: string) => {
 }
 
 // Image Upload Service
+/** Fixed storage path so we can delete/replace reliably */
 export const uploadProductImage = async (file: File, productId: string) => {
   const storage = getFirebaseStorage()
   if (!storage) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")
-  const storageRef = ref(storage, `products/${productId}/${file.name}`)
-  await uploadBytes(storageRef, file)
+  // Always use a fixed object name — avoids collisions and makes delete easy
+  const storageRef = ref(storage, `products/${productId}/main.jpg`)
+  await uploadBytes(storageRef, file, { contentType: file.type || "image/jpeg" })
   const downloadURL = await getDownloadURL(storageRef)
   return downloadURL
 }
 
+/**
+ * Delete a product image. Accepts either a full download URL or a storage path.
+ * Never throws — image cleanup failures should not block product updates.
+ */
 export const deleteProductImage = async (imageUrl: string) => {
   const storage = getFirebaseStorage()
-  if (!storage) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")
-  const imageRef = ref(storage, imageUrl)
-  await deleteObject(imageRef)
+  if (!storage || !imageUrl) return
+  try {
+    let path = imageUrl
+    // Full Firebase download URL → extract object path
+    if (imageUrl.includes("firebasestorage.googleapis.com") || imageUrl.includes("/o/")) {
+      const afterO = imageUrl.split("/o/")[1]
+      if (afterO) {
+        path = decodeURIComponent(afterO.split("?")[0] || "")
+      }
+    }
+    if (!path) return
+    const imageRef = ref(storage, path)
+    await deleteObject(imageRef)
+  } catch (err) {
+    // Object may already be gone or rules blocked — log and continue
+    console.warn("[deleteProductImage] skipped:", err)
+  }
 }
 
 // Store Settings Services

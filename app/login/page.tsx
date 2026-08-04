@@ -93,7 +93,11 @@ export default function LoginPage() {
             endDate: endDateObj?.toISOString() ?? null,
             externalId: storeId.trim(),
           }))
-          if (sub.storeName) localStorage.setItem("storeName", sub.storeName)
+          if (sub.storeName) {
+            localStorage.setItem("storeName", sub.storeName)
+            // Stable HQ name — must not change when switching branches
+            localStorage.setItem("pos_main_store_name", sub.storeName)
+          }
         }
       } catch {}
 

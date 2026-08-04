@@ -1,7 +1,7 @@
 // ── Payroo POS Service Worker ──────────────────────────────────────────────────
 // Strategy: never cache HTML, stale-while-revalidate for JS/CSS, cache-first for images.
 
-const APP_VERSION = "20260804T155140"
+const APP_VERSION = "20260804T164509"
 const CACHE_NAME = "payroo-v" + APP_VERSION
 
 const PRECACHE = [

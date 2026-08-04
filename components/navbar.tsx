@@ -88,25 +88,54 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    // Always fetch fresh from Firestore — never trust localStorage as source of truth
+    // Resolve display name for the ACTIVE branch (not always main)
     const fetchStoreName = async () => {
-      // Show cached value instantly while Firestore loads
+      const activeId =
+        typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") || "" : ""
+
+      // 1) Instant: localStorage name for active store
       const cached = localStorage.getItem(STORE_NAME_KEY)
       if (cached) setStoreName(cached)
+
+      // 2) Branch cache (set when listing / switching branches)
+      try {
+        const raw = localStorage.getItem("pos_branches_cache")
+        if (raw && activeId) {
+          const list = JSON.parse(raw) as { externalId: string; name: string }[]
+          const hit = list.find(b => b.externalId === activeId)
+          if (hit?.name) {
+            setStoreName(hit.name)
+            localStorage.setItem(STORE_NAME_KEY, hit.name)
+          }
+        }
+      } catch {}
+
+      // 3) Firestore storeSettings for this storeId
       try {
         const s = await getStoreSettings()
         if (s?.name) {
           setStoreName(s.name)
           localStorage.setItem(STORE_NAME_KEY, s.name)
+          return
+        }
+      } catch {}
+
+      // 4) Fallback: subscription cache storeName if externalId matches
+      try {
+        const subRaw = localStorage.getItem("pos_subscription")
+        if (subRaw) {
+          const sub = JSON.parse(subRaw)
+          if (sub?.storeName && (!sub.externalId || sub.externalId === activeId)) {
+            setStoreName(sub.storeName)
+            localStorage.setItem(STORE_NAME_KEY, sub.storeName)
+          }
         }
       } catch {}
     }
     fetchStoreName()
 
-    // Re-fetch from Firestore whenever the store name is updated anywhere in the app
     const onStoreName = () => fetchStoreName()
     window.addEventListener("storename", onStoreName)
-    // Also re-fetch on subscription refresh (in case superadmin changed the name)
     const onSubRefresh = () => fetchStoreName()
     window.addEventListener("subscription-refreshed", onSubRefresh)
     const beforeInstall = (e: any) => { e.preventDefault(); setInstallPrompt(e) }

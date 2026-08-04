@@ -1,8 +1,20 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Smartphone, Settings, TrendingUp, History, Wallet, ArrowDownToLine, ArrowUpFromLine, Signal, Calendar, Plus, Zap } from "lucide-react"
+import {
+  Smartphone,
+  Settings,
+  TrendingUp,
+  History,
+  Wallet,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Signal,
+  Calendar,
+  Plus,
+  Zap,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -17,68 +29,116 @@ import type { EWalletTransaction, CommissionSettings } from "@/lib/firebase/type
 import { isFirebaseConfigured } from "@/lib/firebase/config"
 import { getStoreId } from "@/lib/store-id"
 
+type Period = "today" | "week" | "month" | "all"
+
+function getPeriodRange(period: Period): { start?: Date; end?: Date; max?: number } {
+  const end = new Date()
+  end.setHours(23, 59, 59, 999)
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+
+  if (period === "today") {
+    return { start, end }
+  }
+  if (period === "week") {
+    start.setDate(start.getDate() - 6)
+    return { start, end }
+  }
+  if (period === "month") {
+    start.setDate(1)
+    return { start, end }
+  }
+  // all — still cap initial fetch so the page stays fast
+  return { max: 50 }
+}
+
 export default function EWalletPage() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<EWalletTransaction[]>([])
   const [cashinTransactions, setCashinTransactions] = useState<any[]>([])
   const [commissionSettings, setCommissionSettings] = useState<CommissionSettings | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const hasLoaded = useRef(false)
-  const [selectedMonth, setSelectedMonth] = useState<string>("all")
+  const [period, setPeriod] = useState<Period>("today")
   const [showNewTransaction, setShowNewTransaction] = useState(false)
+  const allLimitRef = useRef(50)
 
-  // Check Firebase configuration synchronously on mount
   if (!isFirebaseConfigured) {
     router.push("/setup")
     return null
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const loadData = useCallback(async (opts?: { append?: boolean; nextLimit?: number }) => {
+    const isAppend = opts?.append === true
+    if (!hasLoaded.current && !isAppend) setIsLoading(true)
+    if (isAppend) setIsLoadingMore(true)
 
-  const loadData = async () => {
-    if (!hasLoaded.current) setIsLoading(true)
     try {
       const storeId = getStoreId()
+      const range = getPeriodRange(period)
+      const maxResults =
+        period === "all" ? (opts?.nextLimit ?? allLimitRef.current) : undefined
+
+      // Settings are tiny — load once and reuse
+      const settingsPromise =
+        commissionSettings
+          ? Promise.resolve(commissionSettings)
+          : getCommissionSettings()
+
       const [transactionsData, settingsData, cashinData] = await Promise.all([
-        getEWalletTransactions(),
-        getCommissionSettings(),
-        getCashinTransactions(storeId),
+        getEWalletTransactions(range.start, range.end, maxResults),
+        settingsPromise,
+        getCashinTransactions(storeId, range.start, range.end, maxResults),
       ])
+
       setTransactions(transactionsData || [])
       setCommissionSettings(settingsData || null)
       setCashinTransactions(cashinData || [])
+
+      if (period === "all") {
+        const fetched = (transactionsData?.length || 0) + (cashinData?.length || 0)
+        setHasMore(fetched >= (maxResults || 50))
+        allLimitRef.current = maxResults || 50
+      } else {
+        setHasMore(false)
+      }
     } catch (error) {
       console.error("[v0] Error loading e-wallet data:", error)
     } finally {
       hasLoaded.current = true
       setIsLoading(false)
+      setIsLoadingMore(false)
     }
+  }, [period, commissionSettings])
+
+  useEffect(() => {
+    hasLoaded.current = false
+    allLimitRef.current = 50
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period])
+
+  const handleLoadMore = () => {
+    const next = allLimitRef.current + 50
+    loadData({ append: true, nextLimit: next })
   }
 
   const calculateStats = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Filter transactions based on selected month
-    let filteredTransactions = transactions
-    if (selectedMonth !== "all") {
-      const [year, month] = selectedMonth.split("-")
-      filteredTransactions = transactions.filter((t) => {
-        const transDate = t.createdAt.toDate()
-        return transDate.getFullYear() === parseInt(year) && transDate.getMonth() === parseInt(month)
-      })
-    }
+    const filteredTransactions = transactions
 
-    const todayTransactions = transactions.filter((t) => {
-      const transDate = t.createdAt.toDate()
+    const todayTransactions = transactions.filter(t => {
+      const transDate = t.createdAt?.toDate?.() ?? new Date(0)
       return transDate >= today
     })
 
-    const totalProfit = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
-    const todayProfit = todayTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
+    const totalProfit = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
+    const todayProfit = todayTransactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
     const totalTransactions = filteredTransactions.length
     const todayTransactionsCount = todayTransactions.length
 
@@ -99,25 +159,32 @@ export default function EWalletPage() {
 
   const stats = calculateStats()
 
-  // Generate month options from transactions
-  const getMonthOptions = () => {
-    const months = new Set<string>()
-    transactions.forEach((t) => {
-      const date = t.createdAt.toDate()
-      const monthKey = `${date.getFullYear()}-${date.getMonth()}`
-      months.add(monthKey)
-    })
-    return Array.from(months).sort().reverse().map((key) => {
-      const [year, month] = key.split("-")
-      const date = new Date(parseInt(year), parseInt(month))
-      return {
-        value: key,
-        label: date.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-      }
-    })
-  }
+  const periodLabel =
+    period === "today"
+      ? "Today"
+      : period === "week"
+        ? "This Week"
+        : period === "month"
+          ? "This Month"
+          : "All Time"
 
-  const monthOptions = getMonthOptions()
+  const historyTitle =
+    period === "today" ? "Today's Transactions" : `Transactions · ${periodLabel}`
+
+  const PeriodSelect = (
+    <Select value={period} onValueChange={v => setPeriod(v as Period)}>
+      <SelectTrigger className="w-full md:w-[200px] h-11 md:h-9 rounded-xl border-2 md:rounded-md md:border">
+        <Calendar className="h-4 w-4 mr-2 shrink-0" />
+        <SelectValue placeholder="Period" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="today">Today</SelectItem>
+        <SelectItem value="week">This Week</SelectItem>
+        <SelectItem value="month">This Month</SelectItem>
+        <SelectItem value="all">All Time (paginated)</SelectItem>
+      </SelectContent>
+    </Select>
+  )
 
   return (
     <MobileAppShell
@@ -125,12 +192,7 @@ export default function EWalletPage() {
       subtitle="GCash & Maya services"
       headerAction={
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setShowSettings(true)}
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5"
-          >
+          <Button onClick={() => setShowSettings(true)} variant="outline" size="sm" className="h-9 gap-1.5">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Settings</span>
           </Button>
@@ -142,9 +204,7 @@ export default function EWalletPage() {
             <Zap className="h-4 w-4" />
             <span className="hidden sm:inline">Load</span>
           </Button>
-          <Button
-            onClick={() => router.push("/ewallet/cashin")}
-          >
+          <Button onClick={() => router.push("/ewallet/cashin")} size="sm" className="h-9 gap-1.5">
             <Wallet className="h-4 w-4" />
             <span className="hidden sm:inline">Kiosk</span>
           </Button>
@@ -153,34 +213,19 @@ export default function EWalletPage() {
     >
       {/* Mobile View */}
       <div className="md:hidden space-y-4">
-        {/* Month Filter */}
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-full h-12 rounded-xl border-2">
-            <Calendar className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filter by month" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
-            {monthOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {PeriodSelect}
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
           <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <div className="flex items-center gap-1.5 mb-1.5">
               <div className="p-1.5 bg-green-500 rounded-md">
                 <TrendingUp className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">
-                {selectedMonth === "all" ? "Total Profit" : "Monthly Profit"}
-              </span>
+              <span className="text-[11px] text-muted-foreground">{periodLabel} Profit</span>
             </div>
-            <div className="text-[15px] font-bold text-green-600 truncate">₱{stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">
+              ₱{stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </MobileCard>
 
           <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
@@ -188,11 +233,11 @@ export default function EWalletPage() {
               <div className="p-1.5 bg-blue-500 rounded-md">
                 <ArrowDownToLine className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">
-                {selectedMonth === "all" ? "Cash-In" : "Monthly Cash-In"}
-              </span>
+              <span className="text-[11px] text-muted-foreground">Cash-In</span>
             </div>
-            <div className="text-[15px] font-bold text-blue-600 truncate">₱{stats.grossCashin.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[15px] font-bold text-blue-600 truncate">
+              ₱{stats.grossCashin.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </MobileCard>
 
           <MobileCard className="p-3 bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
@@ -200,11 +245,11 @@ export default function EWalletPage() {
               <div className="p-1.5 bg-orange-500 rounded-md">
                 <ArrowUpFromLine className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">
-                {selectedMonth === "all" ? "Cash-Out" : "Monthly Cash-Out"}
-              </span>
+              <span className="text-[11px] text-muted-foreground">Cash-Out</span>
             </div>
-            <div className="text-[15px] font-bold text-orange-600 truncate">₱{stats.grossCashout.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[15px] font-bold text-orange-600 truncate">
+              ₱{stats.grossCashout.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </MobileCard>
 
           <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
@@ -212,22 +257,23 @@ export default function EWalletPage() {
               <div className="p-1.5 bg-purple-500 rounded-md">
                 <Signal className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">
-                {selectedMonth === "all" ? "Load" : "Monthly Load"}
-              </span>
+              <span className="text-[11px] text-muted-foreground">Load</span>
             </div>
-            <div className="text-[15px] font-bold text-purple-600 truncate">₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">
+              ₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </MobileCard>
         </div>
 
-        {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">
           <MobileCard className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <History className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">Today's Profit</span>
+              <span className="text-[11px] text-muted-foreground">Today&apos;s Profit</span>
             </div>
-            <div className="text-[15px] font-bold text-green-600 truncate">₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[15px] font-bold text-green-600 truncate">
+              ₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </MobileCard>
 
           <MobileCard className="p-3">
@@ -239,16 +285,23 @@ export default function EWalletPage() {
           </MobileCard>
         </div>
 
-        {/* Transaction History */}
         <div>
-          <MobileSectionHeader title="Recent Transactions" />
+          <MobileSectionHeader title={historyTitle} />
           <MobileCard>
             <div className="p-3">
               <TransactionHistory
                 transactions={transactions}
                 cashinTransactions={cashinTransactions}
                 isLoading={isLoading}
-                onRefresh={loadData}
+                onRefresh={() => loadData()}
+                hasMore={hasMore}
+                onLoadMore={handleLoadMore}
+                isLoadingMore={isLoadingMore}
+                emptyHint={
+                  period === "today"
+                    ? "No transactions today"
+                    : `No transactions for ${periodLabel.toLowerCase()}`
+                }
               />
             </div>
           </MobileCard>
@@ -258,108 +311,93 @@ export default function EWalletPage() {
       {/* Desktop View */}
       <div className="hidden md:block">
         <div className="mb-6">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[180px] h-9">
-                <Calendar className="h-3.5 w-3.5 mr-2" />
-                <SelectValue placeholder="Filter by month" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                {monthOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="flex items-center gap-2 flex-wrap">{PeriodSelect}</div>
         </div>
 
         <div className="mb-4 grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
           <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  {selectedMonth === "all" ? "Total Profit" : "Monthly Profit"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-secondary">₱{stats.totalProfit.toFixed(2)}</div>
-              </CardContent>
-            </Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                {periodLabel} Profit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold text-secondary">₱{stats.totalProfit.toFixed(2)}</div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  Today's Profit
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-secondary">₱{stats.todayProfit.toFixed(2)}</div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Today&apos;s Profit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold text-secondary">₱{stats.todayProfit.toFixed(2)}</div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <ArrowDownToLine className="h-3 w-3" />
-                  {selectedMonth === "all" ? "Gross Cash-In" : "Monthly Cash-In"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-blue-600">₱{stats.grossCashin.toFixed(2)}</div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <ArrowDownToLine className="h-3 w-3" />
+                Cash-In
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold text-blue-600">₱{stats.grossCashin.toFixed(2)}</div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <ArrowUpFromLine className="h-3 w-3" />
-                  {selectedMonth === "all" ? "Gross Cash-Out" : "Monthly Cash-Out"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-orange-600">₱{stats.grossCashout.toFixed(2)}</div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <ArrowUpFromLine className="h-3 w-3" />
+                Cash-Out
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold text-orange-600">₱{stats.grossCashout.toFixed(2)}</div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <Signal className="h-3 w-3" />
-                  {selectedMonth === "all" ? "Gross Load" : "Monthly Load"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Signal className="h-3 w-3" />
+                Load
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <History className="h-3 w-3" />
-                  {selectedMonth === "all" ? "Total Transactions" : "Monthly Transactions"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold">{stats.totalTransactions}</div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <History className="h-3 w-3" />
+                Transactions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold">{stats.totalTransactions}</div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="p-3 pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <History className="h-3 w-3" />
-                  Today's Transactions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold">{stats.todayTransactionsCount}</div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="p-3 pb-1">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <History className="h-3 w-3" />
+                Today&apos;s Count
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold">{stats.todayTransactionsCount}</div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -373,7 +411,7 @@ export default function EWalletPage() {
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 {commissionSettings ? (
-                  <TransactionForm commissionSettings={commissionSettings} onSuccess={loadData} />
+                  <TransactionForm commissionSettings={commissionSettings} onSuccess={() => loadData()} />
                 ) : (
                   <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>
                 )}
@@ -384,10 +422,23 @@ export default function EWalletPage() {
           <div className="lg:col-span-2">
             <Card>
               <CardHeader className="p-3 pb-2">
-                <CardTitle className="text-sm">Transaction History</CardTitle>
+                <CardTitle className="text-sm">{historyTitle}</CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <TransactionHistory transactions={transactions} cashinTransactions={cashinTransactions} isLoading={isLoading} onRefresh={loadData} />
+                <TransactionHistory
+                  transactions={transactions}
+                  cashinTransactions={cashinTransactions}
+                  isLoading={isLoading}
+                  onRefresh={() => loadData()}
+                  hasMore={hasMore}
+                  onLoadMore={handleLoadMore}
+                  isLoadingMore={isLoadingMore}
+                  emptyHint={
+                    period === "today"
+                      ? "No transactions today"
+                      : `No transactions for ${periodLabel.toLowerCase()}`
+                  }
+                />
               </CardContent>
             </Card>
           </div>
@@ -398,19 +449,19 @@ export default function EWalletPage() {
             settings={commissionSettings}
             open={showSettings}
             onOpenChange={setShowSettings}
-            onSuccess={loadData}
+            onSuccess={() => loadData()}
           />
         )}
       </div>
 
-      {/* Floating Action Button (Mobile) */}
+      {/* Smaller FAB on mobile */}
       <FloatingActionButton
-        icon={<Plus className="h-7 w-7" />}
-        label="New Transaction"
+        size="sm"
+        icon={<Plus className="h-5 w-5" />}
+        label="New"
         onClick={() => setShowNewTransaction(true)}
       />
 
-      {/* New Transaction Bottom Sheet (Mobile) */}
       <BottomSheet
         open={showNewTransaction}
         onClose={() => setShowNewTransaction(false)}
@@ -432,13 +483,12 @@ export default function EWalletPage() {
         </div>
       </BottomSheet>
 
-      {/* Settings Dialog */}
       {commissionSettings && (
         <CommissionSettingsDialog
           settings={commissionSettings}
           open={showSettings}
           onOpenChange={setShowSettings}
-          onSuccess={loadData}
+          onSuccess={() => loadData()}
         />
       )}
     </MobileAppShell>

@@ -10,6 +10,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   Timestamp,
   serverTimestamp,
@@ -282,24 +283,27 @@ export const addEWalletTransaction = async (
   return docRef.id
 }
 
-export const getEWalletTransactions = async (startDate?: Date, endDate?: Date) => {
+export const getEWalletTransactions = async (
+  startDate?: Date,
+  endDate?: Date,
+  maxResults?: number,
+) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")
   const sid = getStoreId()
-  let q = query(collection(db, "ewalletTransactions"), where("storeId", "==", sid), orderBy("createdAt", "desc"))
+  const constraints: any[] = [where("storeId", "==", sid)]
 
   if (startDate && endDate) {
     const start = new Date(startDate); start.setHours(0, 0, 0, 0)
     const end = new Date(endDate); end.setHours(23, 59, 59, 999)
-    q = query(
-      collection(db, "ewalletTransactions"),
-      where("storeId", "==", sid),
-      where("createdAt", ">=", Timestamp.fromDate(start)),
-      where("createdAt", "<=", Timestamp.fromDate(end)),
-      orderBy("createdAt", "desc"),
-    )
+    constraints.push(where("createdAt", ">=", Timestamp.fromDate(start)))
+    constraints.push(where("createdAt", "<=", Timestamp.fromDate(end)))
   }
 
+  constraints.push(orderBy("createdAt", "desc"))
+  if (maxResults && maxResults > 0) constraints.push(limit(maxResults))
+
+  const q = query(collection(db, "ewalletTransactions"), ...constraints)
   const querySnapshot = await getDocs(q)
   return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as EWalletTransaction)
 }
@@ -333,10 +337,27 @@ export const getCommissionSettings = async () => {
 }
 
 // Kiosk Cash-In Transaction Services
-export const getCashinTransactions = async (storeId: string) => {
+export const getCashinTransactions = async (
+  storeId: string,
+  startDate?: Date,
+  endDate?: Date,
+  maxResults?: number,
+) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured.")
-  const snap = await getDocs(query(collection(db, "cashinTransactions"), where("storeId", "==", storeId), orderBy("createdAt", "desc")))
+  const constraints: any[] = [where("storeId", "==", storeId)]
+
+  if (startDate && endDate) {
+    const start = new Date(startDate); start.setHours(0, 0, 0, 0)
+    const end = new Date(endDate); end.setHours(23, 59, 59, 999)
+    constraints.push(where("createdAt", ">=", Timestamp.fromDate(start)))
+    constraints.push(where("createdAt", "<=", Timestamp.fromDate(end)))
+  }
+
+  constraints.push(orderBy("createdAt", "desc"))
+  if (maxResults && maxResults > 0) constraints.push(limit(maxResults))
+
+  const snap = await getDocs(query(collection(db, "cashinTransactions"), ...constraints))
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as any)
 }
 

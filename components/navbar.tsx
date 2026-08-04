@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getStoreSettings } from "@/lib/firebase/services"
+import { BranchSwitcher } from "@/components/branch-switcher"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
 import { useAppRefresh } from "@/components/pwa-update-manager"
@@ -231,6 +232,7 @@ export function Navbar() {
           {/* Management & Actions */}
           <div className="flex items-center gap-1 shrink-0">
             {/* Settings & Users dropdown */}
+            <BranchSwitcher />
             {(hasPermission("manageSettings") || hasPermission("manageUsers")) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

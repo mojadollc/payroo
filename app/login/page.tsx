@@ -61,6 +61,8 @@ export default function LoginPage() {
       const user = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as any
 
       localStorage.setItem("pos_ext_id", storeId.trim())
+      // Remember HQ / main store for multi-branch switching
+      localStorage.setItem("pos_main_ext_id", storeId.trim())
 
       // Pre-cache subscription
       try {

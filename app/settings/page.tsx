@@ -16,6 +16,8 @@ import { clearAllData, getStoreSettings, saveStoreSettings } from "@/lib/firebas
 import { DEFAULT_STORE_NAME } from "@/components/navbar"
 import { BUSINESS_TYPE_OPTIONS, getBusinessConfig, type BusinessType } from "@/lib/business-config"
 import { useSubscription } from "@/hooks/use-subscription"
+import { BranchManager } from "@/components/branch-manager"
+
 import type { SubscriptionFeatures } from "@/lib/firebase/types"
 
 const PH_REGIONS = [
@@ -215,6 +217,12 @@ export default function SettingsPage() {
         <div>
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Store Information</p>
           <div className="rounded-2xl border overflow-hidden divide-y">
+
+        {/* Multi-branch */}
+        <div className="mb-4">
+          <BranchManager />
+        </div>
+
             {/* Store Name */}
             <button className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left" onClick={() => setEditField("name")}>
               <div className="p-2 bg-blue-100 rounded-xl"><Store className="h-4 w-4 text-blue-600" /></div>

@@ -219,6 +219,8 @@ export interface CustomerSubscription {
   xenditPaymentStatus?: "PENDING" | "PAID" | "EXPIRED" | "FAILED"
   xenditPaymentUrl?: string
   externalId?: string
+  /** If this store is a branch, points to the main store externalId */
+  parentExternalId?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }
@@ -371,4 +373,26 @@ export interface MarketDataPoint {
   date: string            // YYYY-MM-DD
   month: string           // YYYY-MM
   createdAt: Timestamp
+}
+
+// ─── Multi-branch / multi-store ───────────────────────────────────────────────
+
+/**
+ * Links a main (HQ) store to a branch store.
+ * Each branch keeps its own externalId so inventory/sales stay isolated.
+ * Switching branch only changes the active externalId in the client.
+ */
+export interface StoreBranch {
+  id?: string
+  /** Main / HQ store externalId (the one used at login) */
+  mainExternalId: string
+  /** This branch's own Store ID (externalId) */
+  branchExternalId: string
+  branchName: string
+  address?: string
+  phone?: string
+  /** Whether this branch can still be switched to */
+  isActive: boolean
+  createdAt: Timestamp
+  updatedAt: Timestamp
 }

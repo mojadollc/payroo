@@ -44,35 +44,56 @@ function readCache(): SubscriptionState | null {
     const expired = endDate ? endDate < new Date() : false
     const isActive = (parsed.isActive ?? false) && !expired
     const cachedFeatures = parsed.features ?? {}
-    // Invalidate cache if feature keys don't match current schema
-    // (e.g. new features like 'delivery' were added)
-    const expectedKeys = Object.keys(DEFAULT_FEATURES)
-    const cachedKeys = Object.keys(cachedFeatures)
-    if (expectedKeys.length !== cachedKeys.length || !expectedKeys.every(k => k in cachedFeatures)) {
-      localStorage.removeItem(LS_KEY)
-      return null
-    }
     return {
-      ...parsed,
       loading: false,
       isActive,
+      isDeactivated: parsed.isDeactivated ?? false,
+      tier: parsed.tier ?? null,
       features: isActive ? { ...DEFAULT_FEATURES, ...cachedFeatures } : DEFAULT_FEATURES,
+      storeName: parsed.storeName ?? null,
+      businessType: parsed.businessType ?? null,
+      ownerName: parsed.ownerName ?? null,
+      ownerEmail: parsed.ownerEmail ?? null,
       endDate,
+      externalId: parsed.externalId ?? null,
     }
   } catch {
     return null
   }
 }
 
-export function useSubscription(): SubscriptionState {
+async function fetchSubByExternalId(db: any, externalId: string) {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, "customerSubscriptions"),
+        where("externalId", "==", externalId),
+        orderBy("createdAt", "desc"),
+        limit(1)
+      )
+    )
+    if (!snap.empty) return snap.docs[0].data()
+  } catch {
+    // index may be missing — try without orderBy
+    const snap = await getDocs(
+      query(
+        collection(db, "customerSubscriptions"),
+        where("externalId", "==", externalId),
+        limit(1)
+      )
+    )
+    if (!snap.empty) return snap.docs[0].data()
+  }
+  return null
+}
+
+export function useSubscription(): SubscriptionState & { refresh: () => Promise<void> } {
   const [state, setState] = useState<SubscriptionState>(() => {
     if (typeof window === "undefined") {
       return { loading: true, isActive: false, isDeactivated: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
     }
-    // If cache exists, use it immediately — no loading spinner, no blocking
     const cached = readCache()
     if (cached) return cached
-    // No cache — show loading until Firestore responds
     return { loading: true, isActive: false, isDeactivated: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
   })
 
@@ -87,42 +108,55 @@ export function useSubscription(): SubscriptionState {
       const db = getFirebaseDb()
       if (!db) { setState(s => ({ ...s, loading: false })); return }
 
-      const snap = await getDocs(
-        query(
-          collection(db, "customerSubscriptions"),
-          where("externalId", "==", externalId),
-          orderBy("createdAt", "desc"),
-          limit(1)
-        )
-      )
+      let data = await fetchSubByExternalId(db, externalId)
 
-      if (snap.empty) {
+      // Branch with missing/inactive sub → inherit plan from main HQ
+      const mainId = localStorage.getItem("pos_main_ext_id") || ""
+      let inherited = false
+      if ((!data || data.status !== "active") && mainId && mainId !== externalId) {
+        const mainData = await fetchSubByExternalId(db, mainId)
+        if (mainData && mainData.status === "active") {
+          data = {
+            ...mainData,
+            storeName: data?.storeName || localStorage.getItem("storeName") || mainData.storeName,
+            externalId,
+            parentExternalId: mainId,
+          }
+          inherited = true
+        }
+      }
+
+      if (!data) {
+        // Keep previous active cache if any — don't lock user out of Settings
         setState(s => ({ ...s, loading: false }))
         return
       }
 
-      const data = snap.docs[0].data()
       const isPaid = data.status === "active"
-      const isDeactivated = false
-      const endDate = data.endDate?.toDate?.() ?? null
+      const endDate = data.endDate?.toDate?.() ?? (data.endDate ? new Date(data.endDate) : null)
       const expired = endDate ? endDate < new Date() : false
       const active = isPaid && !expired
 
-      // Merge Firestore features on top of defaults so newly added feature keys
-      // (e.g. delivery) that don't exist yet in the stored doc default to false
-      // instead of being undefined (which would show as "locked").
       const storedFeatures = data.features ?? {}
       const freshFeatures: SubscriptionFeatures = active
         ? { ...DEFAULT_FEATURES, ...storedFeatures }
         : DEFAULT_FEATURES
 
+      // Prefer branch display name from localStorage / branch cache
+      let displayName = data.storeName ?? null
+      if (!inherited) {
+        displayName = data.storeName ?? localStorage.getItem("storeName")
+      } else {
+        displayName = localStorage.getItem("storeName") || data.storeName
+      }
+
       const newState: SubscriptionState = {
         loading: false,
         isActive: active,
-        isDeactivated,
+        isDeactivated: false,
         tier: data.tier ?? null,
         features: freshFeatures,
-        storeName: data.storeName ?? null,
+        storeName: displayName,
         businessType: data.businessType ?? null,
         ownerName: data.ownerName ?? null,
         ownerEmail: data.ownerEmail ?? null,
@@ -130,22 +164,17 @@ export function useSubscription(): SubscriptionState {
         externalId,
       }
 
-      // Only update state if something actually changed to avoid re-render loops
       setState(prev => {
-        if (prev.loading) return newState  // always update on first load
+        if (prev.loading) return newState
         const prevKey = JSON.stringify({ isActive: prev.isActive, tier: prev.tier, features: prev.features, storeName: prev.storeName, endDate: prev.endDate?.toISOString() })
         const nextKey = JSON.stringify({ isActive: newState.isActive, tier: newState.tier, features: newState.features, storeName: newState.storeName, endDate: endDate?.toISOString() })
         if (prevKey === nextKey) return prev
         return newState
       })
 
-      // Persist fresh data to localStorage
       localStorage.setItem(LS_KEY, JSON.stringify({ ...newState, endDate: endDate?.toISOString() ?? null }))
 
       if (active) {
-        // NOTE: deliberately NOT writing storeName/businessType to localStorage here.
-        // storeSettings (Firestore) is the single source of truth for those values.
-        // Writing them here would overwrite changes the store owner made in Settings.
         window.dispatchEvent(new Event("subscription-refreshed"))
       }
     } catch (err) {
@@ -158,13 +187,15 @@ export function useSubscription(): SubscriptionState {
     refresh()
     const onVisible = () => { if (document.visibilityState === "visible") refresh() }
     document.addEventListener("visibilitychange", onVisible)
-    // Refresh every 5 minutes so expiry is detected without requiring tab focus
+    const onBranch = () => { refresh() }
+    window.addEventListener("subscription-refreshed", onBranch)
     const interval = setInterval(refresh, 5 * 60 * 1000)
     return () => {
       document.removeEventListener("visibilitychange", onVisible)
+      window.removeEventListener("subscription-refreshed", onBranch)
       clearInterval(interval)
     }
   }, [refresh])
 
-  return state
+  return { ...state, refresh }
 }

@@ -84,6 +84,7 @@ export function Navbar() {
   const { features, isActive, tier } = useSubscription()
   const { refresh, isRefreshing } = useAppRefresh()
   const [storeName, setStoreName] = useState(DEFAULT_STORE_NAME)
+  const [storeIdDisplay, setStoreIdDisplay] = useState("")
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -92,6 +93,7 @@ export function Navbar() {
     const fetchStoreName = async () => {
       const activeId =
         typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") || "" : ""
+      setStoreIdDisplay(activeId)
 
       // 1) Instant: localStorage name for active store
       const cached = localStorage.getItem(STORE_NAME_KEY)
@@ -207,7 +209,7 @@ export function Navbar() {
             <div className="flex flex-col leading-tight">
               <span className="font-bold text-sm">{storeName}</span>
               <span className="text-[9px] text-muted-foreground tracking-wide">
-                ID: {typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") ?? "" : ""}
+                ID: {storeIdDisplay}
               </span>
             </div>
           </Link>

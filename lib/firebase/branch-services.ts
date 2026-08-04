@@ -17,37 +17,55 @@ import {
   getMainStoreId,
   getMainStoreName,
   getStoreId,
+  setMainStoreId,
+  setMainStoreName,
   cacheBranches,
   type CachedBranch,
 } from "@/lib/store-id"
 import type { StoreBranch, CustomerSubscription, StoreUser } from "./types"
 
-/**
- * List all branches linked to the main (HQ) store.
- * Also includes the main store itself as the first entry for the switcher.
- */
+/** Resolve HQ externalId even when currently on a branch and localStorage is incomplete. */
+async function resolveMainExternalId(preferred?: string): Promise<string> {
+  const db = getFirebaseDb()
+  const current = getStoreId()
+  let mainId = (preferred || getMainStoreId() || "").trim()
+
+  // If main is missing or equals current, try reverse lookup via storeBranches
+  if (db && current) {
+    try {
+      const asBranch = await getDocs(
+        query(
+          collection(db, "storeBranches"),
+          where("branchExternalId", "==", current),
+          where("isActive", "==", true),
+          limit(1)
+        )
+      )
+      if (!asBranch.empty) {
+        const m = (asBranch.docs[0].data() as StoreBranch).mainExternalId
+        if (m) {
+          mainId = m
+          setMainStoreId(m)
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (!mainId) mainId = current
+  return mainId
+}
+
 export async function listBranches(mainExternalId?: string): Promise<
   (StoreBranch & { isMain?: boolean })[]
 > {
   const db = getFirebaseDb()
   if (!db) return []
 
-  const mainId = (mainExternalId || getMainStoreId() || getStoreId()).trim()
+  const mainId = await resolveMainExternalId(mainExternalId)
   if (!mainId) return []
 
   let branches: StoreBranch[] = []
   try {
-    const snap = await getDocs(
-      query(
-        collection(db, "storeBranches"),
-        where("mainExternalId", "==", mainId),
-        where("isActive", "==", true),
-        orderBy("branchName")
-      )
-    )
-    branches = snap.docs.map(d => ({ id: d.id, ...d.data() } as StoreBranch))
-  } catch (err) {
-    console.warn("[listBranches] ordered query failed, retrying:", err)
     const snap = await getDocs(
       query(
         collection(db, "storeBranches"),
@@ -58,10 +76,31 @@ export async function listBranches(mainExternalId?: string): Promise<
     branches = snap.docs
       .map(d => ({ id: d.id, ...d.data() } as StoreBranch))
       .sort((a, b) => a.branchName.localeCompare(b.branchName))
+  } catch (err) {
+    console.warn("[listBranches]", err)
   }
 
-  // Stable HQ name — never use the currently active branch name
-  const mainName = getMainStoreName()
+  // Resolve main display name from subscription or stored HQ name
+  let mainName = getMainStoreName()
+  if (!mainName || mainName === "Main Store") {
+    try {
+      const subSnap = await getDocs(
+        query(
+          collection(db, "customerSubscriptions"),
+          where("externalId", "==", mainId),
+          limit(1)
+        )
+      )
+      if (!subSnap.empty) {
+        const n = (subSnap.docs[0].data() as any).storeName
+        if (n) {
+          mainName = n
+          setMainStoreName(n)
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  if (!mainName) mainName = "Main Store"
 
   const list: (StoreBranch & { isMain?: boolean })[] = [
     {
@@ -77,19 +116,17 @@ export async function listBranches(mainExternalId?: string): Promise<
     ...branches,
   ]
 
-  const cache: CachedBranch[] = list.map(b => ({
-    externalId: b.branchExternalId,
-    name: b.branchName,
-    isMain: !!b.isMain,
-  }))
-  cacheBranches(cache)
+  cacheBranches(
+    list.map(b => ({
+      externalId: b.branchExternalId,
+      name: b.branchName,
+      isMain: !!b.isMain,
+    }))
+  )
 
   return list
 }
 
-/**
- * Create a new branch under the current main store.
- */
 export async function createBranch(input: {
   branchName: string
   branchExternalId: string
@@ -101,7 +138,7 @@ export async function createBranch(input: {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured")
 
-  const mainId = getMainStoreId() || getStoreId()
+  const mainId = await resolveMainExternalId()
   if (!mainId) throw new Error("No main store selected")
 
   const branchId = input.branchExternalId.trim()
@@ -118,40 +155,20 @@ export async function createBranch(input: {
   const existingSub = await getDocs(
     query(collection(db, "customerSubscriptions"), where("externalId", "==", branchId), limit(1))
   )
-  if (!existingSub.empty) {
-    throw new Error("This Store ID is already in use. Choose another.")
-  }
+  if (!existingSub.empty) throw new Error("This Store ID is already in use. Choose another.")
 
   const existingBranch = await getDocs(
     query(collection(db, "storeBranches"), where("branchExternalId", "==", branchId), limit(1))
   )
-  if (!existingBranch.empty) {
-    throw new Error("This Store ID is already registered as a branch")
-  }
+  if (!existingBranch.empty) throw new Error("This Store ID is already registered as a branch")
 
   let mainSub: Partial<CustomerSubscription> = {}
   try {
     const mainSnap = await getDocs(
-      query(
-        collection(db, "customerSubscriptions"),
-        where("externalId", "==", mainId),
-        orderBy("createdAt", "desc"),
-        limit(1)
-      )
+      query(collection(db, "customerSubscriptions"), where("externalId", "==", mainId), limit(1))
     )
-    if (!mainSnap.empty) {
-      mainSub = mainSnap.docs[0].data() as CustomerSubscription
-    }
-  } catch {
-    try {
-      const mainSnap = await getDocs(
-        query(collection(db, "customerSubscriptions"), where("externalId", "==", mainId), limit(1))
-      )
-      if (!mainSnap.empty) mainSub = mainSnap.docs[0].data() as CustomerSubscription
-    } catch {
-      /* ignore */
-    }
-  }
+    if (!mainSnap.empty) mainSub = mainSnap.docs[0].data() as CustomerSubscription
+  } catch { /* ignore */ }
 
   const branchName = input.branchName.trim()
 
@@ -174,21 +191,13 @@ export async function createBranch(input: {
     phone: input.phone?.trim() || mainSub.phone || "",
     planId: mainSub.planId || "basic",
     tier: mainSub.tier || "basic",
-    status: mainSub.status || "active",
+    status: "active",
     startDate: mainSub.startDate || serverTimestamp(),
     endDate: mainSub.endDate || null,
     features: mainSub.features || {
-      pos: true,
-      inventory: true,
-      ewallet: true,
-      reports: true,
-      loyalty: false,
-      utang: false,
-      aiRestock: false,
-      multiUser: true,
-      exportData: false,
-      marketIntelligence: false,
-      delivery: false,
+      pos: true, inventory: true, ewallet: true, reports: true,
+      loyalty: false, utang: false, aiRestock: false, multiUser: true,
+      exportData: false, marketIntelligence: false, delivery: false,
     },
     externalId: branchId,
     parentExternalId: mainId,
@@ -197,7 +206,6 @@ export async function createBranch(input: {
     updatedAt: serverTimestamp(),
   })
 
-  // Critical: so navbar shows the correct branch name after switch
   await addDoc(collection(db, "storeSettings"), {
     name: branchName,
     address: input.address?.trim() || "",
@@ -220,12 +228,7 @@ export async function createBranch(input: {
     } satisfies Omit<StoreUser, "id">)
   }
 
-  try {
-    await listBranches(mainId)
-  } catch {
-    /* ignore */
-  }
-
+  try { await listBranches(mainId) } catch { /* ignore */ }
   return branchRef.id
 }
 

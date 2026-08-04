@@ -1,9 +1,5 @@
 /**
  * Store / branch identity helpers.
- *
- * Each physical branch has its own externalId (4–8 digit Store ID).
- * All Firestore queries are scoped with getStoreId() so inventory, sales,
- * e-wallet, etc. stay isolated per branch.
  */
 
 const EXT_ID_KEY = "pos_ext_id"
@@ -17,16 +13,17 @@ export function getStoreId(): string {
   return localStorage.getItem(EXT_ID_KEY) ?? ""
 }
 
-/** The store the user originally logged into (main / HQ). */
 export function getMainStoreId(): string {
   if (typeof window === "undefined") return ""
   return localStorage.getItem(MAIN_STORE_KEY) || getStoreId()
 }
 
-/** Stable HQ display name — not overwritten when switching branches. */
 export function getMainStoreName(): string {
   if (typeof window === "undefined") return "Main Store"
-  return localStorage.getItem(MAIN_STORE_NAME_KEY) || localStorage.getItem(STORE_NAME_KEY) || "Main Store"
+  return (
+    localStorage.getItem(MAIN_STORE_NAME_KEY) ||
+    "Main Store"
+  )
 }
 
 export function setMainStoreName(name: string) {
@@ -47,7 +44,6 @@ export function setActiveStoreId(externalId: string, storeName?: string) {
   }
 }
 
-/** Call once after successful login to remember the HQ store. */
 export function setMainStoreId(externalId: string) {
   if (typeof window === "undefined") return
   localStorage.setItem(MAIN_STORE_KEY, externalId.trim())
@@ -72,9 +68,7 @@ export function cacheBranches(branches: CachedBranch[]) {
   if (typeof window === "undefined") return
   try {
     localStorage.setItem(BRANCH_CACHE_KEY, JSON.stringify(branches))
-  } catch {
-    /* quota */
-  }
+  } catch { /* quota */ }
 }
 
 export function getCachedBranches(): CachedBranch[] {
@@ -86,7 +80,6 @@ export function getCachedBranches(): CachedBranch[] {
   }
 }
 
-/** Resolve display name for a store id from branch cache / main name. */
 export function resolveStoreName(externalId: string): string {
   if (typeof window === "undefined") return ""
   const id = externalId.trim()
@@ -103,9 +96,7 @@ export function resolveStoreName(externalId: string): string {
 }
 
 /**
- * Switch active branch and hard-reload so all modules pick up the new storeId.
- * Clears product/cart caches that are store-scoped.
- * Always updates the visible store name.
+ * Switch branch. Always sets name. Soft-navigates without breaking subscription.
  */
 export function switchBranch(externalId: string, storeName?: string) {
   if (typeof window === "undefined") return
@@ -113,45 +104,40 @@ export function switchBranch(externalId: string, storeName?: string) {
   if (!nextId) return
 
   const current = getStoreId()
-  // Resolve name even if caller omitted it
   const nextName = (storeName && storeName.trim()) || resolveStoreName(nextId) || nextId
 
-  if (current === nextId) {
-    // Still refresh the displayed name if it was wrong
-    localStorage.setItem(STORE_NAME_KEY, nextName)
-    window.dispatchEvent(new Event("storename"))
-    return
+  // Ensure main id is never lost
+  if (!localStorage.getItem(MAIN_STORE_KEY)) {
+    // If we somehow lost it, keep current as main only when switching away first time
+    localStorage.setItem(MAIN_STORE_KEY, current || nextId)
   }
 
   setActiveStoreId(nextId, nextName)
 
-  // Keep subscription cache in sync so UI bits that read storeName stay correct
+  // Update subscription cache identity but KEEP isActive/features from HQ plan
   try {
     const raw = localStorage.getItem("pos_subscription")
     if (raw) {
       const sub = JSON.parse(raw)
       sub.storeName = nextName
       sub.externalId = nextId
+      // Never flip isActive to false during a switch
+      if (sub.isActive === undefined) sub.isActive = true
       localStorage.setItem("pos_subscription", JSON.stringify(sub))
     }
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 
-  // Drop caches that belong to the previous branch
   try {
     localStorage.removeItem("pos_products_cache")
     localStorage.removeItem("pos_cart")
     localStorage.removeItem("pos_offline_queue")
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
 
   try {
     window.dispatchEvent(new Event("storename"))
-  } catch {
-    /* ignore */
-  }
+    window.dispatchEvent(new Event("subscription-refreshed"))
+  } catch { /* ignore */ }
 
-  window.location.href = "/pos"
+  // Use replace so back-button doesn't bounce between stores oddly
+  window.location.replace("/pos")
 }

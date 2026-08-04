@@ -98,21 +98,23 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     // ── Subscription inactive → only /pos is allowed ──────────────────────
-    if (!isActive && pathname !== "/pos") {
+    // Owner can still open Settings / Users to manage the account
+    const ownerBypassRoutes = new Set(["/settings", "/users", "/subscription"])
+    if (!isActive && pathname !== "/pos" && !(user.role === "owner" && ownerBypassRoutes.has(pathname))) {
       router.replace("/pos")
       return
     }
 
-    // ── Feature gate for subadmin ─────────────────────────────────────────
+    // ── Feature gate (subadmin / cashier only — owner always allowed) ─────
     const requiredFeature = ROUTE_FEATURE_MAP[pathname]
-    if (requiredFeature && !features[requiredFeature]) {
+    if (requiredFeature && user.role !== "owner" && !features[requiredFeature]) {
       router.replace("/pos")
       return
     }
 
-    // ── Management permission gates (subadmin) ────────────────────────────
+    // ── Management permission gates (subadmin only — owner always allowed) ─
     const requiredPermission = PERMISSION_MAP[pathname]
-    if (requiredPermission && !hasPermission(requiredPermission)) {
+    if (requiredPermission && user.role !== "owner" && !hasPermission(requiredPermission)) {
       router.replace("/pos")
       return
     }

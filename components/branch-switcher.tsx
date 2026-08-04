@@ -22,51 +22,72 @@ import { listBranches } from "@/lib/firebase/branch-services"
 import { useAuth } from "@/hooks/use-auth"
 
 /**
- * Compact branch switcher for the navbar / mobile header.
- * Owner & subadmin can switch; cashiers stay on their assigned branch.
+ * Branch switcher — always offers Main + linked branches.
+ * Never hides when you are on a branch (so you can switch back).
  */
 export function BranchSwitcher({ className }: { className?: string }) {
   const { user } = useAuth()
   const [branches, setBranches] = useState<CachedBranch[]>(() => getCachedBranches())
   const [loading, setLoading] = useState(false)
-  const [activeId, setActiveId] = useState(getStoreId())
+  const [activeId, setActiveId] = useState("")
+  const [mounted, setMounted] = useState(false)
 
   const canSwitch = !user || user.role === "owner" || user.role === "subadmin"
 
   useEffect(() => {
+    setMounted(true)
+    setActiveId(getStoreId())
+  }, [])
+
+  useEffect(() => {
+    if (!canSwitch || !mounted) return
     let cancelled = false
+
     async function load() {
-      if (!canSwitch) return
       setLoading(true)
       try {
         const list = await listBranches(getMainStoreId())
         if (cancelled) return
-        setBranches(
-          list.map(b => ({
-            externalId: b.branchExternalId,
-            name: b.branchName,
-            isMain: !!b.isMain,
-          }))
-        )
+        const mapped = list.map(b => ({
+          externalId: b.branchExternalId,
+          name: b.branchName,
+          isMain: !!b.isMain,
+        }))
+        setBranches(mapped)
         setActiveId(getStoreId())
       } catch (e) {
         console.warn("[BranchSwitcher]", e)
+        // Keep cached list so user can still switch back to main
+        const cached = getCachedBranches()
+        if (cached.length) setBranches(cached)
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
     load()
-    return () => {
-      cancelled = true
-    }
-  }, [canSwitch])
+    return () => { cancelled = true }
+  }, [canSwitch, mounted])
 
-  // Only show when there is more than one location
-  if (!canSwitch || branches.length <= 1) {
-    return null
+  // Avoid hydration mismatch — render nothing until client mounted
+  if (!mounted || !canSwitch) return null
+
+  // Show if we have 2+ locations OR we're not on main (so user can return)
+  const mainId = getMainStoreId()
+  const notOnMain = activeId && mainId && activeId !== mainId
+  if (branches.length <= 1 && !notOnMain) return null
+
+  // Ensure main is present in the list when not on main
+  let displayList = branches
+  if (notOnMain && !branches.some(b => b.externalId === mainId)) {
+    displayList = [
+      { externalId: mainId, name: "Main Store", isMain: true },
+      ...branches,
+    ]
   }
 
-  const active = branches.find(b => b.externalId === activeId) || branches[0]
+  const active =
+    displayList.find(b => b.externalId === activeId) ||
+    displayList[0]
 
   return (
     <DropdownMenu>
@@ -74,10 +95,12 @@ export function BranchSwitcher({ className }: { className?: string }) {
         <Button
           variant="outline"
           size="sm"
-          className={`h-8 gap-1.5 max-w-[160px] ${className || ""}`}
+          className={`h-8 gap-1.5 max-w-[180px] ${className || ""}`}
         >
           <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" />
-          <span className="truncate text-xs font-medium">{active?.name || "Branch"}</span>
+          <span className="truncate text-xs font-medium">
+            {active?.name || "Branch"}
+          </span>
           {loading ? (
             <Loader2 className="h-3 w-3 animate-spin shrink-0" />
           ) : (
@@ -90,16 +113,17 @@ export function BranchSwitcher({ className }: { className?: string }) {
           Switch branch
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {branches.map(b => {
+        {displayList.map(b => {
           const isActive = b.externalId === activeId
           return (
             <DropdownMenuItem
               key={b.externalId}
               disabled={isActive}
-              onClick={() => {
+              onSelect={(e) => {
+                e.preventDefault()
                 if (!isActive) switchBranch(b.externalId, b.name)
               }}
-              className="flex items-center justify-between gap-2"
+              className="flex items-center justify-between gap-2 cursor-pointer"
             >
               <div className="min-w-0">
                 <div className="truncate font-medium text-sm">{b.name}</div>

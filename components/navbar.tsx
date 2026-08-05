@@ -112,13 +112,16 @@ export function Navbar() {
         }
       } catch {}
 
-      // 3) Firestore storeSettings for this storeId
+    // 3) Firestore storeSettings — only fetch if no cache hit
       try {
-        const s = await getStoreSettings()
-        if (s?.name) {
-          setStoreName(s.name)
-          localStorage.setItem(STORE_NAME_KEY, s.name)
-          return
+        const cached2 = localStorage.getItem(STORE_NAME_KEY)
+        if (!cached2) {
+          const s = await getStoreSettings()
+          if (s?.name) {
+            setStoreName(s.name)
+            localStorage.setItem(STORE_NAME_KEY, s.name)
+            return
+          }
         }
       } catch {}
 

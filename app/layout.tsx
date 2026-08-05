@@ -115,7 +115,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
       </head>
       <body className="font-sans antialiased">
-        <Script id="json-ld" type="application/ld+json" strategy="beforeInteractive">{`
+        <Script id="json-ld" type="application/ld+json" strategy="lazyOnload">{`
           {
             "@context": "https://schema.org",
             "@graph": [
@@ -228,7 +228,7 @@ export default function RootLayout({
             });
           }
         `}</Script>
-        <Script id="meta-pixel" strategy="afterInteractive">{`
+        <Script id="meta-pixel" strategy="lazyOnload">{`
           !function(f,b,e,v,n,t,s)
           {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
           n.callMethod.apply(n,arguments):n.queue.push(arguments)};

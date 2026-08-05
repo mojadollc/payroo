@@ -807,7 +807,7 @@ export default function POSPage() {
                 <CardContent className="p-3 pt-0">
                   <div className="max-h-96 overflow-y-auto">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                      {shuffledProducts.map((product) => (
+                      {shuffledProducts.slice(0, 40).map((product) => (
                       <Button
                         key={product.id}
                         variant="outline"
@@ -821,6 +821,8 @@ export default function POSPage() {
                               src={product.imageUrl}
                               alt={product.name}
                               className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
                             />
                           ) : (
                             <DefaultProductImage />

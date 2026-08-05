@@ -19,7 +19,11 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isPublic = PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/delivery")
 
-  useEffect(() => { initOfflineSync(); initOfflineDB() }, [])
+  useEffect(() => {
+    // defer offline init so it doesn't block first paint
+    const t = setTimeout(() => { initOfflineSync(); initOfflineDB() }, 100)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <AuthProvider>

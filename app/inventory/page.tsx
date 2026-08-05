@@ -420,7 +420,7 @@ export default function InventoryPage() {
             <div key={product.id} className="rounded-lg border overflow-hidden bg-card hover:shadow-md transition-shadow">
               <div className="relative w-full aspect-square bg-muted">
                 {product.imageUrl ? (
-                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <DefaultProductImage />
                 )}
@@ -680,7 +680,7 @@ export default function InventoryPage() {
                 <MobileCard key={product.id}>
                   <div className="relative aspect-square bg-muted">
                     {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     ) : (
                       <DefaultProductImage />
                     )}

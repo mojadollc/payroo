@@ -31,7 +31,7 @@ import { Timestamp } from "firebase/firestore"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 
-const ADMIN_PIN = "superadmin2024"
+const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN ?? "superadmin2024"
 
 const FEATURE_LABELS: Record<keyof SubscriptionFeatures, string> = {
   pos: "POS System",

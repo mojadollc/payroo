@@ -16,8 +16,15 @@ import { useAuth } from "@/hooks/use-auth"
 import { getSubscriptionPlans } from "@/lib/firebase/services"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import type { SubscriptionPlan } from "@/lib/firebase/types"
+import dynamic from "next/dynamic"
 
-import { Hero3DScene } from "@/components/hero-3d-scene"
+// three.js is a large dependency — load it only in the browser, after the
+// rest of the landing page is interactive, instead of blocking the initial
+// bundle for every visitor.
+const Hero3DScene = dynamic(
+  () => import("@/components/hero-3d-scene").then(m => m.Hero3DScene),
+  { ssr: false, loading: () => <div className="w-full h-full min-h-[320px] animate-pulse bg-muted/30 rounded-xl" /> }
+)
 
 export default function HomePage() {
   const router = useRouter()

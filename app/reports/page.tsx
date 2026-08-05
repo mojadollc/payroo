@@ -15,7 +15,13 @@ import {
 import { DateRangePicker } from "@/components/reports/date-range-picker"
 import { SalesReport } from "@/components/reports/sales-report"
 import { EWalletReport } from "@/components/reports/ewallet-report"
-import { ProfitChart } from "@/components/reports/profit-chart"
+import dynamic from "next/dynamic"
+// recharts pulls in a sizeable chunk of its own — split it out of the main
+// reports bundle so tapping into Reports doesn't wait on chart code to parse.
+const ProfitChart = dynamic(
+  () => import("@/components/reports/profit-chart").then(m => m.ProfitChart),
+  { ssr: false, loading: () => <div className="h-[300px] w-full animate-pulse bg-muted/30 rounded-lg" /> }
+)
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { getSales, getEWalletTransactions, getProducts } from "@/lib/firebase/services"
 import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"

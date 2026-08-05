@@ -67,22 +67,25 @@ self.addEventListener("fetch", (e) => {
     return
   }
 
-  // JS/CSS bundles (_next): network-first, cache fallback
+  // JS/CSS bundles (_next): these filenames are content-hashed and immutable,
+  // so once we have a copy there's no need to hit the network again — serve
+  // straight from cache (near-instant) and refresh the cache in the
+  // background for next time. This is what was making every menu tap wait
+  // on a network round-trip even for chunks already downloaded.
   if (url.pathname.startsWith("/_next/")) {
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          if (res.ok) {
-            const clone = res.clone()
-            caches.open(CACHE_NAME).then(c => c.put(e.request, clone)).catch(() => {})
-          }
-          return res
-        })
-        .catch(() =>
-          caches.match(e.request).then(cached =>
-            cached || new Response("", { status: 503, headers: { "Content-Type": "application/javascript" } })
-          )
-        )
+      caches.match(e.request).then(cached => {
+        const network = fetch(e.request)
+          .then(res => {
+            if (res.ok) {
+              const clone = res.clone()
+              caches.open(CACHE_NAME).then(c => c.put(e.request, clone)).catch(() => {})
+            }
+            return res
+          })
+          .catch(() => cached || new Response("", { status: 503, headers: { "Content-Type": "application/javascript" } }))
+        return cached || network
+      })
     )
     return
   }

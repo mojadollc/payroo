@@ -138,13 +138,10 @@ export function Navbar() {
 
     const onStoreName = () => fetchStoreName()
     window.addEventListener("storename", onStoreName)
-    const onSubRefresh = () => fetchStoreName()
-    window.addEventListener("subscription-refreshed", onSubRefresh)
     const beforeInstall = (e: any) => { e.preventDefault(); setInstallPrompt(e) }
     window.addEventListener("beforeinstallprompt", beforeInstall)
     return () => {
       window.removeEventListener("storename", onStoreName)
-      window.removeEventListener("subscription-refreshed", onSubRefresh)
       window.removeEventListener("beforeinstallprompt", beforeInstall)
     }
   }, [])

@@ -135,7 +135,6 @@ export function switchBranch(externalId: string, storeName?: string) {
 
   try {
     window.dispatchEvent(new Event("storename"))
-    window.dispatchEvent(new Event("subscription-refreshed"))
   } catch { /* ignore */ }
 
   // Use replace so back-button doesn't bounce between stores oddly

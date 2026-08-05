@@ -62,7 +62,7 @@ function readCache(): SubscriptionState | null {
   }
 }
 
-async function fetchSubByExternalId(db: any, externalId: string) {
+async function fetchSubDoc(db: any, externalId: string): Promise<any | null> {
   try {
     const snap = await getDocs(
       query(
@@ -74,31 +74,58 @@ async function fetchSubByExternalId(db: any, externalId: string) {
     )
     if (!snap.empty) return snap.docs[0].data()
   } catch {
-    // index may be missing — try without orderBy
-    const snap = await getDocs(
-      query(
-        collection(db, "customerSubscriptions"),
-        where("externalId", "==", externalId),
-        limit(1)
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, "customerSubscriptions"),
+          where("externalId", "==", externalId),
+          limit(1)
+        )
       )
-    )
-    if (!snap.empty) return snap.docs[0].data()
+      if (!snap.empty) return snap.docs[0].data()
+    } catch {
+      return null
+    }
   }
   return null
 }
 
-export function useSubscription(): SubscriptionState & { refresh: () => Promise<void> } {
+export function useSubscription() {
   const [state, setState] = useState<SubscriptionState>(() => {
     if (typeof window === "undefined") {
-      return { loading: true, isActive: false, isDeactivated: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
+      return {
+        loading: true,
+        isActive: false,
+        isDeactivated: false,
+        tier: null,
+        features: DEFAULT_FEATURES,
+        storeName: null,
+        businessType: null,
+        ownerName: null,
+        ownerEmail: null,
+        endDate: null,
+        externalId: null,
+      }
     }
     const cached = readCache()
     if (cached) return cached
-    return { loading: true, isActive: false, isDeactivated: false, tier: null, features: DEFAULT_FEATURES, storeName: null, businessType: null, ownerName: null, ownerEmail: null, endDate: null, externalId: null }
+    return {
+      loading: true,
+      isActive: false,
+      isDeactivated: false,
+      tier: null,
+      features: DEFAULT_FEATURES,
+      storeName: null,
+      businessType: null,
+      ownerName: null,
+      ownerEmail: null,
+      endDate: null,
+      externalId: null,
+    }
   })
 
   const refresh = useCallback(async () => {
-    const externalId = localStorage.getItem("pos_ext_id")
+    const externalId = typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") : null
     if (!externalId) {
       setState(s => ({ ...s, loading: false }))
       return
@@ -106,34 +133,38 @@ export function useSubscription(): SubscriptionState & { refresh: () => Promise<
 
     try {
       const db = getFirebaseDb()
-      if (!db) { setState(s => ({ ...s, loading: false })); return }
+      if (!db) {
+        setState(s => ({ ...s, loading: false }))
+        return
+      }
 
-      let data = await fetchSubByExternalId(db, externalId)
+      let data = await fetchSubDoc(db, externalId)
 
-      // Branch with missing/inactive sub → inherit plan from main HQ
-      const mainId = localStorage.getItem("pos_main_ext_id") || ""
-      let inherited = false
+      // If this is a branch and sub is missing/inactive, inherit HQ plan
+      const mainId =
+        (typeof window !== "undefined" && localStorage.getItem("pos_main_ext_id")) || ""
       if ((!data || data.status !== "active") && mainId && mainId !== externalId) {
-        const mainData = await fetchSubByExternalId(db, mainId)
+        const mainData = await fetchSubDoc(db, mainId)
         if (mainData && mainData.status === "active") {
           data = {
             ...mainData,
-            storeName: data?.storeName || localStorage.getItem("storeName") || mainData.storeName,
-            externalId,
-            parentExternalId: mainId,
+            // keep branch display name if we have one
+            storeName:
+              (typeof window !== "undefined" && localStorage.getItem("storeName")) ||
+              data?.storeName ||
+              mainData.storeName,
           }
-          inherited = true
         }
       }
 
       if (!data) {
-        // Keep previous active cache if any — don't lock user out of Settings
+        // Do not wipe an existing active cache — keeps menus usable
         setState(s => ({ ...s, loading: false }))
         return
       }
 
       const isPaid = data.status === "active"
-      const endDate = data.endDate?.toDate?.() ?? (data.endDate ? new Date(data.endDate) : null)
+      const endDate = data.endDate?.toDate?.() ?? null
       const expired = endDate ? endDate < new Date() : false
       const active = isPaid && !expired
 
@@ -142,13 +173,10 @@ export function useSubscription(): SubscriptionState & { refresh: () => Promise<
         ? { ...DEFAULT_FEATURES, ...storedFeatures }
         : DEFAULT_FEATURES
 
-      // Prefer branch display name from localStorage / branch cache
-      let displayName = data.storeName ?? null
-      if (!inherited) {
-        displayName = data.storeName ?? localStorage.getItem("storeName")
-      } else {
-        displayName = localStorage.getItem("storeName") || data.storeName
-      }
+      const displayName =
+        (typeof window !== "undefined" && localStorage.getItem("storeName")) ||
+        data.storeName ||
+        null
 
       const newState: SubscriptionState = {
         loading: false,
@@ -166,17 +194,36 @@ export function useSubscription(): SubscriptionState & { refresh: () => Promise<
 
       setState(prev => {
         if (prev.loading) return newState
-        const prevKey = JSON.stringify({ isActive: prev.isActive, tier: prev.tier, features: prev.features, storeName: prev.storeName, endDate: prev.endDate?.toISOString() })
-        const nextKey = JSON.stringify({ isActive: newState.isActive, tier: newState.tier, features: newState.features, storeName: newState.storeName, endDate: endDate?.toISOString() })
+        const prevKey = JSON.stringify({
+          isActive: prev.isActive,
+          tier: prev.tier,
+          features: prev.features,
+          storeName: prev.storeName,
+          endDate: prev.endDate?.toISOString?.() ?? null,
+          externalId: prev.externalId,
+        })
+        const nextKey = JSON.stringify({
+          isActive: newState.isActive,
+          tier: newState.tier,
+          features: newState.features,
+          storeName: newState.storeName,
+          endDate: endDate?.toISOString?.() ?? null,
+          externalId: newState.externalId,
+        })
         if (prevKey === nextKey) return prev
         return newState
       })
 
-      localStorage.setItem(LS_KEY, JSON.stringify({ ...newState, endDate: endDate?.toISOString() ?? null }))
+      try {
+        localStorage.setItem(
+          LS_KEY,
+          JSON.stringify({ ...newState, endDate: endDate?.toISOString() ?? null })
+        )
+      } catch { /* quota */ }
 
-      if (active) {
-        window.dispatchEvent(new Event("subscription-refreshed"))
-      }
+      // NOTE: deliberately do NOT dispatch subscription-refreshed here.
+      // Navbar listens to that event; dispatching from refresh caused an infinite loop
+      // and froze all menu clicks.
     } catch (err) {
       console.error("useSubscription error:", err)
       setState(s => ({ ...s, loading: false }))
@@ -185,17 +232,16 @@ export function useSubscription(): SubscriptionState & { refresh: () => Promise<
 
   useEffect(() => {
     refresh()
-    const onVisible = () => { if (document.visibilityState === "visible") refresh() }
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh()
+    }
     document.addEventListener("visibilitychange", onVisible)
-    const onBranch = () => { refresh() }
-    window.addEventListener("subscription-refreshed", onBranch)
     const interval = setInterval(refresh, 5 * 60 * 1000)
     return () => {
       document.removeEventListener("visibilitychange", onVisible)
-      window.removeEventListener("subscription-refreshed", onBranch)
       clearInterval(interval)
     }
   }, [refresh])
 
-  return { ...state, refresh }
+  return state
 }

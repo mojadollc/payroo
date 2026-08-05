@@ -114,13 +114,15 @@ export function switchBranch(externalId: string, storeName?: string) {
 
   setActiveStoreId(nextId, nextName)
 
-  // Update subscription cache identity but KEEP isActive/features from HQ plan
+  // Update subscription cache display name only — NEVER change externalId.
+  // The subscription always belongs to the main store (HQ). Changing externalId
+  // here causes useSubscription to query the branch ID which has no sub doc,
+  // making the store appear expired.
   try {
     const raw = localStorage.getItem("pos_subscription")
     if (raw) {
       const sub = JSON.parse(raw)
       sub.storeName = nextName
-      sub.externalId = nextId
       // Never flip isActive to false during a switch
       if (sub.isActive === undefined) sub.isActive = true
       localStorage.setItem("pos_subscription", JSON.stringify(sub))

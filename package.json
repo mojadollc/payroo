@@ -10,7 +10,10 @@
     "deploy": "node scripts/update-sw-version.js && npm run build && firebase deploy"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1105.0",
+    "@aws-sdk/s3-request-presigner": "^3.1105.0",
     "@hookform/resolvers": "^3.10.0",
+    "@prisma/client": "^6.7.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -54,6 +57,8 @@
     "next": "^16.2.1",
     "next-themes": "^0.4.6",
     "nodemailer": "^8.0.2",
+    "pg-listen": "^1.7.0",
+    "prisma": "^6.7.0",
     "qrcode.react": "^4.2.0",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",

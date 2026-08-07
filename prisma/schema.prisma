@@ -1,0 +1,723 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Payroo POS — Prisma Schema
+// Migrated from Firebase Firestore → PostgreSQL
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SubscriptionTier {
+  basic
+  gold
+  enterprise
+}
+
+enum SubscriptionStatus {
+  active
+  expired
+  suspended
+  pending
+}
+
+enum UserRole {
+  owner
+  subadmin
+  cashier
+}
+
+enum SaleStatus {
+  completed
+  pending
+  cancelled
+  voided
+}
+
+enum PaymentMethod {
+  cash
+  gcash
+  maya
+}
+
+enum EWalletType {
+  cashin
+  cashout
+  load
+}
+
+enum EWalletProvider {
+  gcash
+  maya
+}
+
+enum TransactionStatus {
+  completed
+  pending
+  failed
+}
+
+enum InventoryTransactionType {
+  restock
+  sale
+  adjustment
+  void
+}
+
+enum UtangStatus {
+  active
+  partial
+  settled
+}
+
+enum LoyaltyTransactionType {
+  earn
+  redeem
+}
+
+enum EloadFeeType {
+  flat
+  percentage
+}
+
+enum DeliveryOrderStatus {
+  pending
+  confirmed
+  preparing
+  delivering
+  delivered
+  cancelled
+}
+
+enum AffiliateWithdrawalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum XenditPaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+}
+
+enum ShippingClass {
+  standard
+  bulky
+  fragile
+  digital
+}
+
+// ─── Products ─────────────────────────────────────────────────────────────────
+
+model Product {
+  id            String         @id @default(uuid())
+  storeId       String
+  name          String
+  barcode       String         @default("")
+  price         Float
+  cost          Float          @default(0)
+  stock         Int            @default(0)
+  category      String         @default("")
+  imageUrl      String?
+  description   String?
+  unit          String?
+  onSale        Boolean        @default(false)
+  salePrice     Float?
+  sku           String?
+  weight        Float?
+  dimensions    Json?          // { length, width, height }
+  shippingClass ShippingClass?
+  variants      Json?          // ProductVariant[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  inventoryTransactions InventoryTransaction[]
+  saleItems             SaleItem[]
+
+  @@index([storeId])
+  @@index([storeId, name])
+  @@index([storeId, barcode])
+  @@map("products")
+}
+
+// ─── Categories ───────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(uuid())
+  storeId     String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([storeId])
+  @@index([storeId, name])
+  @@map("categories")
+}
+
+// ─── Sales ────────────────────────────────────────────────────────────────────
+
+model Sale {
+  id            String        @id @default(uuid())
+  storeId       String
+  total         Float
+  profit        Float         @default(0)
+  paymentMethod PaymentMethod
+  status        SaleStatus    @default(completed)
+  voidedAt      DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items SaleItem[]
+
+  @@index([storeId])
+  @@index([storeId, createdAt])
+  @@index([storeId, status])
+  @@map("sales")
+}
+
+model SaleItem {
+  id               String  @id @default(uuid())
+  saleId           String
+  productId        String
+  productName      String
+  quantity         Int
+  price            Float
+  cost             Float   @default(0)
+  subtotal         Float
+  selectedVariants Json?   // Record<string, string>
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("sale_items")
+}
+
+// ─── Inventory Transactions ───────────────────────────────────────────────────
+
+model InventoryTransaction {
+  id            String                   @id @default(uuid())
+  storeId       String
+  productId     String
+  productName   String
+  type          InventoryTransactionType
+  quantity      Int
+  previousStock Int
+  newStock      Int
+  notes         String?
+  createdAt     DateTime                 @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([storeId])
+  @@index([storeId, productId])
+  @@index([storeId, createdAt])
+  @@map("inventory_transactions")
+}
+
+// ─── E-Wallet Transactions ────────────────────────────────────────────────────
+
+model EWalletTransaction {
+  id               String          @id @default(uuid())
+  storeId          String
+  type             EWalletType
+  provider         EWalletProvider
+  amount           Float
+  commission       Float
+  commissionRate   Float
+  profit           Float
+  customerName     String?
+  customerNumber   String?
+  referenceNumber  String          @default("")
+  status           TransactionStatus @default(completed)
+  createdAt        DateTime        @default(now())
+
+  @@index([storeId])
+  @@index([storeId, createdAt])
+  @@map("ewallet_transactions")
+}
+
+// ─── Commission Settings ──────────────────────────────────────────────────────
+
+model CommissionSettings {
+  id                String       @id @default(uuid())
+  storeId           String       @unique
+  xenditFlatFee     Float        @default(10)
+  xenditVatRate     Float        @default(0.12)
+  adminChargeRate   Float        @default(0.01)
+  sellerCashinRate  Float        @default(0.02)
+  gcashCashinRate   Float        @default(0.02)
+  gcashCashoutRate  Float        @default(0.02)
+  mayaCashinRate    Float        @default(0.02)
+  mayaCashoutRate   Float        @default(0.02)
+  eloadFeeType      EloadFeeType @default(flat)
+  eloadFeeValue     Float        @default(5)
+  updatedAt         DateTime     @updatedAt
+
+  @@index([storeId])
+  @@map("commission_settings")
+}
+
+// ─── Cashin Transactions (Xendit Disbursements) ───────────────────────────────
+
+model CashinTransaction {
+  id                   String   @id @default(uuid())
+  storeId              String
+  storeName            String   @default("")
+  txnId                String   @unique
+  xenditDisbursementId String?
+  type                 String   @default("disbursement")
+  channel              String
+  channelCode          String
+  channelType          String
+  accountNumber        String
+  accountName          String   @default("")
+  amountInserted       Float
+  xenditCost           Float    @default(0)
+  xenditVat            Float    @default(0)
+  xenditTotal          Float    @default(0)
+  adminFee             Float    @default(0)
+  sellerEarning        Float    @default(0)
+  fee                  Float    @default(0)
+  sendAmount           Float
+  status               String   @default("COMPLETED")
+  xenditRawStatus      String?
+  failureCode          String?
+  webhookReceivedAt    DateTime?
+  createdAt            DateTime @default(now())
+
+  @@index([storeId])
+  @@index([txnId])
+  @@index([storeId, createdAt])
+  @@map("cashin_transactions")
+}
+
+// ─── Utang (Credit) ───────────────────────────────────────────────────────────
+
+model UtangRecord {
+  id             String      @id @default(uuid())
+  storeId        String
+  storeName      String
+  customerName   String
+  customerPhone  String?
+  totalAmount    Float
+  amountPaid     Float       @default(0)
+  balance        Float
+  status         UtangStatus @default(active)
+  dueDate        DateTime?
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items    UtangItem[]
+  payments UtangPayment[]
+
+  @@index([storeId])
+  @@index([storeId, status])
+  @@index([storeId, customerName])
+  @@map("utang_records")
+}
+
+model UtangItem {
+  id          String @id @default(uuid())
+  utangId     String
+  productName String
+  quantity    Int
+  price       Float
+  subtotal    Float
+
+  utang UtangRecord @relation(fields: [utangId], references: [id], onDelete: Cascade)
+
+  @@index([utangId])
+  @@map("utang_items")
+}
+
+model UtangPayment {
+  id              String        @id @default(uuid())
+  utangId         String
+  customerName    String
+  amount          Float
+  method          PaymentMethod
+  referenceNumber String?
+  createdAt       DateTime      @default(now())
+
+  utang UtangRecord @relation(fields: [utangId], references: [id], onDelete: Cascade)
+
+  @@index([utangId])
+  @@map("utang_payments")
+}
+
+// ─── Loyalty ──────────────────────────────────────────────────────────────────
+
+model LoyaltyCustomer {
+  id             String   @id @default(uuid())
+  storeId        String
+  name           String
+  phone          String?
+  coins          Int      @default(0)
+  totalEarned    Int      @default(0)
+  totalRedeemed  Int      @default(0)
+  qrCode         String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  transactions LoyaltyTransaction[]
+
+  @@index([storeId])
+  @@index([storeId, name])
+  @@index([qrCode])
+  @@map("loyalty_customers")
+}
+
+model LoyaltyTransaction {
+  id           String                 @id @default(uuid())
+  customerId   String
+  customerName String
+  type         LoyaltyTransactionType
+  coins        Int
+  saleItems    Json?                  // { productName, quantity, coinsEarned }[]
+  saleTotal    Float?
+  createdAt    DateTime               @default(now())
+
+  customer LoyaltyCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("loyalty_transactions")
+}
+
+model LoyaltyRule {
+  id          String   @id @default(uuid())
+  productId   String   @unique
+  productName String
+  buyQty      Int
+  earnCoins   Int
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@map("loyalty_rules")
+}
+
+model LoyaltySettings {
+  id             String   @id @default(uuid())
+  storeId        String   @unique
+  minRedeemCoins Int      @default(100)
+  coinValuePeso  Float    @default(1)
+  updatedAt      DateTime @updatedAt
+
+  @@index([storeId])
+  @@map("loyalty_settings")
+}
+
+// ─── Store Settings ───────────────────────────────────────────────────────────
+
+model StoreSettings {
+  id           String  @id @default(uuid())
+  storeId      String  @unique
+  name         String  @default("")
+  address      String  @default("")
+  phone        String?
+  businessType String?
+  region       String?
+  province     String?
+  city         String?
+  barangay     String?
+
+  @@index([storeId])
+  @@map("store_settings")
+}
+
+// ─── Store Users ──────────────────────────────────────────────────────────────
+
+model StoreUser {
+  id              String   @id @default(uuid())
+  externalId      String
+  name            String
+  username        String
+  pin             String
+  role            UserRole @default(cashier)
+  isActive        Boolean  @default(true)
+  allowedFeatures Json?    // Partial<SubscriptionFeatures>
+  permissions     Json?    // Partial<SubadminPermissions>
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([externalId, username])
+  @@index([externalId])
+  @@index([externalId, role])
+  @@map("store_users")
+}
+
+// ─── Subscription Plans ───────────────────────────────────────────────────────
+
+model SubscriptionPlan {
+  id          String           @id @default(uuid())
+  tier        SubscriptionTier @unique
+  name        String
+  price       Float
+  description String           @default("")
+  features    Json             // SubscriptionFeatures
+  isActive    Boolean          @default(true)
+  updatedAt   DateTime         @updatedAt
+
+  customerSubscriptions CustomerSubscription[]
+
+  @@index([tier])
+  @@index([isActive])
+  @@map("subscription_plans")
+}
+
+// ─── Customer Subscriptions ───────────────────────────────────────────────────
+
+model CustomerSubscription {
+  id                   String              @id @default(uuid())
+  externalId           String              @unique
+  parentExternalId     String?
+  ownerName            String
+  ownerEmail           String
+  storeName            String
+  businessType         String?
+  phone                String?
+  planId               String
+  tier                 SubscriptionTier    @default(basic)
+  status               SubscriptionStatus  @default(pending)
+  features             Json?               // SubscriptionFeatures
+  startDate            DateTime?
+  endDate              DateTime?
+  notes                String?
+  referralCode         String?
+  xenditInvoiceId      String?
+  xenditPaymentStatus  XenditPaymentStatus?
+  xenditPaymentUrl     String?
+  oldExternalId        String?
+  expiryReminderDate   DateTime?
+  expiryReminderSent   Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([externalId])
+  @@index([ownerEmail])
+  @@index([status])
+  @@index([parentExternalId])
+  @@map("customer_subscriptions")
+}
+
+// ─── Store Branches ───────────────────────────────────────────────────────────
+
+model StoreBranch {
+  id               String   @id @default(uuid())
+  mainExternalId   String
+  branchExternalId String   @unique
+  branchName       String
+  address          String?
+  phone            String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([mainExternalId])
+  @@index([mainExternalId, isActive])
+  @@map("store_branches")
+}
+
+// ─── Affiliates ───────────────────────────────────────────────────────────────
+
+model Affiliate {
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  phone           String?
+  referralCode    String   @unique
+  walletBalance   Float    @default(0)
+  totalEarned     Float    @default(0)
+  totalWithdrawn  Float    @default(0)
+  totalReferrals  Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  earnings    AffiliateEarning[]
+  withdrawals AffiliateWithdrawal[]
+
+  @@index([email])
+  @@index([referralCode])
+  @@map("affiliates")
+}
+
+model AffiliateEarning {
+  id                 String   @id @default(uuid())
+  affiliateId        String
+  referralCode       String
+  referredEmail      String
+  referredStoreName  String
+  planName           String
+  planPrice          Float
+  commission         Float    @default(150)
+  createdAt          DateTime @default(now())
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@map("affiliate_earnings")
+}
+
+model AffiliateWithdrawal {
+  id             String                    @id @default(uuid())
+  affiliateId    String
+  affiliateName  String
+  affiliateEmail String
+  amount         Float
+  gcashNumber    String                    @default("")
+  gcashName      String                    @default("")
+  paymentMethod  String?
+  accountNumber  String?
+  accountName    String?
+  status         AffiliateWithdrawalStatus @default(pending)
+  notes          String?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  affiliate Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId])
+  @@index([status])
+  @@map("affiliate_withdrawals")
+}
+
+// ─── Market Intelligence ──────────────────────────────────────────────────────
+
+model MarketData {
+  id           String   @id @default(uuid())
+  region       String
+  province     String
+  city         String
+  barangay     String
+  businessType String
+  productName  String
+  category     String
+  quantity     Int
+  revenue      Float
+  hour         Int
+  dayOfWeek    Int
+  date         String   // YYYY-MM-DD
+  month        String   // YYYY-MM
+  createdAt    DateTime @default(now())
+
+  @@index([month])
+  @@index([city])
+  @@index([region])
+  @@index([productName])
+  @@index([month, city])
+  @@map("market_data")
+}
+
+// ─── Delivery ─────────────────────────────────────────────────────────────────
+
+model DeliverySettings {
+  id                String   @id @default(uuid())
+  storeId           String   @unique
+  enabled           Boolean  @default(false)
+  storeName         String
+  storeImage        String?
+  storeLogo         String?
+  description       String?
+  address           String?
+  phone             String?
+  openTime          String   @default("08:00")
+  closeTime         String   @default("22:00")
+  minOrder          Float?
+  deliveryFee       Float?
+  enabledProductIds Json     @default("[]") // string[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  orders DeliveryOrder[]
+
+  @@index([storeId])
+  @@index([enabled])
+  @@map("delivery_settings")
+}
+
+model DeliveryOrder {
+  id              String              @id @default(uuid())
+  storeId         String
+  storeName       String
+  customerName    String
+  customerPhone   String
+  customerAddress String
+  items           Json                // { productId, productName, price, quantity, subtotal }[]
+  total           Float
+  deliveryFee     Float               @default(0)
+  status          DeliveryOrderStatus @default(pending)
+  notes           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  deliverySettings DeliverySettings @relation(fields: [storeId], references: [storeId], onDelete: Restrict)
+
+  @@index([storeId])
+  @@index([storeId, status])
+  @@index([storeId, createdAt])
+  @@map("delivery_orders")
+}
+
+model DeliveryBanner {
+  id        String   @id @default(uuid())
+  imageUrl  String
+  title     String?
+  link      String?
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+  @@index([active, order])
+  @@map("delivery_banners")
+}
+
+// ─── Site Visits ──────────────────────────────────────────────────────────────
+
+model SiteVisit {
+  id          String   @id @default(uuid())
+  ip          String
+  country     String   @default("")
+  countryCode String   @default("")
+  city        String   @default("")
+  region      String   @default("")
+  page        String   @default("")
+  referrer    String   @default("")
+  userAgent   String   @default("")
+  isPWA       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([country])
+  @@map("site_visits")
+}
+
+// ─── PIN Resets ───────────────────────────────────────────────────────────────
+// Was a TODO in reset-owner-pin/route.ts — now properly implemented
+
+model PinReset {
+  id        String   @id @default(uuid())
+  email     String
+  tempPin   String
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([email, used])
+  @@map("pin_resets")
+}

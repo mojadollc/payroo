@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { CreditCard, Wallet, Banknote, Check, Printer, HandCoins, AlertTriangle, QrCode, Star, X } from "lucide-react"
 import {
   Dialog,
@@ -52,16 +52,20 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
   const { toast } = useToast()
   // Pre-fetch store settings when dialog opens so checkout doesn't wait
   const storeSettingsRef = useRef<{ name: string; address: string; phone?: string; businessType?: string; region?: string; province?: string; city?: string; barangay?: string } | null>(null)
+  const utangDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     getStoreSettings().then(s => { storeSettingsRef.current = s }).catch(() => {})
   }, [])
 
-  const checkUtangNetwork = async (name: string) => {
+  const checkUtangNetwork = useCallback((name: string) => {
+    if (utangDebounceRef.current) clearTimeout(utangDebounceRef.current)
     if (name.trim().length < 2) { setUtangWarnings([]); setUtangChecked(false); return }
-    const results = await searchUtangByName(name.trim())
-    setUtangWarnings(results)
-    setUtangChecked(true)
-  }
+    utangDebounceRef.current = setTimeout(async () => {
+      const results = await searchUtangByName(name.trim())
+      setUtangWarnings(results)
+      setUtangChecked(true)
+    }, 600)
+  }, [])
 
   const change = Number.parseFloat(amountReceived) - total
   const isValidPayment = Number.parseFloat(amountReceived) >= total
@@ -216,8 +220,13 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
       }
 
       // Write to Firestore FIRST, then show success
+      // Pass current stock from cart to skip redundant getDoc calls
+      const knownStock: Record<string, number> = {}
+      for (const item of cart) {
+        if (item.id) knownStock[item.id] = item.stock
+      }
       try {
-        await addSale(salePayload, storeLocation)
+        await addSale(salePayload, storeLocation, knownStock)
       } catch (error) {
         console.error("[checkout] Sale write failed:", error)
         toast({ title: "❌ Sale failed to save!", description: "Please try again. " + (error instanceof Error ? error.message : ""), variant: "destructive" })
@@ -615,8 +624,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
               <Input
                 placeholder="Juan dela Cruz"
                 value={utangCustomer}
-                onChange={e => { setUtangCustomer(e.target.value); setUtangChecked(false) }}
-                onBlur={() => checkUtangNetwork(utangCustomer)}
+                onChange={e => { setUtangCustomer(e.target.value); setUtangChecked(false); checkUtangNetwork(e.target.value) }}
               />
               {utangChecked && utangWarnings.length > 0 && (
                 <div className="rounded-lg border border-red-300 bg-red-50 p-2 space-y-1">

@@ -103,6 +103,7 @@ export default function POSPage() {
   }, [cart])
   const [barcodeInput, setBarcodeInput] = useState("")
   const [searchSuggestions, setSearchSuggestions] = useState<Product[]>([])
+  const [dropdownQty, setDropdownQty] = useState<Record<string, number>>({})
   const [liveQuantities, setLiveQuantities] = useState<Record<string, number>>({})
   const [showCartDrawer, setShowCartDrawer] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
@@ -571,6 +572,15 @@ export default function POSPage() {
               ✅ {lastHwScan}
             </span>
           )}
+          {cart.length > 0 && (
+            <button
+              className="relative inline-flex items-center gap-1 text-xs text-white bg-yellow-500 border border-yellow-600 px-2 py-1 rounded-full font-semibold shadow"
+              onClick={() => setShowCartDrawer(true)}
+            >
+              <ShoppingCart className="h-3.5 w-3.5" />
+              {cart.reduce((s, i) => s + i.quantity, 0)}
+            </button>
+          )}
           <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1 rounded-full">
             <Usb className="h-3 w-3" /> Ready
           </span>
@@ -592,32 +602,20 @@ export default function POSPage() {
             {searchSuggestions.length > 0 && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border-2 border-yellow-300 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
                 {searchSuggestions.map(p => {
-                  const q = barcodeInput.toLowerCase()
-                  const name = p.name.toLowerCase()
-                  const category = p.category.toLowerCase()
-                  const description = (p.description || '').toLowerCase()
-                  let matchReason = ''
-                  if (name.includes(q)) matchReason = 'Name match'
-                  else if (p.barcode.includes(q)) matchReason = 'Barcode match'
-                  else if (category.includes(q)) matchReason = `Category: ${p.category}`
-                  else if (description.includes(q)) matchReason = 'Description match'
-                  else matchReason = 'Related item'
+                  const qty = dropdownQty[p.id!] ?? 1
                   return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-yellow-50 active:bg-yellow-100 flex justify-between items-center border-b last:border-b-0"
-                      onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
-                    >
+                    <div key={p.id} className="flex items-center gap-2 px-3 py-2.5 border-b last:border-b-0 bg-white hover:bg-yellow-50">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold truncate">{p.name}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{matchReason} • Stock: {p.stock}</div>
+                        <div className="font-semibold text-sm truncate">{p.name}</div>
+                        <div className="text-xs text-muted-foreground">₱{effectivePrice(p).toFixed(2)} • Stock: {p.stock}{p.onSale && p.salePrice && <span className="ml-1 text-orange-500 font-semibold">SALE</span>}</div>
                       </div>
-                      <div className="text-right ml-3 flex-shrink-0">
-                        <div className="font-bold text-sm text-emerald-700">₱{effectivePrice(p).toFixed(2)}</div>
-                        {p.onSale && p.salePrice && <div className="text-xs text-orange-500 font-semibold">SALE</div>}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button type="button" className="h-7 w-7 rounded-full border border-red-300 text-red-500 font-bold text-base flex items-center justify-center active:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
+                        <span className="w-6 text-center text-sm font-bold">{qty}</span>
+                        <button type="button" className="h-7 w-7 rounded-full border border-green-300 text-green-600 font-bold text-base flex items-center justify-center active:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
+                        <button type="button" className="ml-1 h-8 px-3 rounded-lg bg-yellow-500 text-white text-xs font-bold active:bg-yellow-600" onMouseDown={() => { for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }); setBarcodeInput(""); setSearchSuggestions([]) }}>Add</button>
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -731,60 +729,20 @@ export default function POSPage() {
                         {searchSuggestions.length > 0 && (
                           <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-64 overflow-y-auto">
                             {searchSuggestions.map(p => {
-                              const q = barcodeInput.toLowerCase()
-                              const name = p.name.toLowerCase()
-                              const category = p.category.toLowerCase()
-                              const description = (p.description || '').toLowerCase()
-                              
-                              // Determine match reason for display
-                              let matchReason = ''
-                              if (name.includes(q)) {
-                                matchReason = 'Name match'
-                              } else if (p.barcode.includes(q)) {
-                                matchReason = 'Barcode match'
-                              } else if (category.includes(q)) {
-                                matchReason = `Category: ${p.category}`
-                              } else if (description.includes(q)) {
-                                matchReason = 'Description match'
-                              } else {
-                                // Related product logic
-                                const searchWords = q.split(' ').filter(word => word.length > 2)
-                                const relatedWord = searchWords.find(word => {
-                                  if (word === 'ice' && (name.includes('cold') || name.includes('frozen') || name.includes('drink'))) return true
-                                  if (word === 'juice' && (name.includes('drink') || name.includes('beverage'))) return true
-                                  if (word === 'water' && (name.includes('drink') || name.includes('beverage'))) return true
-                                  if (word === 'milk' && (name.includes('dairy') || name.includes('cream'))) return true
-                                  if (word === 'bread' && (name.includes('loaf') || name.includes('bun'))) return true
-                                  if (word === 'rice' && (name.includes('grain') || name.includes('bigas'))) return true
-                                  if (word === 'soap' && (name.includes('detergent') || name.includes('wash'))) return true
-                                  if (word === 'candy' && (name.includes('sweet') || name.includes('chocolate'))) return true
-                                  if (word === 'noodle' && (name.includes('pasta') || name.includes('instant'))) return true
-                                  if (word === 'coffee' && (name.includes('caffeine') || name.includes('instant'))) return true
-                                  return false
-                                })
-                                matchReason = relatedWord ? `Related to "${relatedWord}"` : 'Related item'
-                              }
-                              
+                              const qty = dropdownQty[p.id!] ?? 1
                               return (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  className="w-full text-left px-3 py-2.5 text-sm hover:bg-muted flex justify-between items-start border-b last:border-b-0"
-                                  onMouseDown={() => { addToCart(p); setBarcodeInput(""); setSearchSuggestions([]) }}
-                                >
+                                <div key={p.id} className="flex items-center gap-2 px-3 py-2 border-b last:border-b-0 hover:bg-muted">
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium truncate">{p.name}</div>
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                      {matchReason} • Stock: {p.stock}
-                                    </div>
+                                    <div className="font-medium text-sm truncate">{p.name}</div>
+                                    <div className="text-xs text-muted-foreground">₱{effectivePrice(p).toFixed(2)} • Stock: {p.stock}{p.onSale && p.salePrice && <span className="ml-1 text-orange-500 font-medium">SALE</span>}</div>
                                   </div>
-                                  <div className="text-right ml-2 flex-shrink-0">
-                                    <div className="font-semibold text-sm">₱{effectivePrice(p).toFixed(2)}</div>
-                                    {p.onSale && p.salePrice && (
-                                      <div className="text-xs text-orange-500 font-medium">ON SALE</div>
-                                    )}
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
+                                    <span className="w-6 text-center text-sm font-bold">{qty}</span>
+                                    <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
+                                    <button type="button" className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold" onMouseDown={() => { for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }); setBarcodeInput(""); setSearchSuggestions([]) }}>Add</button>
                                   </div>
-                                </button>
+                                </div>
                               )
                             })}
                           </div>

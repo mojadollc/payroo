@@ -23,6 +23,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -34,3 +35,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 88sevenstore/
+
+/lib/generated/prisma

@@ -128,7 +128,7 @@ export const deleteCategory = async (id: string) => {
 }
 
 // Sales Services
-export const addSale = async (sale: Omit<Sale, "id" | "createdAt">, storeLocation?: { region: string; province: string; city: string; barangay: string; businessType: string }) => {
+export const addSale = async (sale: Omit<Sale, "id" | "createdAt">, storeLocation?: { region: string; province: string; city: string; barangay: string; businessType: string }, currentStock?: Record<string, number>) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured. Please set your environment variables and refresh the page.")
   const batch = writeBatch(db)
@@ -141,24 +141,39 @@ export const addSale = async (sale: Omit<Sale, "id" | "createdAt">, storeLocatio
   const dateStr = now.toISOString().split("T")[0]
   const monthStr = dateStr.slice(0, 7)
 
-  // Fetch ALL product docs in parallel instead of one-by-one
+  // Only fetch product docs we don't already have stock for
+  const itemsNeedingFetch = currentStock
+    ? sale.items.filter(item => currentStock[item.productId] === undefined)
+    : sale.items
+
   const productRefs = sale.items.map(item => doc(db, "products", item.productId))
-  const productSnaps = await Promise.all(productRefs.map(r => getDoc(r)))
+  let fetchedSnaps: Awaited<ReturnType<typeof getDoc>>[] = []
+
+  if (itemsNeedingFetch.length > 0) {
+    const refsToFetch = itemsNeedingFetch.map(item => doc(db, "products", item.productId))
+    fetchedSnaps = await Promise.all(refsToFetch.map(r => getDoc(r)))
+  }
+
+  // Build a map of productId -> stock
+  const stockMap: Record<string, number> = { ...(currentStock || {}) }
+  let fetchIdx = 0
+  for (const item of itemsNeedingFetch) {
+    const snap = fetchedSnaps[fetchIdx++]
+    if (snap.exists()) stockMap[item.productId] = snap.data().stock
+  }
 
   for (let i = 0; i < sale.items.length; i++) {
     const item = sale.items[i]
-    const productSnap = productSnaps[i]
-
-    if (productSnap.exists()) {
-      const currentStock = productSnap.data().stock
-      const newStock = currentStock - item.quantity
+    const currentStockVal = stockMap[item.productId]
+    if (currentStockVal !== undefined) {
+      const newStock = currentStockVal - item.quantity
       batch.update(productRefs[i], { stock: newStock, updatedAt: serverTimestamp() })
 
       const invTransRef = doc(collection(db, "inventoryTransactions"))
       batch.set(invTransRef, {
         productId: item.productId, productName: item.productName,
         type: "sale", quantity: -item.quantity,
-        previousStock: currentStock, newStock,
+        previousStock: currentStockVal, newStock,
         storeId: sid,
         notes: "Sale transaction", createdAt: serverTimestamp(),
       })
@@ -173,7 +188,9 @@ export const addSale = async (sale: Omit<Sale, "id" | "createdAt">, storeLocatio
         barangay: storeLocation.barangay,
         businessType: storeLocation.businessType,
         productName: item.productName,
-        category: productSnap?.data?.()?.category ?? "Uncategorized",
+        category: stockMap[item.productId] !== undefined
+          ? (fetchedSnaps.find((_, idx) => itemsNeedingFetch[idx]?.productId === item.productId)?.data?.()?.category ?? "Uncategorized")
+          : "Uncategorized",
         quantity: item.quantity,
         revenue: item.subtotal,
         hour: now.getHours(),
@@ -502,8 +519,8 @@ export const getUtangList = async (status?: UtangRecord["status"]) => {
 export const searchUtangByName = async (name: string) => {
   const db = getFirebaseDb()
   if (!db) throw new Error("Firebase not configured.")
-  // Search across ALL stores in the shared network
-  const snap = await getDocs(query(collection(db, "utang"), where("status", "in", ["active", "partial"]), orderBy("createdAt", "desc")))
+  // Search across ALL stores in the shared network — cap at 200 recent records
+  const snap = await getDocs(query(collection(db, "utang"), where("status", "in", ["active", "partial"]), orderBy("createdAt", "desc"), limit(200)))
   const lower = name.toLowerCase()
   return snap.docs.map(d => ({ id: d.id, ...d.data() }) as UtangRecord).filter(r => r.customerName.toLowerCase().includes(lower))
 }

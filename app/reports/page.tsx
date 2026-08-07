@@ -199,17 +199,14 @@ export default function ReportsPage() {
   const { features, tier } = useSubscription()
   const canExport = features.exportData && tier !== "basic"
   const [sales, setSales] = useState<Sale[]>([])
-  const [todaySales, setTodaySales] = useState<Sale[]>([])
   const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>([])
-  const [todayEwallet, setTodayEwallet] = useState<EWalletTransaction[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const hasLoaded = useRef(false)
+  const productsLoadedRef = useRef(false)
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(() => {
     const today = new Date()
-    const weekAgo = new Date(today)
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    return { from: weekAgo, to: today }
+    return { from: today, to: today }
   })
 
   if (!isFirebaseConfigured) {
@@ -222,21 +219,22 @@ export default function ReportsPage() {
   const loadData = async () => {
     if (!hasLoaded.current) setIsLoading(true)
     try {
-      const today = new Date()
-      const todayStart = new Date(today); todayStart.setHours(0, 0, 0, 0)
-      const todayEnd = new Date(today); todayEnd.setHours(23, 59, 59, 999)
-      const [salesData, ewalletData, todaySalesData, todayEwalletData, productsData] = await Promise.all([
+      // Only fetch products once — they don't change with date range
+      const productsPromise = productsLoadedRef.current
+        ? Promise.resolve(null)
+        : getProducts()
+
+      const [salesData, ewalletData, productsData] = await Promise.all([
         getSales(dateRange?.from, dateRange?.to),
         getEWalletTransactions(dateRange?.from, dateRange?.to),
-        getSales(todayStart, todayEnd),
-        getEWalletTransactions(todayStart, todayEnd),
-        getProducts(),
+        productsPromise,
       ])
       setSales(salesData)
       setEWalletTransactions(ewalletData)
-      setTodaySales(todaySalesData)
-      setTodayEwallet(todayEwalletData)
-      setProducts(productsData)
+      if (productsData) {
+        setProducts(productsData)
+        productsLoadedRef.current = true
+      }
     } catch (error) {
       console.error("[v0] Error loading reports data:", error)
     } finally {
@@ -263,7 +261,17 @@ export default function ReportsPage() {
   }
 
   const calculateToday = () => {
-    const activeTodaySales = todaySales.filter(s => s.status !== "voided")
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    // Derive today's data from already-loaded sales (no extra Firestore query)
+    const activeTodaySales = sales.filter(s => {
+      if (s.status === "voided") return false
+      const d = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt)
+      return d >= todayStart
+    })
+    const todayEwallet = ewalletTransactions.filter(t => {
+      const d = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt)
+      return d >= todayStart
+    })
     const gross = activeTodaySales.reduce((sum, s) => sum + s.total, 0)
     const profit = activeTodaySales.reduce((sum, s) =>
       sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)

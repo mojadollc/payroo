@@ -62,6 +62,7 @@ export default function EWalletPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const hasLoaded = useRef(false)
+  const settingsLoadedRef = useRef(false)
   const [period, setPeriod] = useState<Period>("today")
   const [showNewTransaction, setShowNewTransaction] = useState(false)
   const allLimitRef = useRef(50)
@@ -82,11 +83,10 @@ export default function EWalletPage() {
       const maxResults =
         period === "all" ? (opts?.nextLimit ?? allLimitRef.current) : undefined
 
-      // Settings are tiny — load once and reuse
-      const settingsPromise =
-        commissionSettings
-          ? Promise.resolve(commissionSettings)
-          : getCommissionSettings()
+      // Settings: load once and cache — never re-fetch on transaction refresh
+      const settingsPromise = settingsLoadedRef.current
+        ? Promise.resolve(null)
+        : getCommissionSettings()
 
       const [transactionsData, settingsData, cashinData] = await Promise.all([
         getEWalletTransactions(range.start, range.end, maxResults),
@@ -94,8 +94,11 @@ export default function EWalletPage() {
         getCashinTransactions(storeId, range.start, range.end, maxResults),
       ])
 
+      if (settingsData) {
+        setCommissionSettings(settingsData)
+        settingsLoadedRef.current = true
+      }
       setTransactions(transactionsData || [])
-      setCommissionSettings(settingsData || null)
       setCashinTransactions(cashinData || [])
 
       if (period === "all") {
@@ -112,8 +115,9 @@ export default function EWalletPage() {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
-  }, [period, commissionSettings])
+  }, [period])
 
+  // Single load on mount + whenever period changes
   useEffect(() => {
     hasLoaded.current = false
     allLimitRef.current = 50
@@ -411,7 +415,7 @@ export default function EWalletPage() {
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 {commissionSettings ? (
-                  <TransactionForm commissionSettings={commissionSettings} onSuccess={() => loadData()} />
+                  <TransactionForm commissionSettings={commissionSettings} onSuccess={() => { hasLoaded.current = false; loadData() }} />
                 ) : (
                   <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>
                 )}
@@ -473,6 +477,7 @@ export default function EWalletPage() {
             <TransactionForm
               commissionSettings={commissionSettings}
               onSuccess={() => {
+                hasLoaded.current = false
                 loadData()
                 setShowNewTransaction(false)
               }}

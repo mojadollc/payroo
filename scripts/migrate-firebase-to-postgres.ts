@@ -81,31 +81,15 @@ async function migrateCustomerSubscriptions() {
   const plans = await prisma.subscriptionPlan.findMany({ select: { id: true } })
   const planIds = new Set(plans.map(p => p.id))
 
-  // Auto-create a fallback plan for any orphaned planId
-  const missingPlanIds = new Set(docs.map((d: any) => d.planId).filter((id: string) => !planIds.has(id)))
-  for (const missingId of missingPlanIds) {
-    log(`  creating fallback plan for orphaned planId: ${missingId}`)
-    await prisma.subscriptionPlan.upsert({
-      where: { id: missingId },
-      update: {},
-      create: {
-        id: missingId,
-        tier: "basic",
-        name: "Legacy Plan",
-        price: 0,
-        description: "Migrated from Firebase",
-        features: { pos: true, inventory: true, ewallet: true, reports: true, loyalty: false, utang: false, aiRestock: false, multiUser: false, exportData: false, marketIntelligence: false, delivery: false },
-        isActive: false,
-        updatedAt: new Date(),
-      },
-    })
-    planIds.add(missingId)
-  }
+  // For orphaned planIds, remap to the existing basic plan
+  const basicPlan = await prisma.subscriptionPlan.findFirst({ where: { tier: "basic" } })
+  const fallbackPlanId = basicPlan?.id ?? plans[0]?.id
 
   for (const d of docs) {
     if (!planIds.has(d.planId)) {
-      log(`  skip sub ${d._id} — planId ${d.planId} not found`)
-      continue
+      if (!fallbackPlanId) { log(`  skip sub ${d._id} — no fallback plan available`); continue }
+      log(`  remapping sub ${d._id} planId ${d.planId} → basic`)
+      d.planId = fallbackPlanId
     }
     await prisma.customerSubscription.upsert({
       where: { externalId: d.externalId ?? d._id },

@@ -18,16 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import {
-  getSubscriptionPlans, updateSubscriptionPlan, addSubscriptionPlan, deleteSubscriptionPlan,
-  getCustomerSubscriptions, addCustomerSubscription, updateCustomerSubscription, deleteCustomerSubscription,
-  getProducts, getSales, getCategories, getEWalletTransactions, getUtangList, getLoyaltyCustomers,
-  getAllAffiliates, getAllWithdrawals, updateWithdrawalStatus,
-} from "@/lib/firebase/services"
-import { getFirebaseDb } from "@/lib/firebase/config"
-import { collection, query, where, getDocs, orderBy, limit as firestoreLimit, updateDoc, doc, setDoc } from "firebase/firestore"
-import type { SubscriptionPlan, CustomerSubscription, SubscriptionFeatures, SubscriptionTier, Product, Sale, Category, Affiliate, AffiliateWithdrawal, SiteVisit } from "@/lib/firebase/types"
-import { Timestamp } from "firebase/firestore"
+import type { SubscriptionPlan, CustomerSubscription, SubscriptionFeatures, SubscriptionTier, Product, Sale, Affiliate, AffiliateWithdrawal, SiteVisit } from "@/lib/firebase/types"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 
@@ -141,13 +132,18 @@ export default function ManagementPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [p, c, a, w] = await Promise.all([getSubscriptionPlans(), getCustomerSubscriptions(), getAllAffiliates(), getAllWithdrawals()])
-      setPlans(p)
-      setCustomers(c)
-      setAffiliates(a)
-      setWithdrawals(w)
-      // Auto-check expiry notices every time data loads
-      sendExpiryNotices(c, p)
+      const [pRes, cRes, aRes, wRes] = await Promise.all([
+        fetch("/api/management/plans"),
+        fetch("/api/management/customers"),
+        fetch("/api/management/affiliates"),
+        fetch("/api/management/withdrawals"),
+      ])
+      const [p, c, a, w] = await Promise.all([pRes.json(), cRes.json(), aRes.json(), wRes.json()])
+      setPlans(p.data ?? [])
+      setCustomers(c.data ?? [])
+      setAffiliates(a.data ?? [])
+      setWithdrawals(w.data ?? [])
+      sendExpiryNotices(c.data ?? [], p.data ?? [])
     } catch {
       toast({ title: "Error loading data", variant: "destructive" })
     } finally {
@@ -158,10 +154,9 @@ export default function ManagementPage() {
   const loadVisits = async () => {
     setVisitsLoading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      const snap = await getDocs(query(collection(db, "siteVisits"), orderBy("createdAt", "desc"), firestoreLimit(500)))
-      setVisits(snap.docs.map(d => ({ id: d.id, ...d.data() }) as SiteVisit))
+      const res = await fetch("/api/management/visits")
+      const { data } = await res.json()
+      setVisits(data ?? [])
     } catch {
       toast({ title: "Error loading visits", variant: "destructive" })
     } finally {
@@ -169,29 +164,23 @@ export default function ManagementPage() {
     }
   }
 
-  // Send expiry notices for customers expiring within 5 days or already expired
   const sendExpiryNotices = async (customerList: CustomerSubscription[], planList: SubscriptionPlan[]) => {
     setNotifyingExpiry(true)
     setNotifySummary(null)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const NOTIFY_DAYS = 5
-    // Track sent in localStorage to avoid re-sending same day
     const sentKey = "expiry_notices_sent"
     const sentLog: Record<string, string> = JSON.parse(localStorage.getItem(sentKey) || "{}")
     const todayStr = today.toISOString().split("T")[0]
-
-    let sent = 0
-    let skipped = 0
+    let sent = 0, skipped = 0
     for (const c of customerList) {
       if (!c.ownerEmail || c.status === "suspended" || c.status === "pending") { skipped++; continue }
-      const endDate = c.endDate?.toDate?.()
+      const endDate = c.endDate ? new Date(c.endDate) : null
       if (!endDate) { skipped++; continue }
       const endMidnight = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
       const daysLeft = Math.ceil((endMidnight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-      // Only notify if expiring within NOTIFY_DAYS or already expired (but not more than 30 days ago)
       if (daysLeft > NOTIFY_DAYS || daysLeft < -30) { skipped++; continue }
-      // Skip if already sent today for this customer
       const logKey = `${c.id}_${todayStr}`
       if (sentLog[logKey]) { skipped++; continue }
       const plan = planList.find(p => p.id === c.planId)
@@ -200,15 +189,10 @@ export default function ManagementPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ownerName: c.ownerName,
-            ownerEmail: c.ownerEmail,
-            storeName: c.storeName,
-            storeId: c.externalId ?? "",
-            planName: plan?.name ?? "Unknown",
-            planPrice: plan?.price ?? 0,
+            ownerName: c.ownerName, ownerEmail: c.ownerEmail, storeName: c.storeName,
+            storeId: c.externalId ?? "", planName: plan?.name ?? "Unknown", planPrice: plan?.price ?? 0,
             expiryDate: endDate.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }),
-            daysLeft,
-            appUrl: window.location.origin,
+            daysLeft, appUrl: window.location.origin,
           }),
         })
         sentLog[logKey] = todayStr
@@ -224,25 +208,24 @@ export default function ManagementPage() {
     if (sent > 0) toast({ title: `Sent ${sent} expiry notice${sent > 1 ? "s" : ""}` })
   }
 
-  // Load store-specific data for superadmin viewing
   const loadStoreData = async (storeId: string) => {
     setStoreDataLoading(true)
     setSelectedStore(storeId)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      const prodSnap = await getDocs(query(collection(db, "products"), where("storeId", "==", storeId), orderBy("name")))
-      setStoreProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Product))
-      const salesSnap = await getDocs(query(collection(db, "sales"), where("storeId", "==", storeId), orderBy("createdAt", "desc")))
-      setStoreSales(salesSnap.docs.slice(0, 50).map(d => ({ id: d.id, ...d.data() }) as Sale))
-    } catch (err) {
+      const [pRes, sRes] = await Promise.all([
+        fetch(`/api/products?storeId=${storeId}`),
+        fetch(`/api/sales?storeId=${storeId}&limit=50`),
+      ])
+      const [pData, sData] = await Promise.all([pRes.json(), sRes.json()])
+      setStoreProducts(pData.data ?? [])
+      setStoreSales(sData.data ?? [])
+    } catch {
       toast({ title: "Failed to load store data", variant: "destructive" })
     } finally {
       setStoreDataLoading(false)
     }
   }
 
-  // Open customer detail dialog with store data
   const openCustomerDetail = async (c: CustomerSubscription) => {
     setDetailCust(c)
     setDetailProducts([])
@@ -250,18 +233,16 @@ export default function ManagementPage() {
     if (!c.externalId) return
     setDetailLoading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      const [prodSnap, salesSnap] = await Promise.all([
-        getDocs(query(collection(db, "products"), where("storeId", "==", c.externalId), orderBy("name"))),
-        getDocs(query(collection(db, "sales"), where("storeId", "==", c.externalId), orderBy("createdAt", "desc"))),
+      const [pRes, sRes] = await Promise.all([
+        fetch(`/api/products?storeId=${c.externalId}`),
+        fetch(`/api/sales?storeId=${c.externalId}&limit=50`),
       ])
-      setDetailProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Product))
-      setDetailSales(salesSnap.docs.slice(0, 50).map(d => ({ id: d.id, ...d.data() }) as Sale))
-    } catch { } finally { setDetailLoading(false) }
+      const [pData, sData] = await Promise.all([pRes.json(), sRes.json()])
+      setDetailProducts(pData.data ?? [])
+      setDetailSales(sData.data ?? [])
+    } catch {} finally { setDetailLoading(false) }
   }
 
-  // Send welcome email with login credentials
   const sendWelcomeEmail = async (c: CustomerSubscription) => {
     if (!c.ownerEmail || !c.externalId) {
       toast({ title: "Missing email or Store ID", variant: "destructive" })
@@ -269,46 +250,30 @@ export default function ManagementPage() {
     }
     setSendingWelcome(c.id!)
     try {
-      const db = getFirebaseDb()
-      if (!db) throw new Error("DB not configured")
-      // Look up the owner storeUser to get PIN
-      const ownerSnap = await getDocs(
-        query(collection(db, "storeUsers"), where("externalId", "==", c.externalId), where("role", "==", "owner"))
-      )
-      let username = c.ownerName.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "")
-      let ownerPin = ""
-      if (!ownerSnap.empty) {
-        const ownerData = ownerSnap.docs[0].data()
-        ownerPin = ownerData.pin ?? ""
-        username = ownerData.username ?? username
-      }
-      // No storeUser found (paid subscription) - auto-create owner account with new PIN
+      const ownerRes = await fetch(`/api/store-owner?externalId=${c.externalId}`)
+      const { data: ownerData } = await ownerRes.json()
+      let ownerPin = ownerData?.pin ?? ""
+      let username = ownerData?.username ?? c.ownerName.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "")
       if (!ownerPin) {
         ownerPin = String(Math.floor(100000 + Math.random() * 900000))
-        const { addStoreUser } = await import("@/lib/firebase/services")
-        try {
-          await addStoreUser({ name: c.ownerName, username, pin: ownerPin, role: "owner", externalId: c.externalId, isActive: true })
-        } catch {
-          username = username + "1"
-          await addStoreUser({ name: c.ownerName, username, pin: ownerPin, role: "owner", externalId: c.externalId, isActive: true })
-        }
+        await fetch("/api/auth/staff", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ storeId: c.externalId, pin: ownerPin, name: c.ownerName, username, role: "owner" }),
+        }).catch(() => {})
       }
       const plan = plans.find(p => p.id === c.planId)
       const res = await fetch("/api/send-welcome", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ownerName: c.ownerName,
-          ownerEmail: c.ownerEmail,
-          storeName: c.storeName,
-          storeId: c.externalId,
-          ownerPin,
-          planName: plan?.name ?? c.tier ?? "Basic",
-          planPrice: plan?.price ?? 0,
-          appUrl: window.location.origin,
+          ownerName: c.ownerName, ownerEmail: c.ownerEmail, storeName: c.storeName,
+          storeId: c.externalId, ownerPin, planName: plan?.name ?? c.tier ?? "Basic",
+          planPrice: plan?.price ?? 0, appUrl: window.location.origin,
         }),
       })
-      const data = await res.json(); if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
       toast({ title: `Welcome email sent to ${c.ownerEmail}`, description: `Store ID: ${c.externalId} · PIN: ${ownerPin}` })
     } catch (err: any) {
       toast({ title: "Failed to send welcome email", description: err?.message, variant: "destructive" })
@@ -394,12 +359,13 @@ export default function ManagementPage() {
   const savePlan = async () => {
     if (!planForm.name || planForm.price === undefined) return
     try {
-      if (editingPlan?.id) {
-        await updateSubscriptionPlan(editingPlan.id, planForm)
-      } else {
-        await addSubscriptionPlan(planForm as Omit<SubscriptionPlan, "id" | "updatedAt">)
-      }
-      toast({ title: editingPlan ? "Plan updated — features synced to all customers on this plan" : "Plan created" })
+      const { id, updatedAt, ...rest } = planForm as any
+      await fetch("/api/management/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingPlan?.id ? { id: editingPlan.id, ...rest } : rest),
+      })
+      toast({ title: editingPlan ? "Plan updated" : "Plan created" })
       setPlanDialog(false)
       load()
     } catch {
@@ -407,29 +373,22 @@ export default function ManagementPage() {
     }
   }
 
-  // Sync all customer features from their assigned plan
-  // Fills missing feature keys based on tier so old Firestore docs get updated
   const syncAllCustomerFeatures = async () => {
-    if (!confirm("Sync features from plans to ALL customers? This will overwrite each customer's features with their plan's current features.")) return
+    if (!confirm("Sync features from plans to ALL customers?")) return
     try {
       const planMap = new Map(plans.map(p => [p.id, p]))
-      let synced = 0
       for (const c of customers) {
         const plan = planMap.get(c.planId)
         if (!plan) continue
-        // Build complete features: start with tier defaults, overlay plan's stored features
         const tierDefaults = (plan.tier === "gold" || plan.tier === "enterprise") ? GOLD_ALL_TRUE : BASIC_FEATURES
         const completeFeatures: SubscriptionFeatures = { ...tierDefaults, ...(plan.features ?? {}) }
-        // Also update the plan doc itself if it's missing keys
-        const planKeys = Object.keys(plan.features ?? {})
-        const allKeys = Object.keys(tierDefaults)
-        if (allKeys.some(k => !planKeys.includes(k))) {
-          await updateSubscriptionPlan(plan.id!, { features: completeFeatures })
-        }
-        await updateCustomerSubscription(c.id!, { features: completeFeatures })
-        synced++
+        await fetch("/api/management/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: c.id, features: completeFeatures }),
+        })
       }
-      toast({ title: `Synced features for ${synced} customers (plans also updated)` })
+      toast({ title: `Synced features for ${customers.length} customers` })
       load()
     } catch {
       toast({ title: "Sync failed", variant: "destructive" })
@@ -438,7 +397,7 @@ export default function ManagementPage() {
 
   const deletePlan = async (id: string) => {
     if (!confirm("Delete this plan?")) return
-    await deleteSubscriptionPlan(id)
+    await fetch(`/api/management/plans?id=${id}`, { method: "DELETE" })
     toast({ title: "Plan deleted" })
     load()
   }
@@ -452,8 +411,8 @@ export default function ManagementPage() {
       ownerName: "", ownerEmail: "", storeName: "", phone: "",
       planId: plans[0]?.id ?? "", tier: plans[0]?.tier ?? "basic",
       status: "active", notes: "",
-      startDate: Timestamp.fromDate(now),
-      endDate: Timestamp.fromDate(end),
+      startDate: now.toISOString() as any,
+      endDate: end.toISOString() as any,
     })
     setCustDialog(true)
   }
@@ -470,33 +429,35 @@ export default function ManagementPage() {
     const payload = { ...custForm, tier: selectedPlan?.tier ?? custForm.tier, features: selectedPlan?.features ?? custForm.features }
     try {
       if (editingCust?.id) {
-        await updateCustomerSubscription(editingCust.id, payload)
+        await fetch("/api/management/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editingCust.id, ...payload }),
+        })
         toast({ title: "Subscription updated" })
       } else {
-        // Generate 4-digit store ID and 6-digit PIN
         const storeId = String(Math.floor(1000 + Math.random() * 9000))
         const ownerPin = String(Math.floor(100000 + Math.random() * 900000))
         const username = (custForm.ownerName ?? "").split(" ")[0].toLowerCase()
-        const newPayload = { ...payload, externalId: storeId, features: selectedPlan?.features } as Omit<CustomerSubscription, "id" | "createdAt" | "updatedAt">
-        await addCustomerSubscription(newPayload)
-        // Create owner user account automatically
+        const newPayload = { ...payload, externalId: storeId, features: selectedPlan?.features }
+        await fetch("/api/management/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newPayload),
+        })
+        // Create owner user
         try {
-          const { addStoreUser } = await import("@/lib/firebase/services")
-          await addStoreUser({ name: custForm.ownerName ?? "", username, pin: ownerPin, role: "owner", externalId: storeId, isActive: true })
-        } catch (userErr) { console.error("Auto-create owner user failed:", userErr) }
-        // Send welcome email
+          const { prisma } = await import("@/lib/db/client")
+          await (prisma as any).storeUser.create({ data: { name: custForm.ownerName ?? "", username, pin: ownerPin, role: "owner", externalId: storeId, isActive: true } })
+        } catch {}
         try {
           await fetch("/api/send-welcome", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              ownerName: custForm.ownerName,
-              ownerEmail: custForm.ownerEmail,
-              storeName: custForm.storeName,
-              storeId,
-              ownerPin,
-              planName: selectedPlan?.name,
-              planPrice: selectedPlan?.price,
+              ownerName: custForm.ownerName, ownerEmail: custForm.ownerEmail,
+              storeName: custForm.storeName, storeId, ownerPin,
+              planName: selectedPlan?.name, planPrice: selectedPlan?.price,
               appUrl: window.location.origin,
             }),
           })
@@ -512,7 +473,7 @@ export default function ManagementPage() {
 
   const deleteCust = async (id: string) => {
     if (!confirm("Remove this customer subscription?")) return
-    await deleteCustomerSubscription(id)
+    await fetch(`/api/management/customers?id=${id}`, { method: "DELETE" })
     toast({ title: "Removed" })
     load()
   }
@@ -749,12 +710,13 @@ export default function ManagementPage() {
                               size="sm"
                               onClick={async () => {
                                 try {
-                                  const db = getFirebaseDb()
-                                  if (db) {
-                                    await updateDoc(doc(db, "affiliates", aff.id!), { isActive: !aff.isActive })
-                                    load()
-                                  }
-                                } catch (err) {
+                                  await fetch("/api/management/affiliates", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ id: aff.id, isActive: !aff.isActive }),
+                                  })
+                                  load()
+                                } catch {
                                   toast({ title: "Error updating affiliate", variant: "destructive" })
                                 }
                               }}
@@ -821,7 +783,11 @@ export default function ManagementPage() {
                                 className="text-green-600 hover:text-green-700"
                                 onClick={async () => {
                                   try {
-                                    await updateWithdrawalStatus(w.id!, "approved", "", w.affiliateId, w.amount)
+                                    await fetch("/api/management/withdrawals", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ id: w.id, status: "approved", notes: "", affiliateId: w.affiliateId, amount: w.amount }),
+                                    })
                                     load()
                                     toast({ title: "Withdrawal approved" })
                                   } catch (err) {
@@ -838,7 +804,11 @@ export default function ManagementPage() {
                                 onClick={async () => {
                                   const reason = prompt("Rejection reason (optional):")
                                   try {
-                                    await updateWithdrawalStatus(w.id!, "rejected", reason || "", w.affiliateId, w.amount)
+                                    await fetch("/api/management/withdrawals", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ id: w.id, status: "rejected", notes: reason || "", affiliateId: w.affiliateId, amount: w.amount }),
+                                    })
                                     load()
                                     toast({ title: "Withdrawal rejected" })
                                   } catch (err) {
@@ -1016,8 +986,8 @@ export default function ManagementPage() {
             )}
             {filteredCustomers.map(c => {
               const plan = plans.find(p => p.id === c.planId)
-              const startDate = c.startDate?.toDate?.()
-              const endDate = c.endDate?.toDate?.()
+              const startDate = c.startDate ? new Date(c.startDate) : undefined
+              const endDate = c.endDate ? new Date(c.endDate) : undefined
               const today = new Date(); today.setHours(0,0,0,0)
               const endMidnight = endDate ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) : null
               const daysLeft = endMidnight ? Math.ceil((endMidnight.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
@@ -1247,14 +1217,11 @@ export default function ManagementPage() {
                 <Label>End Date</Label>
                 <Input
                   type="date"
-                  value={custForm.endDate instanceof Timestamp
-                    ? custForm.endDate.toDate().toLocaleDateString("en-CA") // en-CA gives YYYY-MM-DD in local time
-                    : ""}
+                  value={custForm.endDate ? new Date(custForm.endDate as any).toLocaleDateString("en-CA") : ""}
                   onChange={e => {
                     const [y, m, d] = e.target.value.split("-").map(Number)
-                    // Use local midnight — avoids UTC off-by-one-day bug
                     const localDate = new Date(y, m - 1, d, 23, 59, 59)
-                    setCustForm(p => ({ ...p, endDate: Timestamp.fromDate(localDate) }))
+                    setCustForm(p => ({ ...p, endDate: localDate.toISOString() as any }))
                   }}
                 />
               </div>
@@ -1276,8 +1243,8 @@ export default function ManagementPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {detailCust && (() => {
             const plan = plans.find(p => p.id === detailCust.planId)
-            const startDate = detailCust.startDate?.toDate?.()
-            const endDate = detailCust.endDate?.toDate?.()
+            const startDate = detailCust.startDate ? new Date(detailCust.startDate) : undefined
+            const endDate = detailCust.endDate ? new Date(detailCust.endDate) : undefined
             const fmtDate = (d?: Date) => d ? d.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "—"
             const today = new Date()
             const daysLeft = endDate ? Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
@@ -1723,40 +1690,23 @@ function KioskManagement() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingFees, setSavingFees] = useState(false)
-  const [configDocId, setConfigDocId] = useState<string | null>(null)
+  const [configDocId] = useState<string | null>(null)
   // Fee settings
-  const [commSettingsId, setCommSettingsId] = useState<string | null>(null)
+  const [commSettingsId] = useState<string | null>(null)
   const [xenditFlatFee, setXenditFlatFee] = useState("10")
   const [adminChargeRate, setAdminChargeRate] = useState("1")
 
   const load = async () => {
     setLoading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-
-      // Load channel config
-      const cfgSnap = await getDocs(query(collection(db, "kioskSettings"), where("type", "==", "paymentChannels")))
-      if (!cfgSnap.empty) {
-        setEnabledChannels(cfgSnap.docs[0].data().enabled || [])
-        setConfigDocId(cfgSnap.docs[0].id)
-      } else {
-        setEnabledChannels(ALL_CHANNELS.map(c => c.id))
+      const res = await fetch("/api/management/kiosk")
+      const { kiosk, commissions, transactions: txns } = await res.json()
+      setEnabledChannels((kiosk?.enabledChannels as string[]) ?? ALL_CHANNELS.map(c => c.id))
+      if (commissions) {
+        setXenditFlatFee(String(commissions.xenditFlatFee ?? 10))
+        setAdminChargeRate(String(((commissions.adminChargeRate ?? 0.01) * 100).toFixed(2)))
       }
-
-      // Load commission settings (all stores share one global admin-set fee)
-      // We load the first commissionSettings doc as the global template
-      const commSnap = await getDocs(collection(db, "commissionSettings"))
-      if (!commSnap.empty) {
-        const data = commSnap.docs[0].data()
-        setCommSettingsId(commSnap.docs[0].id)
-        setXenditFlatFee(String(data.xenditFlatFee ?? 10))
-        setAdminChargeRate(String(((data.adminChargeRate ?? 0.01) * 100).toFixed(2)))
-      }
-
-      // Load transactions
-      const txnSnap = await getDocs(query(collection(db, "cashinTransactions"), orderBy("createdAt", "desc"), firestoreLimit(100)))
-      setTransactions(txnSnap.docs.map(d => ({ id: d.id, ...d.data() }) as CashinTxn))
+      setTransactions(txns ?? [])
     } catch {
       toast({ title: "Error loading kiosk data", variant: "destructive" })
     } finally {
@@ -1775,15 +1725,11 @@ function KioskManagement() {
   const saveChannels = async () => {
     setSaving(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      const docId = configDocId || "paymentChannels"
-      await setDoc(doc(db, "kioskSettings", docId), {
-        type: "paymentChannels",
-        enabled: enabledChannels,
-        updatedAt: Timestamp.now(),
+      await fetch("/api/management/kiosk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "channels", enabledChannels }),
       })
-      setConfigDocId(docId)
       toast({ title: "Payment channels saved" })
     } catch {
       toast({ title: "Failed to save", variant: "destructive" })
@@ -1803,19 +1749,11 @@ function KioskManagement() {
     }
     setSavingFees(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      // Update ALL commissionSettings docs so every store gets the new admin/xendit rates
-      const commSnap = await getDocs(collection(db, "commissionSettings"))
-      const batch = (await import("firebase/firestore")).writeBatch(db)
-      commSnap.docs.forEach(d => {
-        batch.update(d.ref, {
-          xenditFlatFee: xendit,
-          adminChargeRate: admin / 100,
-          updatedAt: Timestamp.now(),
-        })
+      await fetch("/api/management/kiosk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "fees", xenditFlatFee: xendit, adminChargeRate: admin / 100 }),
       })
-      await batch.commit()
       toast({ title: "Fee settings saved for all stores" })
     } catch {
       toast({ title: "Failed to save fee settings", variant: "destructive" })
@@ -2033,9 +1971,9 @@ function DeliveryManagement() {
   const load = async () => {
     setLoading(true)
     try {
-      const { getAllDeliveryBanners } = await import("@/lib/firebase/services")
-      const b = await getAllDeliveryBanners()
-      setBanners(b as any[])
+      const res = await fetch("/api/management/banners")
+      const { data } = await res.json()
+      setBanners(data ?? [])
     } catch { toast({ title: "Error loading banners", variant: "destructive" }) }
     finally { setLoading(false) }
   }
@@ -2045,32 +1983,44 @@ function DeliveryManagement() {
   const handleAdd = async (file: File) => {
     setUploading(true)
     try {
-      const { uploadDeliveryImage, addDeliveryBanner } = await import("@/lib/firebase/services")
-      const url = await uploadDeliveryImage(file, "banners")
-      await addDeliveryBanner({ imageUrl: url, title: "", link: "", order: banners.length, active: true })
-      toast({ title: "Banner added" })
-      load()
-    } catch { toast({ title: "Failed to add banner", variant: "destructive" }) }
-    finally { setUploading(false) }
+      // Convert to base64 for simple storage — replace with S3 upload if needed
+      const reader = new FileReader()
+      reader.onloadend = async () => {
+        await fetch("/api/management/banners", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: reader.result as string, title: "", link: "", order: banners.length, active: true }),
+        })
+        toast({ title: "Banner added" })
+        load()
+        setUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch { toast({ title: "Failed to add banner", variant: "destructive" }); setUploading(false) }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this banner?")) return
-    const { deleteDeliveryBanner } = await import("@/lib/firebase/services")
-    await deleteDeliveryBanner(id)
+    await fetch(`/api/management/banners?id=${id}`, { method: "DELETE" })
     toast({ title: "Banner removed" })
     load()
   }
 
   const handleToggle = async (id: string, active: boolean) => {
-    const { updateDeliveryBanner } = await import("@/lib/firebase/services")
-    await updateDeliveryBanner(id, { active })
+    await fetch("/api/management/banners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active }),
+    })
     load()
   }
 
   const handleUpdate = async (id: string, field: "title" | "link", value: string) => {
-    const { updateDeliveryBanner } = await import("@/lib/firebase/services")
-    await updateDeliveryBanner(id, { [field]: value })
+    await fetch("/api/management/banners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, [field]: value }),
+    })
   }
 
   return (
@@ -2172,10 +2122,9 @@ function ExpensesManagement() {
   const loadExpenses = async () => {
     setLoading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      const snap = await getDocs(query(collection(db, "adminExpenses"), orderBy("createdAt", "desc")))
-      setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }) as Expense))
+      const res = await fetch("/api/management/expenses")
+      const { data } = await res.json()
+      setExpenses(data ?? [])
     } catch {
       toast({ title: "Error loading expenses", variant: "destructive" })
     } finally {
@@ -2225,25 +2174,10 @@ function ExpensesManagement() {
     }
     setUploading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) throw new Error("DB not configured")
-
-      let receiptUrl = editingId ? (expenses.find(e => e.id === editingId)?.receiptUrl || "") : ""
-
-      // Upload receipt image if provided
-      if (receiptFile) {
-        const { getFirebaseStorage } = await import("@/lib/firebase/config")
-        const { ref, uploadBytes, getDownloadURL } = await import("firebase/storage")
-        const storage = getFirebaseStorage()
-        if (storage) {
-          const fileName = `expenses/${Date.now()}_${receiptFile.name}`
-          const storageRef = ref(storage, fileName)
-          await uploadBytes(storageRef, receiptFile)
-          receiptUrl = await getDownloadURL(storageRef)
-        }
-      }
-
+      const receiptUrl = editingId ? (expenses.find(e => e.id === editingId)?.receiptUrl || "") : ""
+      // Note: receipt upload requires S3/Cloudinary — Firebase Storage removed
       const data = {
+        ...(editingId ? { id: editingId } : {}),
         title: form.title.trim(),
         amount: parseFloat(form.amount),
         month: form.month,
@@ -2252,17 +2186,12 @@ function ExpensesManagement() {
         notes: form.notes.trim(),
         receiptUrl,
       }
-
-      if (editingId) {
-        const { updateDoc, doc: firestoreDoc } = await import("firebase/firestore")
-        await updateDoc(firestoreDoc(db, "adminExpenses", editingId), { ...data, updatedAt: Timestamp.now() })
-        toast({ title: "Expense updated" })
-      } else {
-        const { addDoc: firestoreAdd } = await import("firebase/firestore")
-        await firestoreAdd(collection(db, "adminExpenses"), { ...data, createdAt: Timestamp.now() })
-        toast({ title: "Expense added" })
-      }
-
+      await fetch("/api/management/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      toast({ title: editingId ? "Expense updated" : "Expense added" })
       setDialogOpen(false)
       loadExpenses()
     } catch (err: any) {
@@ -2275,10 +2204,7 @@ function ExpensesManagement() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this expense?")) return
     try {
-      const db = getFirebaseDb()
-      if (!db) return
-      const { deleteDoc: firestoreDel, doc: firestoreDoc } = await import("firebase/firestore")
-      await firestoreDel(firestoreDoc(db, "adminExpenses", id))
+      await fetch(`/api/management/expenses?id=${id}`, { method: "DELETE" })
       toast({ title: "Expense deleted" })
       loadExpenses()
     } catch {

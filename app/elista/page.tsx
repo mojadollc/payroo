@@ -9,8 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { db } from "@/lib/firebase/config"
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, serverTimestamp } from "firebase/firestore"
 import { offlineGetElistas, offlineAddElista, offlineUpdateElista, offlineDeleteElista } from "@/lib/offline/services"
 import { isOnline } from "@/lib/offline/sync-engine"
 
@@ -47,28 +45,14 @@ export default function EListaPage() {
 
   useEffect(() => {
     if (!user?.id) return
-
-    // Load from IndexedDB first (works offline)
     offlineGetElistas(user.id).then(data => {
       if (data.length > 0) setListas(data as Lista[])
     })
-
-    // If online, also subscribe to real-time updates
-    if (!db || !isOnline()) return
-    const q = query(collection(db, "elistas"), where("userId", "==", user.id))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs
-        .filter(d => !deletedIds.has(d.id))
-        .map(d => ({ id: d.id, ...d.data() } as Lista))
-      setListas(data.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()))
-      // Keep IndexedDB in sync with Firestore snapshot
-      snapshot.docChanges().forEach(change => {
-        if (change.type === "removed") {
-          offlineDeleteElista(change.doc.id).catch(() => {})
-        }
-      })
-    })
-    return () => unsubscribe()
+    if (!isOnline()) return
+    fetch(`/api/elistas?userId=${user.id}`)
+      .then(r => r.json())
+      .then(({ data }) => { if (data?.length) setListas(data) })
+      .catch(() => {})
   }, [user])
 
   const resetForm = () => {
@@ -118,15 +102,14 @@ export default function EListaPage() {
         updatedAt: { toMillis: () => Date.now() } as any,
       }
 
-      if (isOnline() && db) {
-        const docRef = await addDoc(collection(db, "elistas"), {
-          title: title.trim(),
-          items: validItems,
-          userId: user.id,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+      if (isOnline()) {
+        const res = await fetch("/api/elistas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: title.trim(), items: validItems, userId: user.id }),
         })
-        newLista.id = docRef.id
+        const { data } = await res.json()
+        newLista.id = data.id
       } else {
         await offlineAddElista({ title: title.trim(), items: validItems, userId: user.id })
         const fresh = await offlineGetElistas(user.id)
@@ -137,7 +120,6 @@ export default function EListaPage() {
         setSubmitting(false)
         return
       }
-      // Optimistic: add to state immediately
       setListas(prev => [newLista, ...prev])
       toast({ title: "Success", description: "e-Lista created" })
       setIsCreateOpen(false)
@@ -165,11 +147,11 @@ export default function EListaPage() {
     }
     setSubmitting(true)
     try {
-      if (isOnline() && db) {
-        await updateDoc(doc(db, "elistas", editingLista.id), {
-          title: title.trim(),
-          items: validItems,
-          updatedAt: serverTimestamp(),
+      if (isOnline()) {
+        await fetch("/api/elistas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editingLista.id, title: title.trim(), items: validItems }),
         })
       } else {
         await offlineUpdateElista(editingLista.id, { title: title.trim(), items: validItems })
@@ -191,13 +173,11 @@ export default function EListaPage() {
     if (!confirm("Delete this e-Lista?")) return
     // Track deleted ID so snapshot never re-adds it
     deletedIds.add(id)
-    // Immediately remove from UI
     setListas(prev => prev.filter(l => l.id !== id))
     try {
-      // Always delete from IndexedDB first so cache never restores it
       await offlineDeleteElista(id)
-      if (isOnline() && db) {
-        await deleteDoc(doc(db, "elistas", id))
+      if (isOnline()) {
+        await fetch(`/api/elistas?id=${id}`, { method: "DELETE" })
       }
       toast({ title: "Deleted", description: "e-Lista removed" })
     } catch (error) {

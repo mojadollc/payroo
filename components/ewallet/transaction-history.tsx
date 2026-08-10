@@ -3,10 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowDownToLine, ArrowUpFromLine, Clock, Signal, Smartphone, Trash2 } from "lucide-react"
-import { deleteDoc, doc } from "firebase/firestore"
-import { getFirebaseDb } from "@/lib/firebase/config"
 import type { EWalletTransaction } from "@/lib/firebase/types"
-import type { Timestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 
 interface TransactionHistoryProps {
@@ -21,8 +18,8 @@ interface TransactionHistoryProps {
   emptyHint?: string
 }
 
-function fmtDate(timestamp: Timestamp | any) {
-  const date = timestamp?.toDate?.() ?? new Date(timestamp)
+function fmtDate(timestamp: any) {
+  const date = timestamp instanceof Date ? timestamp : (timestamp?.toDate?.() ?? new Date(timestamp))
   return new Intl.DateTimeFormat("en-PH", {
     month: "short",
     day: "numeric",
@@ -47,9 +44,8 @@ export function TransactionHistory({
   const handleDeleteManual = async (id: string) => {
     if (!confirm("Delete this transaction? This cannot be undone.")) return
     try {
-      const db = getFirebaseDb()
-      if (!db) throw new Error("DB not configured")
-      await deleteDoc(doc(db, "ewalletTransactions", id))
+      const res = await fetch(`/api/ewallet-transactions?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed")
       toast({ title: "Transaction deleted" })
       onRefresh?.()
     } catch {

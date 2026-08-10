@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { db } from "@/lib/firebase/config"
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, serverTimestamp, orderBy } from "firebase/firestore"
 
 interface ChecklistItem {
   text: string
@@ -39,12 +37,10 @@ export default function ChecklistPage() {
 
   useEffect(() => {
     if (!user?.id) return
-    const q = query(collection(db, "checklists"), where("userId", "==", user.id))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Checklist))
-      setChecklists(data.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)))
-    })
-    return () => unsubscribe()
+    fetch(`/api/checklists?userId=${user.id}`)
+      .then(r => r.json())
+      .then(({ data }) => setChecklists((data ?? []).sort((a: Checklist, b: Checklist) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())))
+      .catch(() => {})
   }, [user])
 
   const handleCreate = async () => {
@@ -58,14 +54,13 @@ export default function ChecklistPage() {
       return
     }
     try {
-      await addDoc(collection(db, "checklists"), {
-        title: title.trim(),
-        items: validItems,
-        status: "active",
-        userId: user.id,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const res = await fetch("/api/checklists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), items: validItems, status: "active", userId: user.id }),
       })
+      const { data } = await res.json()
+      setChecklists(prev => [data, ...prev])
       toast({ title: "Checklist created" })
       setShowCreate(false)
       setTitle("")
@@ -75,48 +70,46 @@ export default function ChecklistPage() {
     }
   }
 
+  const updateChecklist = async (id: string, data: Partial<Checklist>) => {
+    await fetch("/api/checklists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...data }),
+    })
+    setChecklists(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
+  }
+
   const toggleItem = async (checklist: Checklist, index: number) => {
     if (!checklist.id) return
     const updated = [...checklist.items]
     updated[index] = { ...updated[index], done: !updated[index].done }
     const allDone = updated.every(i => i.done)
-    await updateDoc(doc(db, "checklists", checklist.id), {
-      items: updated,
-      status: allDone ? "done" : "active",
-      updatedAt: serverTimestamp(),
-    })
+    await updateChecklist(checklist.id, { items: updated, status: allDone ? "done" : "active" })
   }
 
   const markAllDone = async (checklist: Checklist) => {
     if (!checklist.id) return
     const updated = checklist.items.map(i => ({ ...i, done: true }))
-    await updateDoc(doc(db, "checklists", checklist.id), {
-      items: updated,
-      status: "done",
-      updatedAt: serverTimestamp(),
-    })
+    await updateChecklist(checklist.id, { items: updated, status: "done" })
     toast({ title: "✅ Checklist completed!" })
   }
 
   const resetChecklist = async (checklist: Checklist) => {
     if (!checklist.id) return
     const updated = checklist.items.map(i => ({ ...i, done: false }))
-    await updateDoc(doc(db, "checklists", checklist.id), {
-      items: updated,
-      status: "active",
-      updatedAt: serverTimestamp(),
-    })
+    await updateChecklist(checklist.id, { items: updated, status: "active" })
   }
 
   const archiveChecklist = async (checklist: Checklist) => {
     if (!checklist.id) return
-    await updateDoc(doc(db, "checklists", checklist.id), { status: "archived", updatedAt: serverTimestamp() })
+    await updateChecklist(checklist.id, { status: "archived" })
     toast({ title: "Archived" })
   }
 
   const deleteChecklist = async (id: string) => {
     if (!confirm("Delete this checklist?")) return
-    await deleteDoc(doc(db, "checklists", id))
+    await fetch(`/api/checklists?id=${id}`, { method: "DELETE" })
+    setChecklists(prev => prev.filter(c => c.id !== id))
   }
 
   // OCR: Take photo / pick image → extract text → create checklist items

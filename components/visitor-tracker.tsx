@@ -2,11 +2,9 @@
 
 import { useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { getFirebaseDb } from "@/lib/firebase/config"
-import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 const SESSION_KEY = "visitor_tracked"
-const TRACK_INTERVAL_MS = 30 * 60 * 1000 // track at most once per 30 min per page
+const TRACK_INTERVAL_MS = 30 * 60 * 1000
 
 function isPWAInstalled(): boolean {
   if (typeof window === "undefined") return false
@@ -20,7 +18,6 @@ export function VisitorTracker() {
   const pathname = usePathname()
 
   useEffect(() => {
-    // Skip tracking on management page
     if (pathname?.startsWith("/management")) return
 
     const isPWA = isPWAInstalled()
@@ -34,20 +31,20 @@ export function VisitorTracker() {
         if (!res.ok) return
         const geo = await res.json()
 
-        const db = getFirebaseDb()
-        if (!db) return
-
-        await addDoc(collection(db, "siteVisits"), {
-          ip: geo.ip || "unknown",
-          country: geo.country_name || "Unknown",
-          countryCode: geo.country_code || "XX",
-          city: geo.city || "Unknown",
-          region: geo.region || "Unknown",
-          page: pathname || "/",
-          referrer: document.referrer || "",
-          userAgent: navigator.userAgent || "",
-          isPWA,
-          createdAt: serverTimestamp(),
+        await fetch("/api/visitor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ip: geo.ip || "unknown",
+            country: geo.country_name || "Unknown",
+            countryCode: geo.country_code || "XX",
+            city: geo.city || "Unknown",
+            region: geo.region || "Unknown",
+            page: pathname || "/",
+            referrer: document.referrer || "",
+            userAgent: navigator.userAgent || "",
+            isPWA,
+          }),
         })
 
         sessionStorage.setItem(trackKey, String(Date.now()))

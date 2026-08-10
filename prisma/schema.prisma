@@ -706,6 +706,63 @@ model SiteVisit {
   @@map("site_visits")
 }
 
+// ─── Checklists ──────────────────────────────────────────────────────────────
+
+model Checklist {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  items     Json     // { text: string, done: boolean }[]
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("checklists")
+}
+
+// ─── Elistas ──────────────────────────────────────────────────────────────────
+
+model Elista {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  items     Json     // { name, qty, price, amount, notes }[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("elistas")
+}
+
+// ─── Admin Expenses ───────────────────────────────────────────────────────────
+
+model AdminExpense {
+  id         String   @id @default(uuid())
+  title      String
+  amount     Float
+  month      String
+  year       Int
+  category   String   @default("Miscellaneous")
+  notes      String   @default("")
+  receiptUrl String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([month, year])
+  @@map("admin_expenses")
+}
+
+// ─── Kiosk Settings ───────────────────────────────────────────────────────────
+
+model KioskSettings {
+  id              String   @id @default(uuid())
+  enabledChannels Json     @default("[]")
+  updatedAt       DateTime @updatedAt
+
+  @@map("kiosk_settings")
+}
+
 // ─── PIN Resets ───────────────────────────────────────────────────────────────
 // Was a TODO in reset-owner-pin/route.ts — now properly implemented
 

@@ -20,3 +20,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 })
+  await prisma.eWalletTransaction.delete({ where: { id } })
+  return NextResponse.json({ ok: true })
+}

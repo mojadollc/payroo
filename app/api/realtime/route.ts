@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import createSubscriber from "pg-listen"
+import { Client } from "pg"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -15,35 +15,31 @@ export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get("storeId")
   if (!storeId) return new Response("Missing storeId", { status: 400 })
 
-  const subscriber = createSubscriber({ connectionString: process.env.DATABASE_URL! })
+  const client = new Client({ connectionString: process.env.DATABASE_URL })
+  await client.connect()
+  for (const ch of CHANNELS) await client.query(`LISTEN "${ch}"`)
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
-    async start(controller) {
-      const send = (data: object) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-      }
-
-      subscriber.notifications.on("*", (payload: string, channel: string) => {
+    start(controller) {
+      client.on("notification", (msg) => {
         try {
-          const parsed = JSON.parse(payload)
-          if (parsed.storeId === storeId) {
-            send({ channel, ...parsed })
+          const payload = JSON.parse(msg.payload ?? "{}")
+          if (payload.storeId === storeId) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ channel: msg.channel, ...payload })}\n\n`)
+            )
           }
         } catch {}
       })
 
-      await subscriber.connect()
-      for (const ch of CHANNELS) await subscriber.listenTo(ch)
-
-      // heartbeat every 25s to keep connection alive
       const heartbeat = setInterval(() => {
         try { controller.enqueue(encoder.encode(": ping\n\n")) } catch {}
       }, 25_000)
 
       req.signal.addEventListener("abort", async () => {
         clearInterval(heartbeat)
-        await subscriber.close()
+        await client.end()
         controller.close()
       })
     },

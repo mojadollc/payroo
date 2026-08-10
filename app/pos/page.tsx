@@ -12,10 +12,6 @@ import { CheckoutDialog } from "@/components/pos/checkout-dialog"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
-import { getProductByBarcode, getProducts, onProductsSnapshot } from "@/lib/firebase/services"
-import type { Product } from "@/lib/firebase/types"
-import { useToast } from "@/hooks/use-toast"
-import { isFirebaseConfigured } from "@/lib/firebase/config"
 import { cacheProducts, getCachedProducts, isOnline } from "@/lib/offline-sync"
 import { localPutMany, localGetByStoreId } from "@/lib/offline/store"
 import { useBusinessConfig } from "@/hooks/use-business-config"
@@ -23,6 +19,8 @@ import { useSubscription } from "@/hooks/use-subscription"
 import { useHardwareScanner } from "@/hooks/use-hardware-scanner"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { DefaultProductImage } from "@/components/ui/default-product-image"
+import { getStoreId } from "@/lib/store-id"
+import type { Product } from "@/lib/firebase/types"
 import Link from "next/link"
 
 interface CartItem extends Product {
@@ -140,69 +138,45 @@ export default function POSPage() {
     return shuffled
   }
 
-  // Real-time product listener — stock updates from desktop push to mobile instantly
+  // Load products on mount — fetch from Postgres API
   useEffect(() => {
-    if (!isFirebaseConfigured) return
+    const storeId = getStoreId()
+    if (!storeId) return
 
-    let gotData = false
-
-    // Start with cached products immediately (fast first paint / offline)
+    // Show cached products immediately
     const cached = getCachedProducts()
     if (cached.length > 0) {
       setProducts(cached as Product[])
       setShuffledProducts(shuffleArray(cached as Product[]))
       productsRef.current = cached as Product[]
-      gotData = true
     } else {
-      // Try IndexedDB (larger storage, works offline)
       localGetByStoreId<Product>("products").then(idbProducts => {
-        if (idbProducts.length > 0 && !gotData) {
+        if (idbProducts.length > 0) {
           setProducts(idbProducts)
           setShuffledProducts(shuffleArray(idbProducts))
           productsRef.current = idbProducts
-          gotData = true
         }
       }).catch(() => {})
     }
 
-    // Subscribe to real-time Firestore updates
-    // IMPORTANT: do NOT re-shuffle the full catalog on every stock change (kills POS performance)
-    const unsubscribe = onProductsSnapshot((data) => {
-      gotData = true
-      setProducts(data)
-      productsRef.current = data
-      setShuffledProducts(prev => {
-        if (prev.length === 0) return shuffleArray(data)
-        // Preserve display order; refresh stock/price in place; append new products
-        const map = new Map(data.map(p => [p.id, p]))
-        const kept = prev
-          .map(p => map.get(p.id))
-          .filter((p): p is Product => !!p)
-        const existingIds = new Set(kept.map(p => p.id))
-        const added = data.filter(p => !existingIds.has(p.id))
-        return [...kept, ...added]
+    fetch(`/api/products?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (!data?.length) return
+        setProducts(data)
+        setShuffledProducts(prev => {
+          if (prev.length === 0) return shuffleArray(data)
+          const map = new Map(data.map((p: Product) => [p.id, p]))
+          const kept = prev.map(p => map.get(p.id)).filter((p): p is Product => !!p)
+          const existingIds = new Set(kept.map(p => p.id))
+          const added = data.filter((p: Product) => !existingIds.has(p.id))
+          return [...kept, ...added]
+        })
+        productsRef.current = data
+        cacheProducts(data)
+        localPutMany("products", data.map((d: Product) => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
       })
-      cacheProducts(data)
-      // Also save to IndexedDB for offline
-      localPutMany("products", data.map(d => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
-    })
-
-    // Fallback: if snapshot hasn't fired after 3s (fresh install, slow connection),
-    // do a one-time fetch to populate the page
-    const fallbackTimer = setTimeout(async () => {
-      if (gotData) return
-      try {
-        const data = await getProducts()
-        if (data.length > 0) {
-          setProducts(data)
-          setShuffledProducts(shuffleArray(data))
-          productsRef.current = data
-          cacheProducts(data)
-        }
-      } catch {}
-    }, 3000)
-
-    return () => { unsubscribe(); clearTimeout(fallbackTimer) }
+      .catch(() => {})
   }, [])
 
   // Auto-sync cart stock when products update in real-time
@@ -227,12 +201,6 @@ export default function POSPage() {
     }, [])
     if (changed) setCart(updated)
   }, [products])
-
-  // Check Firebase configuration synchronously on mount
-  if (!isFirebaseConfigured) {
-    router.push("/setup")
-    return null
-  }
 
   // Block entire POS if subscription is expired
   if (!subLoading && !isActive) {
@@ -275,13 +243,18 @@ export default function POSPage() {
 
   const loadProducts = async () => {
     try {
-      const data = await getProducts()
-      setProducts(data)
-      setShuffledProducts(shuffleArray(data))
-      productsRef.current = data
-      cacheProducts(data)
+      const storeId = getStoreId()
+      if (!storeId) return
+      const res = await fetch(`/api/products?storeId=${storeId}`)
+      const { data } = await res.json()
+      if (data?.length > 0) {
+        setProducts(data)
+        setShuffledProducts(shuffleArray(data))
+        productsRef.current = data
+        cacheProducts(data)
+      }
     } catch (error) {
-      console.error("[v0] Error loading products:", error)
+      console.error("[pos] Error loading products:", error)
       const cached = getCachedProducts()
       if (cached.length > 0) {
         setProducts(cached as Product[])
@@ -374,41 +347,30 @@ export default function POSPage() {
 
   const handleBarcodeSubmit = async (barcode: string) => {
     try {
-      // Try Firestore first, fall back to local cache
+      const storeId = getStoreId()
       let product: Product | null = null
       try {
-        product = await getProductByBarcode(barcode)
+        const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(barcode)}`)
+        const { data } = await res.json()
+        product = data ?? null
       } catch {
-        // Offline — search cached products
         const cached = getCachedProducts() as Product[]
         product = cached.find(p => p.barcode === barcode) ?? null
       }
       if (product) {
         if (product.stock <= 0) {
-          toast({
-            title: "Out of stock",
-            description: `${product.name} is currently out of stock`,
-            variant: "destructive",
-          })
+          toast({ title: "Out of stock", description: `${product.name} is currently out of stock`, variant: "destructive" })
           return
         }
         addToCart(product)
         setBarcodeInput("")
         setSearchSuggestions([])
       } else {
-        toast({
-          title: "Product not found",
-          description: "No product found with this barcode",
-          variant: "destructive",
-        })
+        toast({ title: "Product not found", description: "No product found with this barcode", variant: "destructive" })
       }
     } catch (error) {
-      console.error("[v0] Error finding product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to find product",
-        variant: "destructive",
-      })
+      console.error("[pos] Error finding product:", error)
+      toast({ title: "Error", description: "Failed to find product", variant: "destructive" })
     }
   }
 
@@ -558,7 +520,7 @@ export default function POSPage() {
 
   const handleCheckoutSuccess = () => {
     clearCart()
-    // No need to manually reload — onSnapshot listener auto-updates stock
+    loadProducts()
   }
 
   return (

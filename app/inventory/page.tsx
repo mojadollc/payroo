@@ -36,11 +36,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { getProducts, deleteProduct, getCategories, updateProduct, bulkAddProducts } from "@/lib/firebase/services"
-import { offlineGetProducts, offlineGetCategories, offlineDeleteProduct, offlineUpdateProduct } from "@/lib/offline/services"
+import { offlineGetProducts, offlineGetCategories } from "@/lib/offline/services"
 import { isOnline } from "@/lib/offline/sync-engine"
 import { Label } from "@/components/ui/label"
 import type { Product, Category } from "@/lib/firebase/types"
+import { getStoreId } from "@/lib/store-id"
 import { AddProductDialog } from "@/components/inventory/add-product-dialog"
 import { EditProductDialog } from "@/components/inventory/edit-product-dialog"
 import { CategoryManager } from "@/components/inventory/category-manager"
@@ -170,39 +170,36 @@ export default function InventoryPage() {
 
   const loadProducts = async () => {
     try {
-      // Try IndexedDB first (works offline), then Firestore
-      const offline = await offlineGetProducts()
-      if (offline.length > 0) setProducts(offline)
-      if (isOnline()) {
-        const data = await getProducts()
-        if (data.length > 0) setProducts(data)
-      }
+      const storeId = getStoreId()
+      if (!storeId) return
+      const res = await fetch(`/api/products?storeId=${storeId}`)
+      const { data } = await res.json()
+      if (data?.length > 0) setProducts(data)
     } catch (error) {
       console.error("Error loading products:", error)
+      const offline = await offlineGetProducts()
+      if (offline.length > 0) setProducts(offline)
     }
   }
 
   const loadCategories = async () => {
     try {
-      const offline = await offlineGetCategories()
-      if (offline.length > 0) setCategories(offline)
-      if (isOnline()) {
-        const data = await getCategories()
-        if (data.length > 0) setCategories(data)
-      }
+      const storeId = getStoreId()
+      if (!storeId) return
+      const res = await fetch(`/api/categories?storeId=${storeId}`)
+      const { data } = await res.json()
+      if (data?.length > 0) setCategories(data)
     } catch (error) {
       console.error("Error loading categories:", error)
+      const offline = await offlineGetCategories()
+      if (offline.length > 0) setCategories(offline)
     }
   }
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
     try {
-      if (isOnline()) {
-        await deleteProduct(id)
-      } else {
-        await offlineDeleteProduct(id)
-      }
+      await fetch(`/api/products?id=${id}`, { method: "DELETE" })
       toast({ title: "Product deleted" })
       loadProducts()
     } catch (error) {
@@ -349,12 +346,13 @@ export default function InventoryPage() {
     const qty = parseInt(restockQty)
     if (isNaN(qty)) return
     try {
-      if (isOnline()) {
-        await updateProduct(restockProduct.id!, { stock: restockProduct.stock + qty })
-      } else {
-        await offlineUpdateProduct(restockProduct.id!, { stock: restockProduct.stock + qty })
-      }
-      toast({ title: "Stock updated", description: `${restockProduct.name}: ${restockProduct.stock} → ${restockProduct.stock + qty}` })
+      const newStock = restockProduct.stock + qty
+      await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: restockProduct.id, stock: newStock }),
+      })
+      toast({ title: "Stock updated", description: `${restockProduct.name}: ${restockProduct.stock} → ${newStock}` })
       setRestockProduct(null)
       setRestockQty("")
       loadProducts()
@@ -548,11 +546,18 @@ export default function InventoryPage() {
     if (!valid.length) return
     setBulkUploading(true)
     try {
-      await bulkAddProducts(valid.map(r => ({
-        name: r.name, barcode: r.barcode, category: r.category,
-        unit: r.unit, cost: r.cost, price: r.price, stock: r.stock,
-        description: r.description,
-      })))
+      const storeId = getStoreId()
+      await Promise.all(valid.map(r =>
+        fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storeId, name: r.name, barcode: r.barcode, category: r.category,
+            unit: r.unit, cost: r.cost, price: r.price, stock: r.stock,
+            description: r.description,
+          }),
+        })
+      ))
       toast({ title: `✅ Uploaded ${valid.length} product${valid.length > 1 ? "s" : ""}` })
       setBulkOpen(false)
       setParsedRows([])

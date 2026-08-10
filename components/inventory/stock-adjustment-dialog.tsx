@@ -16,9 +16,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addInventoryTransaction } from "@/lib/firebase/services"
 import type { Product } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
+import { getStoreId } from "@/lib/store-id"
 
 interface StockAdjustmentDialogProps {
   product: Product
@@ -44,21 +44,23 @@ export function StockAdjustmentDialog({ product, open, onOpenChange, onSuccess }
     setIsSubmitting(true)
 
     try {
-      await addInventoryTransaction({
-        productId: product.id!,
-        productName: product.name,
-        type: formData.type,
-        quantity: Number.parseInt(formData.quantity),
-        previousStock: product.stock,
-        newStock: newStock,
-        notes: formData.notes,
+      const storeId = getStoreId()
+      const res = await fetch("/api/inventory-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId,
+          productId: product.id,
+          productName: product.name,
+          type: formData.type,
+          quantity: Number.parseInt(formData.quantity),
+          previousStock: product.stock,
+          newStock,
+          notes: formData.notes,
+        }),
       })
-
-      toast({
-        title: "Stock updated",
-        description: `Stock has been successfully adjusted`,
-      })
-
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to adjust stock")
+      toast({ title: "Stock updated", description: "Stock has been successfully adjusted" })
       setFormData({ type: "restock", quantity: "", notes: "" })
       onSuccess()
       onOpenChange(false)

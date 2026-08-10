@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { updateProduct, uploadProductImage, deleteProductImage, getProductByBarcode } from "@/lib/firebase/services"
 import type { Product, Category } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
 import { BarcodeScanner } from "./barcode-scanner"
 import { cropImageToSquare } from "@/lib/crop-image"
 import { useBusinessConfig } from "@/hooks/use-business-config"
+import { getStoreId } from "@/lib/store-id"
 
 interface EditProductDialogProps {
   product: Product
@@ -159,13 +159,11 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
     const barcode = formData.barcode.trim()
     if (barcode && barcode !== product.barcode) {
       try {
-        const existing = await getProductByBarcode(barcode)
+        const storeId = getStoreId()
+        const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(barcode)}`)
+        const { data: existing } = await res.json()
         if (existing && existing.id !== product.id) {
-          toast({
-            title: "Barcode already in use",
-            description: `Already used by: ${existing.name}`,
-            variant: "destructive",
-          })
+          toast({ title: "Barcode already in use", description: `Already used by: ${existing.name}`, variant: "destructive" })
           return
         }
       } catch {
@@ -176,7 +174,7 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
     setIsSubmitting(true)
     try {
       const isEcommerce = cfg.type === "ecommerce"
-      const updates: Partial<Product> = {
+      const updates: any = {
         name: formData.name,
         barcode: formData.barcode,
         price: Number.parseFloat(formData.price),
@@ -190,37 +188,32 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
         ...(isEcommerce && {
           sku: formData.sku.trim() || undefined,
           weight: formData.weight ? Number(formData.weight) : undefined,
-          dimensions:
-            formData.dimLength && formData.dimWidth && formData.dimHeight
-              ? {
-                  length: Number(formData.dimLength),
-                  width: Number(formData.dimWidth),
-                  height: Number(formData.dimHeight),
-                }
-              : undefined,
+          dimensions: formData.dimLength && formData.dimWidth && formData.dimHeight
+            ? { length: Number(formData.dimLength), width: Number(formData.dimWidth), height: Number(formData.dimHeight) }
+            : undefined,
           shippingClass: formData.shippingClass,
-          variants: variants
-            .filter(v => v.name.trim() && v.options.trim())
-            .map(v => ({
-              name: v.name.trim(),
-              options: v.options.split(",").map(o => o.trim()).filter(Boolean),
-            })),
+          variants: variants.filter(v => v.name.trim() && v.options.trim()).map(v => ({ name: v.name.trim(), options: v.options.split(",").map(o => o.trim()).filter(Boolean) })),
         }),
       }
 
-      // Image: replace or remove
+      // Image: store as base64 or remove
       if (imageFile) {
-        if (product.imageUrl) {
-          await deleteProductImage(product.imageUrl)
-        }
-        const imageUrl = await uploadProductImage(imageFile, product.id!)
-        updates.imageUrl = imageUrl
-      } else if (removeImage && product.imageUrl) {
-        await deleteProductImage(product.imageUrl)
-        updates.imageUrl = undefined // services updateProduct maps undefined → deleteField()
+        const reader = new FileReader()
+        updates.imageUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(imageFile)
+        })
+      } else if (removeImage) {
+        updates.imageUrl = null
       }
 
-      await updateProduct(product.id!, updates)
+      const res = await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: product.id, ...updates }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to update product")
 
       toast({
         title: "Product updated",

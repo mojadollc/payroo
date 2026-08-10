@@ -19,10 +19,10 @@ import {
 import { EditProductDialog } from "./edit-product-dialog"
 import { StockAdjustmentDialog } from "./stock-adjustment-dialog"
 import { InventoryHistoryDialog } from "./inventory-history-dialog"
-import { deleteProduct, deleteProductImage } from "@/lib/firebase/services"
 import { DefaultProductImage } from "@/components/ui/default-product-image"
 import type { Product, Category } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
+import { getStoreId } from "@/lib/store-id"
 
 interface ProductListProps {
   products: Product[]
@@ -40,24 +40,13 @@ export function ProductList({ products, categories, onUpdate, isLoading }: Produ
 
   const handleDelete = async () => {
     if (!deletingProduct) return
-
     try {
-      if (deletingProduct.imageUrl) {
-        await deleteProductImage(deletingProduct.imageUrl)
-      }
-      await deleteProduct(deletingProduct.id!)
-      toast({
-        title: "Product deleted",
-        description: "Product has been successfully removed",
-      })
+      await fetch(`/api/products?id=${deletingProduct.id}`, { method: "DELETE" })
+      toast({ title: "Product deleted", description: "Product has been successfully removed" })
       onUpdate()
     } catch (error) {
       console.error("[v0] Error deleting product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete product",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to delete product", variant: "destructive" })
     } finally {
       setDeletingProduct(null)
     }

@@ -4,9 +4,8 @@ import { useState, useEffect } from "react"
 import { Clock, TrendingUp, TrendingDown, Package } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { getInventoryTransactions } from "@/lib/firebase/services"
 import type { Product, InventoryTransaction } from "@/lib/firebase/types"
-import type { Timestamp } from "firebase/firestore"
+import { getStoreId } from "@/lib/store-id"
 
 interface InventoryHistoryDialogProps {
   product: Product
@@ -27,8 +26,10 @@ export function InventoryHistoryDialog({ product, open, onOpenChange }: Inventor
   const loadHistory = async () => {
     setIsLoading(true)
     try {
-      const data = await getInventoryTransactions(product.id)
-      setTransactions(data)
+      const storeId = getStoreId()
+      const res = await fetch(`/api/inventory-transactions?storeId=${storeId}&productId=${product.id}`)
+      const { data } = await res.json()
+      setTransactions(data ?? [])
     } catch (error) {
       console.error("[v0] Error loading inventory history:", error)
     } finally {
@@ -36,15 +37,10 @@ export function InventoryHistoryDialog({ product, open, onOpenChange }: Inventor
     }
   }
 
-  const formatDate = (timestamp: Timestamp) => {
-    const date = timestamp.toDate()
+  const formatDate = (timestamp: string | Date) => {
     return new Intl.DateTimeFormat("en-PH", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date)
+      month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
+    }).format(new Date(timestamp))
   }
 
   const getTypeIcon = (type: string) => {

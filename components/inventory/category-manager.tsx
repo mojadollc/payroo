@@ -18,9 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { addCategory, deleteCategory } from "@/lib/firebase/services"
 import type { Category } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
+import { getStoreId } from "@/lib/store-id"
 
 interface CategoryManagerProps {
   categories: Category[]
@@ -51,28 +51,19 @@ export function CategoryManager({ categories = [], onUpdate }: CategoryManagerPr
     }
 
     setIsAdding(true)
-
     try {
-      await addCategory({
-        name: formData.name.trim(),
-        description: formData.description.trim(),
+      const storeId = getStoreId()
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId, name: formData.name.trim(), description: formData.description.trim() }),
       })
-
-      toast({
-        title: "Success",
-        description: "Category has been added successfully",
-      })
-
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to add category")
+      toast({ title: "Success", description: "Category has been added successfully" })
       setFormData({ name: "", description: "" })
       onUpdate()
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to add category"
-      console.error("[v0] Error adding category:", error)
-      toast({
-        title: "Configuration Error",
-        description: "Firebase environment variables are not configured. Please visit the Setup page to configure them.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to add category", variant: "destructive" })
     } finally {
       setIsAdding(false)
     }
@@ -82,19 +73,12 @@ export function CategoryManager({ categories = [], onUpdate }: CategoryManagerPr
     if (!deletingCategory) return
 
     try {
-      await deleteCategory(deletingCategory.id!)
-      toast({
-        title: "Success",
-        description: "Category has been deleted successfully",
-      })
+      await fetch(`/api/categories?id=${deletingCategory.id}`, { method: "DELETE" })
+      toast({ title: "Success", description: "Category has been deleted successfully" })
       onUpdate()
     } catch (error) {
       console.error("[v0] Error deleting category:", error)
-      toast({
-        title: "Configuration Error",
-        description: "Firebase environment variables are not configured. Please visit the Setup page to configure them.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to delete category", variant: "destructive" })
     } finally {
       setDeletingCategory(null)
     }

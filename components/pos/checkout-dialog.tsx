@@ -14,10 +14,10 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { addSale, addUtang, searchUtangByName, getStoreSettings, getLoyaltyCustomerByQR, getLoyaltyRules, getLoyaltySettings, earnLoyaltyCoins } from "@/lib/firebase/services"
 import { enqueueOfflineSale, enqueueOfflineUtang, isOnline } from "@/lib/offline-sync"
 import { offlineAddSale, offlineAddUtang } from "@/lib/offline/services"
 import type { Product, UtangRecord, LoyaltyCustomer } from "@/lib/firebase/types"
+import { getStoreId } from "@/lib/store-id"
 import { useToast } from "@/hooks/use-toast"
 
 interface CartItem extends Product {
@@ -54,15 +54,21 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
   const storeSettingsRef = useRef<{ name: string; address: string; phone?: string; businessType?: string; region?: string; province?: string; city?: string; barangay?: string } | null>(null)
   const utangDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    getStoreSettings().then(s => { storeSettingsRef.current = s }).catch(() => {})
+    const storeId = getStoreId()
+    if (!storeId) return
+    fetch(`/api/store-settings?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ data }) => { if (data) storeSettingsRef.current = data })
+      .catch(() => {})
   }, [])
 
   const checkUtangNetwork = useCallback((name: string) => {
     if (utangDebounceRef.current) clearTimeout(utangDebounceRef.current)
     if (name.trim().length < 2) { setUtangWarnings([]); setUtangChecked(false); return }
     utangDebounceRef.current = setTimeout(async () => {
-      const results = await searchUtangByName(name.trim())
-      setUtangWarnings(results)
+      const res = await fetch(`/api/utang?search=${encodeURIComponent(name.trim())}`)
+      const { data } = await res.json()
+      setUtangWarnings(data ?? [])
       setUtangChecked(true)
     }, 600)
   }, [])
@@ -92,7 +98,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
 
         if (!isOnline()) {
           // Queue utang offline (both legacy localStorage + IndexedDB)
-          const storeId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "unknown-store"
+          const storeId = getStoreId()
           const storeName = localStorage.getItem("storeName") || "My Store"
           enqueueOfflineUtang({
             customerName: utangCustomer.trim(),
@@ -119,8 +125,8 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         }
 
         const storeSettings = storeSettingsRef.current
-        const storeName = storeSettings?.name || "My Store"
-        const storeId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "unknown-store"
+        const storeName = storeSettings?.name || localStorage.getItem("storeName") || "My Store"
+        const storeId = getStoreId()
 
         // Optimistic UI — show success immediately
         const utangPayload = {
@@ -139,10 +145,11 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         setIsProcessing(false)
 
         // Fire-and-forget
-        addUtang(utangPayload).catch((error) => {
-          console.error("[checkout] Background utang write failed:", error)
-          toast({ title: "⚠️ Utang may not have saved", description: "Check your connection", variant: "destructive" })
-        })
+        fetch("/api/utang", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(utangPayload) })
+          .catch((error) => {
+            console.error("[checkout] Background utang write failed:", error)
+            toast({ title: "⚠️ Utang may not have saved", description: "Check your connection", variant: "destructive" })
+          })
         return
       }
 
@@ -219,14 +226,18 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         status: "completed" as const,
       }
 
-      // Write to Firestore FIRST, then show success
-      // Pass current stock from cart to skip redundant getDoc calls
-      const knownStock: Record<string, number> = {}
-      for (const item of cart) {
-        if (item.id) knownStock[item.id] = item.stock
-      }
+      // Write to Postgres FIRST, then show success
+      const storeId = getStoreId()
       try {
-        await addSale(salePayload, storeLocation, knownStock)
+        const res = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...salePayload, storeId }),
+        })
+        if (!res.ok) {
+          const { error } = await res.json()
+          throw new Error(error || "Failed to save sale")
+        }
       } catch (error) {
         console.error("[checkout] Sale write failed:", error)
         toast({ title: "❌ Sale failed to save!", description: "Please try again. " + (error instanceof Error ? error.message : ""), variant: "destructive" })
@@ -256,17 +267,18 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
     if (!loyaltyQR.trim()) return
     setLoyaltyLookingUp(true)
     try {
-      const customer = await getLoyaltyCustomerByQR(loyaltyQR.trim())
+      const storeId = getStoreId()
+      const res = await fetch(`/api/loyalty/customers?storeId=${storeId}&qrCode=${encodeURIComponent(loyaltyQR.trim())}`)
+      const { data: customer } = await res.json()
       if (!customer) { toast({ title: "QR not found", description: "Customer not enrolled", variant: "destructive" }); setLoyaltyLookingUp(false); return }
-      // Calculate coins earned from rules
-      const [rules] = await Promise.all([getLoyaltyRules()])
+      const rulesRes = await fetch(`/api/loyalty/rules?storeId=${storeId}`)
+      const { data: rules } = await rulesRes.json()
       let totalCoins = 0
-      const saleItems: { productName: string; quantity: number; coinsEarned: number }[] = []
       for (const item of cart) {
-        const rule = rules.find(r => r.productId === item.id)
+        const rule = (rules ?? []).find((r: any) => r.productId === item.id)
         if (rule) {
           const coins = Math.floor(item.quantity / rule.buyQty) * rule.earnCoins
-          if (coins > 0) { totalCoins += coins; saleItems.push({ productName: item.name, quantity: item.quantity, coinsEarned: coins }) }
+          if (coins > 0) totalCoins += coins
         }
       }
       setLoyaltyCustomer(customer)
@@ -278,8 +290,11 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
   const handleAwardCoins = async () => {
     if (!loyaltyCustomer || loyaltyCoinsEarned === 0) { setLoyaltyDone(true); return }
     try {
-      const saleItems = cart.map(item => ({ productName: item.name, quantity: item.quantity, coinsEarned: 0 }))
-      await earnLoyaltyCoins(loyaltyCustomer.id!, loyaltyCustomer.name, loyaltyCoinsEarned, saleItems, total)
+      await fetch("/api/loyalty/earn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: loyaltyCustomer.id, customerName: loyaltyCustomer.name, coins: loyaltyCoinsEarned, saleTotal: total }),
+      })
       toast({ title: `🪙 +${loyaltyCoinsEarned} coins awarded to ${loyaltyCustomer.name}!` })
     } catch { toast({ title: "Error awarding coins", variant: "destructive" }) }
     setLoyaltyDone(true)
@@ -339,10 +354,13 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
 
   const handlePrintReceipt = async () => {
     const snap = saleSnapshot!
-    const storeSettings = await getStoreSettings()
-    const storeName = storeSettings?.name || "My Store"
-    const storeAddress = storeSettings?.address || ""
-    const storePhone = storeSettings?.phone || ""
+    const storeId = getStoreId()
+    let storeName = "My Store", storeAddress = "", storePhone = ""
+    try {
+      const res = await fetch(`/api/store-settings?storeId=${storeId}`)
+      const { data } = await res.json()
+      if (data) { storeName = data.name || storeName; storeAddress = data.address || ""; storePhone = data.phone || "" }
+    } catch {}
     const date = new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })
 
     const itemRows = snap.cart.map(item => {

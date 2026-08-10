@@ -12,28 +12,65 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { id, storeId, total, profit, paymentMethod, status, items } = body
-    const sale = await prisma.sale.create({
-      data: {
-        id,
-        storeId,
-        total,
-        profit: profit ?? 0,
-        paymentMethod,
-        status: status ?? "completed",
-        items: {
-          create: (items ?? []).map((item: any) => ({
-            id: item.id,
+
+    const sale = await prisma.$transaction(async (tx) => {
+      const created = await tx.sale.create({
+        data: {
+          id,
+          storeId,
+          total,
+          profit: profit ?? 0,
+          paymentMethod,
+          status: status ?? "completed",
+          items: {
+            create: (items ?? []).map((item: any) => ({
+              id: item.id,
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              price: item.price,
+              cost: item.cost ?? 0,
+              subtotal: item.subtotal,
+              selectedVariants: item.selectedVariants,
+            })),
+          },
+        },
+      })
+
+      // Deduct stock and log inventory transactions
+      for (const item of items ?? []) {
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (!product) continue
+        const newStock = product.stock - item.quantity
+        await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } })
+        await tx.inventoryTransaction.create({
+          data: {
+            storeId,
             productId: item.productId,
             productName: item.productName,
-            quantity: item.quantity,
-            price: item.price,
-            cost: item.cost ?? 0,
-            subtotal: item.subtotal,
-            selectedVariants: item.selectedVariants,
-          })),
-        },
-      },
+            type: "sale",
+            quantity: -item.quantity,
+            previousStock: product.stock,
+            newStock,
+            notes: "Sale transaction",
+          },
+        })
+      }
+
+      return created
     })
+
+    return NextResponse.json({ data: sale })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { id, ...data } = body
+    const sale = await prisma.sale.update({ where: { id }, data })
     return NextResponse.json({ data: sale })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

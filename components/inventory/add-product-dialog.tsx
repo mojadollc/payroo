@@ -9,13 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addProduct, uploadProductImage, updateProduct, getProductByBarcode } from "@/lib/firebase/services"
 import type { Category } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
 import { BarcodeScanner } from "./barcode-scanner"
 import { useHardwareScanner } from "@/hooks/use-hardware-scanner"
 import { cropImageToSquare } from "@/lib/crop-image"
 import { useBusinessConfig } from "@/hooks/use-business-config"
+import { getStoreId } from "@/lib/store-id"
 
 interface AddProductDialogProps {
   open: boolean
@@ -64,13 +64,11 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
 
     // Reject if barcode already exists in this store
     try {
-      const existing = await getProductByBarcode(clean)
+      const storeId = getStoreId()
+      const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(clean)}`)
+      const { data: existing } = await res.json()
       if (existing) {
-        toast({
-          title: "Barcode already in use",
-          description: `Already used by: ${existing.name}`,
-          variant: "destructive",
-        })
+        toast({ title: "Barcode already in use", description: `Already used by: ${existing.name}`, variant: "destructive" })
         return
       }
     } catch {
@@ -208,13 +206,11 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
     // Unique barcode check
     if (formData.barcode.trim()) {
       try {
-        const existing = await getProductByBarcode(barcode)
+        const storeId = getStoreId()
+        const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(barcode)}`)
+        const { data: existing } = await res.json()
         if (existing) {
-          toast({
-            title: "Barcode already in use",
-            description: `Already used by: ${existing.name}`,
-            variant: "destructive",
-          })
+          toast({ title: "Barcode already in use", description: `Already used by: ${existing.name}`, variant: "destructive" })
           return
         }
       } catch {
@@ -224,8 +220,10 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
 
     setIsSubmitting(true)
     try {
+      const storeId = getStoreId()
       const isEcommerce = cfg.type === "ecommerce"
-      const productId = await addProduct({
+      const productData: any = {
+        storeId,
         name: formData.name.trim(),
         barcode,
         price,
@@ -237,38 +235,31 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
         ...(isEcommerce && {
           sku: formData.sku.trim() || undefined,
           weight: formData.weight ? Number(formData.weight) : undefined,
-          dimensions:
-            formData.dimLength && formData.dimWidth && formData.dimHeight
-              ? {
-                  length: Number(formData.dimLength),
-                  width: Number(formData.dimWidth),
-                  height: Number(formData.dimHeight),
-                }
-              : undefined,
+          dimensions: formData.dimLength && formData.dimWidth && formData.dimHeight
+            ? { length: Number(formData.dimLength), width: Number(formData.dimWidth), height: Number(formData.dimHeight) }
+            : undefined,
           shippingClass: formData.shippingClass,
-          variants: variants
-            .filter(v => v.name.trim() && v.options.trim())
-            .map(v => ({
-              name: v.name.trim(),
-              options: v.options.split(",").map(o => o.trim()).filter(Boolean),
-            })),
+          variants: variants.filter(v => v.name.trim() && v.options.trim()).map(v => ({ name: v.name.trim(), options: v.options.split(",").map(o => o.trim()).filter(Boolean) })),
         }),
-      })
-
-      if (imageFile) {
-        try {
-          const imageUrl = await uploadProductImage(imageFile, productId)
-          await updateProduct(productId, { imageUrl })
-        } catch (imgErr) {
-          console.error("[add-product] image upload failed:", imgErr)
-          toast({
-            title: "Product saved, image failed",
-            description: "You can add the image later by editing the product",
-            variant: "destructive",
-          })
-          // Product still created — don't fail the whole operation
-        }
       }
+
+      // Upload image as base64 if present
+      if (imageFile) {
+        const reader = new FileReader()
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(imageFile)
+        })
+        productData.imageUrl = base64
+      }
+
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to add product")
 
       toast({ title: "Success", description: `${cfg.itemLabel} added successfully` })
       setFormData({

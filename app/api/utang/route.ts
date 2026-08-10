@@ -3,6 +3,16 @@ import { prisma } from "@/lib/db/client"
 
 export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get("storeId")
+  const search = req.nextUrl.searchParams.get("search")
+  // Cross-store name search for utang network warning
+  if (search) {
+    const items = await prisma.utangRecord.findMany({
+      where: { status: { in: ["active", "partial"] }, customerName: { contains: search, mode: "insensitive" } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    })
+    return NextResponse.json({ data: items })
+  }
   if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
   const items = await prisma.utangRecord.findMany({ where: { storeId }, orderBy: { createdAt: "desc" } })
   return NextResponse.json({ data: items })

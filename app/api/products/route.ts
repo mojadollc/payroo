@@ -3,8 +3,13 @@ import { prisma } from "@/lib/db/client"
 
 export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get("storeId")
+  const barcode = req.nextUrl.searchParams.get("barcode")
   if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
-  const items = await prisma.product.findMany({ where: { storeId } })
+  if (barcode) {
+    const item = await prisma.product.findFirst({ where: { storeId, barcode } })
+    return NextResponse.json({ data: item })
+  }
+  const items = await prisma.product.findMany({ where: { storeId }, orderBy: { name: "asc" } })
   return NextResponse.json({ data: items })
 }
 

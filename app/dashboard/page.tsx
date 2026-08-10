@@ -11,11 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getFirebaseDb } from "@/lib/firebase/config"
-import { collection, query, where, getDocs } from "firebase/firestore"
 import { HomeNavbar } from "@/components/home-navbar"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
-import type { StoreUser } from "@/lib/firebase/types"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -77,82 +74,27 @@ export default function DashboardPage() {
 
     setLoading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) throw new Error("Firebase not configured")
+      const res = await fetch("/api/auth/owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.toLowerCase().trim(), pin: pin.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || "Login failed."); return }
 
-      // 1. Find subscription by email
-      const subSnap = await getDocs(
-        query(
-          collection(db, "customerSubscriptions"),
-          where("ownerEmail", "==", email.toLowerCase().trim())
-        )
-      )
-
-      if (subSnap.empty) {
-        setError("Email not found. Please check and try again.")
-        setLoading(false)
-        return
-      }
-
-      const subscription = subSnap.docs[0].data()
-
-      // 2. Check subscription status
-      if (subscription.status === "pending") {
-        setError("Your payment is still being processed. Please wait a few minutes and try again, or check your email for confirmation.")
-        setLoading(false)
-        return
-      }
-      if (subscription.status !== "active") {
-        setError(`Your subscription is ${subscription.status}. Please renew or contact support.`)
-        setLoading(false)
-        return
-      }
-
-      const endDate = subscription.endDate?.toDate?.()
-      if (endDate && endDate < new Date()) {
-        setError("Your subscription has expired. Please renew to continue.")
-        setLoading(false)
-        return
-      }
-
+      const { user: ownerUser, subscription } = data
       const externalId = subscription.externalId
-      if (!externalId) {
-        setError("Store ID not found for this subscription. Contact support.")
-        setLoading(false)
-        return
-      }
 
-      // 3. Find the owner user account and verify PIN
-      const userSnap = await getDocs(
-        query(
-          collection(db, "storeUsers"),
-          where("externalId", "==", externalId),
-          where("role", "==", "owner"),
-          where("pin", "==", pin.trim()),
-          where("isActive", "==", true)
-        )
-      )
-
-      if (userSnap.empty) {
-        setError("Incorrect PIN. Please try again.")
-        setLoading(false)
-        return
-      }
-
-      const ownerUser = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as StoreUser
-
-      // 4. Log in as the owner — set all localStorage keys BEFORE navigating
       localStorage.setItem("pos_ext_id", externalId)
+      localStorage.setItem("pos_main_ext_id", externalId)
 
-      // Pre-cache subscription so AuthGuard + navbar see features immediately
-      const endDateObj = subscription.endDate?.toDate?.() ?? null
       const fullFeatures = {
         pos: false, inventory: false, ewallet: false, reports: false,
         loyalty: false, utang: false, aiRestock: false, multiUser: false,
-        exportData: false, marketIntelligence: false,
+        exportData: false, marketIntelligence: false, delivery: false,
         ...(subscription.features ?? {}),
       }
-      const subCache = {
+      localStorage.setItem("pos_subscription", JSON.stringify({
         loading: false,
         isActive: true,
         tier: subscription.tier ?? "basic",
@@ -161,19 +103,19 @@ export default function DashboardPage() {
         businessType: subscription.businessType ?? null,
         ownerName: subscription.ownerName ?? null,
         ownerEmail: subscription.ownerEmail ?? null,
-        endDate: endDateObj?.toISOString() ?? null,
+        endDate: subscription.endDate ?? null,
         externalId,
+      }))
+      if (subscription.storeName) {
+        localStorage.setItem("storeName", subscription.storeName)
+        localStorage.setItem("pos_main_store_name", subscription.storeName)
       }
-      localStorage.setItem("pos_subscription", JSON.stringify(subCache))
-      if (subscription.storeName) localStorage.setItem("storeName", subscription.storeName)
 
       login(ownerUser)
-
       toast({ title: `Welcome, ${subscription.ownerName}!`, description: `${subscription.storeName} — ${subscription.tier} plan` })
       router.push("/pos")
     } catch (err: any) {
       setError(err.message || "Login failed. Please try again.")
-      console.error("Dashboard login error:", err)
     } finally {
       setLoading(false)
     }

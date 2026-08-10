@@ -11,8 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getFirebaseDb } from "@/lib/firebase/config"
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -42,64 +40,20 @@ export default function LoginPage() {
 
     setLoading(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) throw new Error("Database not configured")
-
-      // Find user by storeId + PIN (no username needed)
-      const userSnap = await getDocs(query(
-        collection(db, "storeUsers"),
-        where("externalId", "==", storeId.trim()),
-        where("pin", "==", pin.trim()),
-        where("isActive", "==", true)
-      ))
-
-      if (userSnap.empty) {
-        toast({ title: "Invalid credentials", description: "Check your Store ID and PIN.", variant: "destructive" })
+      const res = await fetch("/api/auth/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: storeId.trim(), pin: pin.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({ title: "Invalid credentials", description: data.error || "Check your Store ID and PIN.", variant: "destructive" })
         return
       }
 
-      const user = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as any
-
+      const { user } = data
       localStorage.setItem("pos_ext_id", storeId.trim())
-      // Remember HQ / main store for multi-branch switching
       localStorage.setItem("pos_main_ext_id", storeId.trim())
-
-      // Pre-cache subscription
-      try {
-        const subSnap = await getDocs(query(
-          collection(db, "customerSubscriptions"),
-          where("externalId", "==", storeId.trim()),
-          orderBy("createdAt", "desc"),
-          limit(1)
-        ))
-        if (!subSnap.empty) {
-          const sub = subSnap.docs[0].data()
-          const endDateObj = sub.endDate?.toDate?.() ?? null
-          const fullFeatures = {
-            pos: false, inventory: false, ewallet: false, reports: false,
-            loyalty: false, utang: false, aiRestock: false, multiUser: false,
-            exportData: false, marketIntelligence: false, delivery: false,
-            ...(sub.features ?? {}),
-          }
-          localStorage.setItem("pos_subscription", JSON.stringify({
-            loading: false,
-            isActive: sub.status === "active" && (!endDateObj || endDateObj > new Date()),
-            tier: sub.tier ?? "basic",
-            features: fullFeatures,
-            storeName: sub.storeName ?? null,
-            businessType: sub.businessType ?? null,
-            ownerName: sub.ownerName ?? null,
-            ownerEmail: sub.ownerEmail ?? null,
-            endDate: endDateObj?.toISOString() ?? null,
-            externalId: storeId.trim(),
-          }))
-          if (sub.storeName) {
-            localStorage.setItem("storeName", sub.storeName)
-            // Stable HQ name — must not change when switching branches
-            localStorage.setItem("pos_main_store_name", sub.storeName)
-          }
-        }
-      } catch {}
 
       login(user)
       toast({ title: `Welcome, ${user.name}!`, description: `Logged in as ${user.role}` })

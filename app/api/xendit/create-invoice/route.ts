@@ -1,96 +1,41 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getFirebaseDb } from "@/lib/firebase/config"
-import { collection, addDoc, serverTimestamp, doc, getDoc, query, where, getDocs, orderBy, limit, deleteDoc } from "firebase/firestore"
+import { prisma } from "@/lib/db/client"
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    console.log("[create-invoice] Received request body:", JSON.stringify(body, null, 2))
-    
     const { planId, planName, planPrice, ownerName, ownerEmail, storeName, phone, businessType, referralCode } = body
 
-    console.log("[create-invoice] Extracted fields:")
-    console.log("- planId:", planId, typeof planId)
-    console.log("- planName:", planName, typeof planName)
-    console.log("- planPrice:", planPrice, typeof planPrice)
-    console.log("- ownerName:", ownerName, typeof ownerName)
-    console.log("- ownerEmail:", ownerEmail, typeof ownerEmail)
-    console.log("- storeName:", storeName, typeof storeName)
-
     if (!planId || !planName || planPrice === undefined || planPrice === null || !ownerName || !ownerEmail || !storeName) {
-      console.log("[create-invoice] Validation failed - missing fields")
-      console.log("- planId valid:", !!planId)
-      console.log("- planName valid:", !!planName)
-      console.log("- planPrice valid:", planPrice !== undefined && planPrice !== null)
-      console.log("- ownerName valid:", !!ownerName)
-      console.log("- ownerEmail valid:", !!ownerEmail)
-      console.log("- storeName valid:", !!storeName)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     const secretKey = process.env.XENDIT_SECRET_KEY
-    if (!secretKey) {
-      return NextResponse.json({ error: "Payment gateway not configured" }, { status: 500 })
-    }
+    if (!secretKey) return NextResponse.json({ error: "Payment gateway not configured" }, { status: 500 })
 
-    const db = getFirebaseDb()
-
-    // ── Simplified deduplication: check for existing subscriptions by email ──
-    if (db) {
-      try {
-        // Use simple query without orderBy to avoid composite index issues
-        const existingSnap = await getDocs(query(
-          collection(db, "customerSubscriptions"),
-          where("ownerEmail", "==", ownerEmail)
-        ))
-
-        for (const d of existingSnap.docs) {
-          const data = d.data()
-
-          // Block if there's already an active, non-expired subscription
-          if (data.status === "active") {
-            const endDate = data.endDate?.toDate?.()
-            if (endDate && endDate > new Date()) {
-              return NextResponse.json(
-                { error: "You already have an active subscription. Please wait until it expires or contact support." },
-                { status: 409 }
-              )
-            }
-          }
-
-          // Reuse existing pending invoice if it's for the same plan and still has a payment URL
-          if (data.status === "pending" && data.planId === planId && data.xenditPaymentUrl) {
-            return NextResponse.json({
-              invoiceUrl: data.xenditPaymentUrl,
-              invoiceId: data.xenditInvoiceId,
-              externalId: data.externalId,
-            })
-          }
-
-          // Clean up stale pending subscriptions for this email (different plan or no URL)
-          if (data.status === "pending") {
-            await deleteDoc(d.ref)
-          }
-        }
-      } catch (indexError) {
-        // Continue without deduplication if query fails
-        console.warn("Deduplication query failed, proceeding without check:", indexError.message)
+    // Deduplication
+    const existing = await prisma.customerSubscription.findMany({ where: { ownerEmail } })
+    for (const sub of existing) {
+      if (sub.status === "active" && sub.endDate && sub.endDate > new Date()) {
+        return NextResponse.json(
+          { error: "You already have an active subscription. Please wait until it expires or contact support." },
+          { status: 409 }
+        )
+      }
+      if (sub.status === "pending" && sub.planId === planId && sub.xenditPaymentUrl) {
+        return NextResponse.json({ invoiceUrl: sub.xenditPaymentUrl, invoiceId: sub.xenditInvoiceId, externalId: sub.externalId })
+      }
+      if (sub.status === "pending") {
+        await prisma.customerSubscription.delete({ where: { id: sub.id } })
       }
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const externalId = String(Math.floor(100000 + Math.random() * 900000))
 
-    // Fetch plan details from Firestore to get tier + features
-    let planTier = "basic"
-    let planFeatures = {}
-    if (db) {
-      const planSnap = await getDoc(doc(db, "subscriptionPlans", planId))
-      if (planSnap.exists()) {
-        planTier = planSnap.data().tier ?? "basic"
-        planFeatures = planSnap.data().features ?? {}
-      }
-    }
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id: planId } })
+    const planTier = (plan?.tier ?? "basic") as any
+    const planFeatures = (plan?.features ?? {}) as any
 
     // Create Xendit invoice
     const xenditRes = await fetch("https://api.xendit.co/v2/invoices", {
@@ -104,11 +49,7 @@ export async function POST(req: NextRequest) {
         amount: planPrice,
         description: `POS Subscription — ${planName} Plan (1 month)`,
         invoice_duration: 86400,
-        customer: {
-          given_names: ownerName,
-          email: ownerEmail,
-          mobile_number: phone || undefined,
-        },
+        customer: { given_names: ownerName, email: ownerEmail, mobile_number: phone || undefined },
         customer_notification_preference: {
           invoice_created: ["email"],
           invoice_reminder: ["email"],
@@ -117,28 +58,20 @@ export async function POST(req: NextRequest) {
         success_redirect_url: `${appUrl}/payment/success?ext=${externalId}`,
         failure_redirect_url: `${appUrl}/payment/failed?ext=${externalId}`,
         currency: "PHP",
-        items: [
-          {
-            name: `${planName} Plan — Monthly Subscription`,
-            quantity: 1,
-            price: planPrice,
-            category: "Software Subscription",
-          },
-        ],
+        items: [{ name: `${planName} Plan — Monthly Subscription`, quantity: 1, price: planPrice, category: "Software Subscription" }],
       }),
     })
 
     if (!xenditRes.ok) {
       const err = await xenditRes.json()
-      console.error("Xendit error:", err)
       return NextResponse.json({ error: err.message || "Failed to create invoice" }, { status: 502 })
     }
 
     const invoice = await xenditRes.json()
 
-    // Save pending subscription to Firestore
-    if (db) {
-      await addDoc(collection(db, "customerSubscriptions"), {
+    await prisma.customerSubscription.create({
+      data: {
+        externalId,
         ownerName,
         ownerEmail,
         storeName,
@@ -151,17 +84,10 @@ export async function POST(req: NextRequest) {
         xenditInvoiceId: invoice.id,
         xenditPaymentStatus: "PENDING",
         xenditPaymentUrl: invoice.invoice_url,
-        externalId,
         referralCode: referralCode || "",
-        startDate: null,
-        endDate: null,
-        expiryReminderDate: null,
-        expiryReminderSent: false,
         notes: `Awaiting payment. Invoice: ${invoice.id}`,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-    }
+      },
+    })
 
     return NextResponse.json({ invoiceUrl: invoice.invoice_url, invoiceId: invoice.id, externalId })
   } catch (err) {

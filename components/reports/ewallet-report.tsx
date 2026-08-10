@@ -3,7 +3,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Wallet, ArrowDownToLine, ArrowUpFromLine, Signal } from "lucide-react"
 import type { EWalletTransaction } from "@/lib/firebase/types"
-import type { Timestamp } from "firebase/firestore"
 
 interface EWalletReportProps {
   transactions: EWalletTransaction[]
@@ -11,8 +10,8 @@ interface EWalletReportProps {
 }
 
 export function EWalletReport({ transactions, isLoading }: EWalletReportProps) {
-  const formatDate = (timestamp: Timestamp) => {
-    const d = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp as any)
+  const formatDate = (timestamp: any) => {
+    const d = new Date(timestamp)
     return new Intl.DateTimeFormat("en-PH", {
       month: "short", day: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: true,
@@ -40,7 +39,7 @@ export function EWalletReport({ transactions, isLoading }: EWalletReportProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const recentTxns = transactions.filter(t => {
-    const d = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt as any)
+    const d = new Date(t.createdAt as any)
     return d >= today
   })
 

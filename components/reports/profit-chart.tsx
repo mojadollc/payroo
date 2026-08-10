@@ -37,7 +37,7 @@ export function ProfitChart({ sales, ewalletTransactions, isLoading }: ProfitCha
     const dataMap = new Map<string, { date: string; ts: number; sales: number; ewallet: number; total: number }>()
 
     sales.forEach((sale) => {
-      const d = sale.createdAt.toDate()
+      const d = new Date(sale.createdAt as any)
       const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
       const ts = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
       const existing = dataMap.get(date) || { date, ts, sales: 0, ewallet: 0, total: 0 }
@@ -47,7 +47,7 @@ export function ProfitChart({ sales, ewalletTransactions, isLoading }: ProfitCha
     })
 
     ewalletTransactions.forEach((t) => {
-      const d = t.createdAt.toDate()
+      const d = new Date(t.createdAt as any)
       const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
       const ts = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
       const existing = dataMap.get(date) || { date, ts, sales: 0, ewallet: 0, total: 0 }

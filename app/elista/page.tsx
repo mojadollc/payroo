@@ -98,8 +98,8 @@ export default function EListaPage() {
         title: title.trim(),
         items: validItems,
         userId: user.id,
-        createdAt: { toMillis: () => Date.now() } as any,
-        updatedAt: { toMillis: () => Date.now() } as any,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       }
 
       if (isOnline()) {
@@ -157,7 +157,7 @@ export default function EListaPage() {
         await offlineUpdateElista(editingLista.id, { title: title.trim(), items: validItems })
       }
       // Optimistic: update state immediately
-      setListas(prev => prev.map(l => l.id === editingLista.id ? { ...l, title: title.trim(), items: validItems, updatedAt: { toMillis: () => Date.now() } as any } : l))
+      setListas(prev => prev.map(l => l.id === editingLista.id ? { ...l, title: title.trim(), items: validItems, updatedAt: new Date().toISOString() } : l))
       toast({ title: "Success", description: "e-Lista updated" })
       setEditingLista(null)
       resetForm()

@@ -23,11 +23,10 @@ const ProfitChart = dynamic(
   { ssr: false, loading: () => <div className="h-[300px] w-full animate-pulse bg-muted/30 rounded-lg" /> }
 )
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
-import { getSales, getEWalletTransactions, getProducts } from "@/lib/firebase/services"
-import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"
-import { isFirebaseConfigured } from "@/lib/firebase/config"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
+import { getStoreId } from "@/lib/store-id"
+import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"
 
 // ── CSV helpers ────────────────────────────────────────────────────────────────
 
@@ -209,34 +208,39 @@ export default function ReportsPage() {
     return { from: today, to: today }
   })
 
-  if (!isFirebaseConfigured) {
-    router.push("/setup")
-    return null
-  }
-
   useEffect(() => { loadData() }, [dateRange])
 
   const loadData = async () => {
     if (!hasLoaded.current) setIsLoading(true)
     try {
-      // Only fetch products once — they don't change with date range
-      const productsPromise = productsLoadedRef.current
-        ? Promise.resolve(null)
-        : getProducts()
+      const storeId = getStoreId()
+      if (!storeId) return
 
-      const [salesData, ewalletData, productsData] = await Promise.all([
-        getSales(dateRange?.from, dateRange?.to),
-        getEWalletTransactions(dateRange?.from, dateRange?.to),
-        productsPromise,
+      const params = new URLSearchParams({ storeId })
+      if (dateRange?.from) params.set("from", dateRange.from.toISOString())
+      if (dateRange?.to) params.set("to", dateRange.to.toISOString())
+
+      const [salesRes, ewalletRes] = await Promise.all([
+        fetch(`/api/sales?${params}`),
+        fetch(`/api/ewallet-transactions?${params}`),
       ])
-      setSales(salesData)
-      setEWalletTransactions(ewalletData)
-      if (productsData) {
-        setProducts(productsData)
+
+      const [{ data: salesData }, { data: ewalletData }] = await Promise.all([
+        salesRes.json(),
+        ewalletRes.json(),
+      ])
+
+      setSales(salesData ?? [])
+      setEWalletTransactions(ewalletData ?? [])
+
+      if (!productsLoadedRef.current) {
+        const prodRes = await fetch(`/api/products?storeId=${storeId}`)
+        const { data: productsData } = await prodRes.json()
+        setProducts(productsData ?? [])
         productsLoadedRef.current = true
       }
     } catch (error) {
-      console.error("[v0] Error loading reports data:", error)
+      console.error("[reports] Error loading data:", error)
     } finally {
       hasLoaded.current = true
       setIsLoading(false)
@@ -262,14 +266,13 @@ export default function ReportsPage() {
 
   const calculateToday = () => {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-    // Derive today's data from already-loaded sales (no extra Firestore query)
     const activeTodaySales = sales.filter(s => {
       if (s.status === "voided") return false
-      const d = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt)
+      const d = new Date(s.createdAt)
       return d >= todayStart
     })
     const todayEwallet = ewalletTransactions.filter(t => {
-      const d = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt)
+      const d = new Date(t.createdAt)
       return d >= todayStart
     })
     const gross = activeTodaySales.reduce((sum, s) => sum + s.total, 0)

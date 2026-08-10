@@ -9,11 +9,9 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { voidSale } from "@/lib/firebase/services"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import type { Sale } from "@/lib/firebase/types"
-import type { Timestamp } from "firebase/firestore"
 
 interface SalesReportProps {
   sales: Sale[]
@@ -29,8 +27,8 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
 
-  const formatDate = (timestamp: Timestamp) => {
-    const d = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp as any)
+  const formatDate = (timestamp: any) => {
+    const d = new Date(timestamp)
     return new Intl.DateTimeFormat("en-PH", {
       month: "short", day: "numeric",
       hour: "2-digit", minute: "2-digit", hour12: true,
@@ -42,7 +40,12 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
     setVoidingId(voidTarget.id)
     setVoidTarget(null)
     try {
-      await voidSale(voidTarget.id)
+      const res = await fetch("/api/sales", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: voidTarget.id, status: "voided" }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to void")
       toast({
         title: "Sale voided",
         description: `₱${voidTarget.total.toFixed(2)} reversed — stock restored.`,
@@ -79,7 +82,7 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const recentSales = sales.filter(s => {
-    const d = s.createdAt?.toDate ? s.createdAt.toDate() : new Date(s.createdAt as any)
+    const d = new Date(s.createdAt as any)
     return d >= today
   })
 

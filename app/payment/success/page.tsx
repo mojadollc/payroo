@@ -6,10 +6,7 @@ import { CheckCircle, Loader2, LogIn, ArrowRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { getFirebaseDb } from "@/lib/firebase/config"
-import { collection, query, where, getDocs } from "firebase/firestore"
 import { useAuth } from "@/hooks/use-auth"
-import type { StoreUser } from "@/lib/firebase/types"
 
 function SuccessContent() {
   const params = useSearchParams()
@@ -27,18 +24,15 @@ function SuccessContent() {
     localStorage.setItem("pos_ext_id", ext)
 
     let attempts = 0
-    const MAX_ATTEMPTS = 20 // ~60 seconds total
+    const MAX_ATTEMPTS = 20 // ~60 seconds
 
     const poll = async () => {
       try {
-        const db = getFirebaseDb()
-        if (!db) { setLoading(false); return }
-        const snap = await getDocs(query(
-          collection(db, "customerSubscriptions"),
-          where("externalId", "==", ext)
-        ))
-        if (!snap.empty) {
-          const data = snap.docs[0].data()
+        const res = await fetch(`/api/subscription?externalId=${ext}`)
+        const json = await res.json()
+        const data = json.data
+
+        if (data) {
           setSubData(data)
 
           if (data.storeName) {
@@ -50,8 +44,7 @@ function SuccessContent() {
             window.dispatchEvent(new Event("businesstype"))
           }
 
-          // If webhook has activated the subscription, auto-login
-          if (data.status === "active" && data.xenditPaymentStatus === "PAID") {
+          if (data.status === "active") {
             setActivated(true)
             setLoading(false)
             autoLoginOwner(data, ext)
@@ -75,44 +68,25 @@ function SuccessContent() {
   const autoLoginOwner = async (sub: any, storeId: string) => {
     setAutoLogging(true)
     try {
-      const db = getFirebaseDb()
-      if (!db) return
+      const res = await fetch(`/api/store-owner?externalId=${storeId}`)
+      const json = await res.json()
+      const owner = json.data
+      if (!owner) return
 
-      // Find owner user
-      const userSnap = await getDocs(query(
-        collection(db, "storeUsers"),
-        where("externalId", "==", storeId),
-        where("role", "==", "owner"),
-        where("isActive", "==", true)
-      ))
-
-      if (userSnap.empty) return
-
-      const ownerUser = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as StoreUser
-
-      // Cache subscription
-      const endDateObj = sub.endDate?.toDate?.() ?? null
       localStorage.setItem("pos_subscription", JSON.stringify({
         loading: false,
         isActive: true,
         tier: sub.tier ?? "basic",
-        features: {
-          pos: false, inventory: false, ewallet: false, reports: false,
-          loyalty: false, utang: false, aiRestock: false, multiUser: false,
-          exportData: false, marketIntelligence: false,
-          ...(sub.features ?? {}),
-        },
+        features: sub.features ?? {},
         storeName: sub.storeName ?? null,
         businessType: sub.businessType ?? null,
         ownerName: sub.ownerName ?? null,
         ownerEmail: sub.ownerEmail ?? null,
-        endDate: endDateObj?.toISOString() ?? null,
+        endDate: sub.endDate ?? null,
         externalId: storeId,
       }))
 
-      login(ownerUser)
-
-      // Redirect to POS after brief delay so user sees success
+      login(owner)
       setTimeout(() => router.push("/pos"), 2000)
     } catch (err) {
       console.error("Auto-login failed:", err)
@@ -147,21 +121,18 @@ function SuccessContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Activating spinner */}
             {loading && !activated && (
               <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" /> Activating your account...
               </div>
             )}
 
-            {/* Auto-login redirect notice */}
             {activated && (
               <div className="flex items-center justify-center gap-2 py-2 text-green-700 text-sm font-medium">
                 <Loader2 className="h-4 w-4 animate-spin" /> Logging you in automatically...
               </div>
             )}
 
-            {/* Store info */}
             {subData && (
               <div className="rounded-lg bg-muted p-4 space-y-2 text-sm">
                 <p className="font-semibold text-base">{subData.storeName}</p>
@@ -176,7 +147,6 @@ function SuccessContent() {
               </div>
             )}
 
-            {/* Credentials — show only after activation or timeout */}
             {ownerUsername && !loading && (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
                 <p className="font-semibold text-sm flex items-center gap-2">
@@ -204,7 +174,6 @@ function SuccessContent() {
               </p>
             )}
 
-            {/* Manual buttons — show if not auto-redirecting */}
             {!loading && !autoLogging && (
               <div className="flex flex-col gap-2 pt-1">
                 {activated ? (

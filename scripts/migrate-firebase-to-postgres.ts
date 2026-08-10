@@ -213,6 +213,7 @@ async function migrateSales() {
   const productIds = new Set(products.map(p => p.id))
 
   for (const d of docs) {
+    if (!d.storeId) { log(`  skip sale ${d._id} — missing storeId`); continue }
     const existing = await prisma.sale.findUnique({ where: { id: d._id } })
     if (existing) continue
 
@@ -254,6 +255,7 @@ async function migrateInventoryTransactions() {
   const productIds = new Set(products.map(p => p.id))
 
   for (const d of docs) {
+    if (!d.storeId) { log(`  skip invTxn ${d._id} — missing storeId`); continue }
     if (!productIds.has(d.productId)) continue
     await prisma.inventoryTransaction.upsert({
       where: { id: d._id },
@@ -279,6 +281,7 @@ async function migrateEWalletTransactions() {
   const docs = await fetchAll("ewalletTransactions")
   log(`ewallet_transactions: ${docs.length} docs`)
   for (const d of docs) {
+    if (!d.storeId) { log(`  skip ewalletTxn ${d._id} — missing storeId`); continue }
     await prisma.eWalletTransaction.upsert({
       where: { id: d._id },
       update: {},
@@ -308,6 +311,7 @@ async function migrateUtang() {
   log(`utang_records: ${utangDocs.length} docs, utang_payments: ${paymentDocs.length} docs`)
 
   for (const d of utangDocs) {
+    if (!d.storeId) { log(`  skip utang ${d._id} — missing storeId`); continue }
     const existing = await prisma.utangRecord.findUnique({ where: { id: d._id } })
     if (existing) continue
 

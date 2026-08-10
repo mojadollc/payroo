@@ -1,14 +1,10 @@
-import {
-  collection, getDocs, query, where, orderBy, addDoc, updateDoc, deleteDoc, doc,
-  serverTimestamp, Timestamp, onSnapshot, writeBatch, getDoc
-} from "firebase/firestore"
-import { getFirebaseDb } from "@/lib/firebase/config"
 import { getStoreId } from "@/lib/store-id"
 import {
   localPutMany, localPut, localDelete, localGetByStoreId,
-  getPendingWrites, removePendingWrite, setLastSyncTime, getLastSyncTime,
+  getPendingWrites, removePendingWrite, setLastSyncTime,
   getPendingWriteCount,
 } from "./store"
+import { startRealtimeSync as startSSESync } from "@/lib/db/realtime"
 import type { PendingWrite } from "./db"
 
 let syncing = false
@@ -18,13 +14,22 @@ export function isOnline(): boolean {
   return typeof navigator !== "undefined" ? navigator.onLine : true
 }
 
-// ── Push: send pending local writes to Firestore ──────────────────────────────
+// ── Collection → API route map ────────────────────────────────────────────────
+
+const COLLECTION_ROUTE: Record<string, string> = {
+  products:              "/api/products",
+  categories:            "/api/categories",
+  sales:                 "/api/sales",
+  utang:                 "/api/utang",
+  inventoryTransactions: "/api/inventory-transactions",
+  ewalletTransactions:   "/api/ewallet-transactions",
+  elistas:               "/api/elistas",
+}
+
+// ── Push: send pending local writes to API routes ─────────────────────────────
 
 export async function pushPendingWrites(): Promise<{ synced: number; failed: number }> {
   if (syncing || !isOnline()) return { synced: 0, failed: 0 }
-
-  const db = getFirebaseDb()
-  if (!db) return { synced: 0, failed: 0 }
 
   const pending = await getPendingWrites()
   if (pending.length === 0) return { synced: 0, failed: 0 }
@@ -35,7 +40,7 @@ export async function pushPendingWrites(): Promise<{ synced: number; failed: num
 
   for (const pw of pending) {
     try {
-      await executePendingWrite(db, pw)
+      await executePendingWrite(pw)
       await removePendingWrite(pw.id)
       synced++
     } catch (err) {
@@ -53,59 +58,63 @@ export async function pushPendingWrites(): Promise<{ synced: number; failed: num
   return { synced, failed }
 }
 
-async function executePendingWrite(db: any, pw: PendingWrite) {
+async function executePendingWrite(pw: PendingWrite) {
   const storeId = getStoreId()
+  const route = COLLECTION_ROUTE[pw.collection]
+  if (!route) throw new Error(`No route for collection: ${pw.collection}`)
 
   if (pw.operation === "add") {
     const data = { ...pw.data }
-    delete data.id
     delete data._createdAtMs
     delete data._updatedAtMs
-    // Replace timestamp markers
-    if (data._needsServerTimestamp) {
-      data.createdAt = serverTimestamp()
-      data.updatedAt = serverTimestamp()
-      delete data._needsServerTimestamp
-    }
-    await addDoc(collection(db, pw.collection), { ...data, storeId })
+    delete data._needsServerTimestamp
+    await apiFetch(route, "POST", { ...data, storeId })
   } else if (pw.operation === "update") {
     const data = { ...pw.data }
-    delete data.id
     delete data._createdAtMs
     delete data._updatedAtMs
-    data.updatedAt = serverTimestamp()
-    await updateDoc(doc(db, pw.collection, pw.docId), data)
+    delete data._needsServerTimestamp
+    await apiFetch(route, "PATCH", { id: pw.docId, ...data })
   } else if (pw.operation === "delete") {
-    await deleteDoc(doc(db, pw.collection, pw.docId))
+    await apiFetch(`${route}?id=${pw.docId}`, "DELETE")
   }
 }
 
-// ── Pull: fetch latest data from Firestore into IndexedDB ─────────────────────
+async function apiFetch(url: string, method: string, body?: object) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+// ── Pull: fetch latest data from API into IndexedDB ───────────────────────────
 
 export async function pullCollection(
   collectionName: "products" | "categories" | "sales" | "utang" | "inventoryTransactions" | "ewalletTransactions",
 ): Promise<number> {
   if (!isOnline()) return 0
 
-  const db = getFirebaseDb()
-  if (!db) return 0
-
   const storeId = getStoreId()
   if (!storeId) return 0
 
-  try {
-    const q = query(collection(db, collectionName), where("storeId", "==", storeId))
-    const snap = await getDocs(q)
-    const items = snap.docs.map(d => {
-      const data = d.data()
-      return {
-        ...data,
-        id: d.id,
-        _createdAtMs: data.createdAt?.toMillis?.() ?? Date.now(),
-        _updatedAtMs: data.updatedAt?.toMillis?.() ?? Date.now(),
-      }
-    })
+  const route = COLLECTION_ROUTE[collectionName]
+  if (!route) return 0
 
+  try {
+    const res = await fetch(`${route}?storeId=${encodeURIComponent(storeId)}`)
+    if (!res.ok) return 0
+    const { data } = await res.json()
+    const items = (data ?? []).map((item: any) => ({
+      ...item,
+      _createdAtMs: item.createdAt ? new Date(item.createdAt).getTime() : Date.now(),
+      _updatedAtMs: item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now(),
+    }))
     await localPutMany(collectionName, items)
     await setLastSyncTime(collectionName, Date.now())
     return items.length
@@ -117,23 +126,15 @@ export async function pullCollection(
 
 export async function pullElistas(userId: string): Promise<number> {
   if (!isOnline()) return 0
-
-  const db = getFirebaseDb()
-  if (!db) return 0
-
   try {
-    const q = query(collection(db, "elistas"), where("userId", "==", userId))
-    const snap = await getDocs(q)
-    const items = snap.docs.map(d => {
-      const data = d.data()
-      return {
-        ...data,
-        id: d.id,
-        _createdAtMs: data.createdAt?.toMillis?.() ?? Date.now(),
-        _updatedAtMs: data.updatedAt?.toMillis?.() ?? Date.now(),
-      }
-    })
-
+    const res = await fetch(`/api/elistas?userId=${encodeURIComponent(userId)}`)
+    if (!res.ok) return 0
+    const { data } = await res.json()
+    const items = (data ?? []).map((item: any) => ({
+      ...item,
+      _createdAtMs: item.createdAt ? new Date(item.createdAt).getTime() : Date.now(),
+      _updatedAtMs: item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now(),
+    }))
     await localPutMany("elistas", items)
     await setLastSyncTime("elistas", Date.now())
     return items.length
@@ -143,15 +144,13 @@ export async function pullElistas(userId: string): Promise<number> {
   }
 }
 
-// ── Full sync: push then pull all collections ─────────────────────────────────
+// ── Full sync ─────────────────────────────────────────────────────────────────
 
 export async function fullSync(): Promise<{ pushed: number; pulled: number }> {
   if (!isOnline()) return { pushed: 0, pulled: 0 }
 
-  // Push first
   const { synced: pushed } = await pushPendingWrites()
 
-  // Then pull
   let pulled = 0
   const collections = ["products", "categories", "sales", "utang", "inventoryTransactions", "ewalletTransactions"] as const
   for (const col of collections) {
@@ -161,32 +160,28 @@ export async function fullSync(): Promise<{ pushed: number; pulled: number }> {
   return { pushed, pulled }
 }
 
-// ── Real-time listener for products (keeps IndexedDB in sync) ─────────────────
+// ── Real-time sync via SSE (replaces onSnapshot) ──────────────────────────────
 
 export function startRealtimeSync(): () => void {
-  const db = getFirebaseDb()
-  if (!db) return () => {}
-
   const storeId = getStoreId()
   if (!storeId) return () => {}
 
-  // Products real-time sync
-  const unsub = onSnapshot(
-    query(collection(db, "products"), where("storeId", "==", storeId)),
-    (snap) => {
-      const items = snap.docs.map(d => ({
-        ...d.data(),
-        id: d.id,
-        _createdAtMs: d.data().createdAt?.toMillis?.() ?? Date.now(),
-        _updatedAtMs: d.data().updatedAt?.toMillis?.() ?? Date.now(),
-      }))
-      localPutMany("products", items)
-    },
-    (err) => console.error("[RealtimeSync] products error:", err)
-  )
+  const unsubProducts = startSSESync(storeId)
 
-  listeners.push(unsub)
+  // Re-pull products whenever a change is notified
+  const handler = (e: Event) => {
+    const detail = (e as CustomEvent).detail
+    if (detail?.channel === "products_changed") pullCollection("products")
+    if (detail?.channel === "sales_changed") pullCollection("sales")
+    if (detail?.channel === "utang_records_changed") pullCollection("utang")
+    if (detail?.channel === "ewallet_transactions_changed") pullCollection("ewalletTransactions")
+  }
+
+  window.addEventListener("realtime-change", handler)
+  listeners.push(() => window.removeEventListener("realtime-change", handler))
+
   return () => {
+    unsubProducts()
     listeners.forEach(fn => fn())
     listeners = []
   }
@@ -200,24 +195,19 @@ export function initOfflineDB() {
   if (typeof window === "undefined" || initialized) return
   initialized = true
 
-  // Sync when coming back online
   window.addEventListener("online", () => {
     setTimeout(() => pushPendingWrites(), 1000)
   })
 
-  // Sync on tab focus
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && isOnline()) {
       pushPendingWrites()
     }
   })
 
-  // Initial sync attempt
   if (isOnline()) {
     setTimeout(() => fullSync(), 2000)
   }
 }
-
-// ── Helper: get pending count for UI ──────────────────────────────────────────
 
 export { getPendingWriteCount }

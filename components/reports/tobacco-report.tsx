@@ -77,7 +77,7 @@ function CostCapitalTable({ rows }: { rows: CostRow[] }) {
   if (rows.length === 0) return (
     <div className="flex flex-col items-center justify-center py-10">
       <Cigarette className="h-8 w-8 text-muted-foreground/30 mb-2" />
-      <p className="text-sm text-muted-foreground">No tobacco products found</p>
+      <p className="text-sm text-muted-foreground">No products with category "Tobacco" found</p>
     </div>
   )
 

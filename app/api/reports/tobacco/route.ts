@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
 
-const TOBACCO_KEYWORDS = ["cigarette", "tobacco", "cigarro", "cigar", "vape", "e-cig", "nicotine", "marlboro", "winston", "philip morris", "fortune", "hope", "champion", "camel", "menthol"]
-
-function isTobacco(name: string, category: string) {
-  const haystack = `${name} ${category}`.toLowerCase()
-  return TOBACCO_KEYWORDS.some(k => haystack.includes(k))
+function isTobacco(category: string) {
+  return category.trim().toLowerCase() === "tobacco"
 }
 
 export async function GET(req: NextRequest) {
@@ -24,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   // 1. Get all tobacco products for this store
   const allProducts = await prisma.product.findMany({ where: { storeId } })
-  const tobaccoProducts = allProducts.filter(p => isTobacco(p.name, p.category))
+  const tobaccoProducts = allProducts.filter(p => isTobacco(p.category))
   const tobaccoIds = tobaccoProducts.map(p => p.id)
 
   if (tobaccoIds.length === 0) {

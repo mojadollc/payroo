@@ -30,7 +30,7 @@
 
             <meta-data
                 android:name="android.support.customtabs.trusted.ADDITIONAL_TRUSTED_ORIGINS"
-                android:value="https://${hostName}" />
+                android:value="https://${hostName},https://${hostName2}" />
 
             <!-- Force refresh on app launch -->
             <meta-data
@@ -80,6 +80,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${hostName}" />
             </intent-filter>
+
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${hostName2}" />
+            </intent-filter>
         </activity>
 
         <!-- File Provider for splash screen -->
@@ -114,6 +121,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${hostName}" android:path="/pos" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${hostName2}" android:path="/pos" />
             </intent-filter>
         </activity-alias>
 

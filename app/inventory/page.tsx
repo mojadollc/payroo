@@ -161,6 +161,8 @@ export default function InventoryPage() {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
   const [bulkUploading, setBulkUploading] = useState(false)
   const [activeTab, setActiveTab] = useState("products")
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 20
   const { toast } = useToast()
 
   useEffect(() => {
@@ -212,6 +214,13 @@ export default function InventoryPage() {
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.barcode.includes(searchTerm)
   )
+
+  // Pagination helper
+  const paginate = (list: typeof filteredProducts) => {
+    const total = Math.ceil(list.length / PAGE_SIZE)
+    const page = Math.min(currentPage, total || 1)
+    return { items: list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total, page }
+  }
 
   // Calculate Stock Value (Cost * Stock)
   const totalStockValue = products.reduce((sum, p) => sum + (p.cost * p.stock), 0)
@@ -380,7 +389,58 @@ export default function InventoryPage() {
     return null
   }
 
-  const renderProductList = (list: typeof filteredProducts) => (
+  const PaginationBar = ({ total, page, onChange }: { total: number; page: number; onChange: (p: number) => void }) => {
+    if (total <= 1) return null
+    return (
+      <div className="flex items-center justify-center gap-1 pt-2">
+        <button
+          onClick={() => onChange(1)}
+          disabled={page === 1}
+          className="px-2 py-1 text-xs rounded border disabled:opacity-40 hover:bg-muted transition-colors"
+        >«</button>
+        <button
+          onClick={() => onChange(page - 1)}
+          disabled={page === 1}
+          className="px-2 py-1 text-xs rounded border disabled:opacity-40 hover:bg-muted transition-colors"
+        >‹</button>
+        {Array.from({ length: total }, (_, i) => i + 1)
+          .filter(p => p === 1 || p === total || Math.abs(p - page) <= 1)
+          .reduce<(number | "...")[]>((acc, p, i, arr) => {
+            if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("...")
+            acc.push(p)
+            return acc
+          }, [])
+          .map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onChange(p as number)}
+                className={`px-2.5 py-1 text-xs rounded border transition-colors ${
+                  p === page ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                }`}
+              >{p}</button>
+            )
+          )}
+        <button
+          onClick={() => onChange(page + 1)}
+          disabled={page === total}
+          className="px-2 py-1 text-xs rounded border disabled:opacity-40 hover:bg-muted transition-colors"
+        >›</button>
+        <button
+          onClick={() => onChange(total)}
+          disabled={page === total}
+          className="px-2 py-1 text-xs rounded border disabled:opacity-40 hover:bg-muted transition-colors"
+        >»</button>
+        <span className="ml-2 text-xs text-muted-foreground">{page}/{total}</span>
+      </div>
+    )
+  }
+
+  const renderProductList = (list: typeof filteredProducts) => {
+    const { items, total, page } = paginate(list)
+    return (
     <>
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
@@ -388,7 +448,7 @@ export default function InventoryPage() {
           <Input
             placeholder="Search products..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8"
           />
         </div>
@@ -414,9 +474,9 @@ export default function InventoryPage() {
 
       {viewMode === "grid" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {list.map((product) => (
+          {items.map((product) => (
             <div key={product.id} className="rounded-lg border overflow-hidden bg-card hover:shadow-md transition-shadow">
-              <div className="relative w-full aspect-square bg-muted">
+              <div className="relative w-full h-28 sm:h-32 bg-muted">
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 ) : (
@@ -482,7 +542,7 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((product) => (
+              {items.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
@@ -526,8 +586,15 @@ export default function InventoryPage() {
           </Table>
         </div>
       )}
+      <PaginationBar total={total} page={page} onChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: "smooth" }) }} />
+      {list.length > 0 && (
+        <p className="text-center text-xs text-muted-foreground">
+          Showing {Math.min((page - 1) * PAGE_SIZE + 1, list.length)}–{Math.min(page * PAGE_SIZE, list.length)} of {list.length} products
+        </p>
+      )}
     </>
-  )
+    )
+  }
 
   const handleBulkFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -574,6 +641,10 @@ export default function InventoryPage() {
     "low-stock": filteredProducts.filter(p => p.stock > 0 && p.stock <= 5),
     "out-of-stock": filteredProducts.filter(p => p.stock === 0),
   } as Record<string, typeof filteredProducts>
+
+  // Reset page when search or tab changes
+  const handleSearchChange = (val: string) => { setSearchTerm(val); setCurrentPage(1) }
+  const handleTabChange = (val: string) => { setActiveTab(val); setCurrentPage(1) }
 
   return (
     <MobileAppShell
@@ -641,7 +712,7 @@ export default function InventoryPage() {
         </div>
 
         {/* Tab Filter */}
-        <Select value={activeTab} onValueChange={setActiveTab}>
+        <Select value={activeTab} onValueChange={handleTabChange}>
           <SelectTrigger className="w-full h-12 rounded-xl border-2">
             <SelectValue />
           </SelectTrigger>
@@ -662,7 +733,7 @@ export default function InventoryPage() {
                 <Input
                   placeholder="Search products..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
                 />
               </div>
@@ -677,13 +748,16 @@ export default function InventoryPage() {
               <CategoryManager categories={categories} onUpdate={loadCategories} />
             </div>
           </MobileCard>
-        ) : (
+        ) : (() => {
+          const mobileList = tabProducts[activeTab] ?? filteredProducts
+          const { items: mobileItems, total: mobileTotal, page: mobilePage } = paginate(mobileList)
+          return (
           <div>
             <MobileSectionHeader title={activeTab === "products" ? `All ${cfg.itemLabelPlural}` : activeTab === "low-stock" ? "Low Stock" : "Out of Stock"} />
             <div className="grid grid-cols-2 gap-3">
-              {(tabProducts[activeTab] ?? filteredProducts).map((product) => (
+              {mobileItems.map((product) => (
                 <MobileCard key={product.id}>
-                  <div className="relative aspect-square bg-muted">
+                  <div className="relative h-28 bg-muted">
                     {product.imageUrl ? (
                       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     ) : (
@@ -730,8 +804,15 @@ export default function InventoryPage() {
                 </MobileCard>
               ))}
             </div>
+            <PaginationBar total={mobileTotal} page={mobilePage} onChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: "smooth" }) }} />
+            {mobileList.length > 0 && (
+              <p className="text-center text-xs text-muted-foreground pt-1">
+                Showing {Math.min((mobilePage - 1) * PAGE_SIZE + 1, mobileList.length)}–{Math.min(mobilePage * PAGE_SIZE, mobileList.length)} of {mobileList.length}
+              </p>
+            )}
           </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* ── Desktop View ── */}

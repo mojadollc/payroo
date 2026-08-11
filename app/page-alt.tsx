@@ -13,7 +13,7 @@ import {
   Barcode, Gift, Rocket, Shield, Sparkles, Crown, Target
 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
-import { getSubscriptionPlans } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import type { SubscriptionPlan } from "@/lib/firebase/types"
 
@@ -28,8 +28,9 @@ export default function HomePage() {
   }, [user, loading, router])
 
   useEffect(() => {
-    getSubscriptionPlans()
-      .then(p => setPlans(p.filter(pl => pl.isActive)))
+    fetch("/api/management/plans")
+      .then(r => r.json())
+      .then(({ data: p }) => setPlans((p ?? []).filter((pl: any) => pl.isActive)))
       .finally(() => setPlansLoading(false))
   }, [])
 

@@ -6,8 +6,8 @@ import {
   ChevronLeft, CheckCircle, XCircle, AlertTriangle,
   Loader2, Delete, ChevronRight, RotateCcw,
 } from "lucide-react"
-import { addEWalletTransaction, getCommissionSettings } from "@/lib/firebase/services"
 import type { CommissionSettings } from "@/lib/firebase/types"
+import { getStoreId } from "@/lib/store-id"
 
 type Step = "browse" | "phone" | "confirm" | "processing" | "success" | "failed"
 
@@ -68,7 +68,13 @@ export default function ELoadPage() {
       .finally(() => setLoading(false))
 
     // Load commission settings for e-load fee
-    getCommissionSettings().then(s => setCommSettings(s)).catch(() => {})
+    const storeId = getStoreId()
+    if (storeId) {
+      fetch(`/api/commission-settings?storeId=${storeId}`)
+        .then(r => r.json())
+        .then(({ data }) => { if (data) setCommSettings(data) })
+        .catch(() => {})
+    }
   }, [])
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
@@ -131,22 +137,19 @@ export default function ELoadPage() {
   const recordEloadTransaction = async (refId: string) => {
     if (!selectedProduct) return
     try {
+      const storeId = getStoreId()
       const feeType = commSettings?.eloadFeeType || "flat"
       const feeValue = commSettings?.eloadFeeValue ?? 5
       const fee = feeType === "flat" ? feeValue : selectedProduct.amount * feeValue
       const rate = feeType === "percentage" ? feeValue : feeValue / selectedProduct.amount
-
-      await addEWalletTransaction({
-        type: "load",
-        provider: "gcash" as const, // stored as gcash but represents e-load via GBITS
-        amount: selectedProduct.amount,
-        commission: fee,
-        commissionRate: rate,
-        profit: fee,
-        customerName: phone,
-        customerNumber: phone,
-        referenceNumber: refId,
-        status: "completed",
+      await fetch("/api/ewallet-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId, type: "load", provider: "gcash", amount: selectedProduct.amount,
+          commission: fee, commissionRate: rate, profit: fee,
+          customerName: phone, customerNumber: phone, referenceNumber: refId, status: "completed",
+        }),
       })
     } catch (e) {
       console.error("Failed to record e-load transaction:", e)

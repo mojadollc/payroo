@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { getAllDeliveryBanners, addDeliveryBanner, updateDeliveryBanner, deleteDeliveryBanner, uploadDeliveryImage } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import type { DeliveryBanner } from "@/lib/firebase/types"
 
 export function DeliveryBannerManager() {
@@ -18,7 +18,9 @@ export function DeliveryBannerManager() {
   const [uploading, setUploading] = useState(false)
 
   const load = () => {
-    getAllDeliveryBanners().then(b => { setBanners(b); setLoading(false) })
+    fetch("/api/management/banners")
+      .then(r => r.json())
+      .then(({ data: b }) => { setBanners(b ?? []); setLoading(false) })
   }
 
   useEffect(() => { load() }, [])
@@ -26,8 +28,17 @@ export function DeliveryBannerManager() {
   const handleAdd = async (file: File) => {
     setUploading(true)
     try {
-      const url = await uploadDeliveryImage(file, "banners")
-      await addDeliveryBanner({ imageUrl: url, title: "", link: "", order: banners.length, active: true })
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      await fetch("/api/management/banners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: base64, title: "", link: "", order: banners.length, active: true }),
+      })
       toast({ title: "Banner added" })
       load()
     } catch { toast({ title: "Failed to add banner", variant: "destructive" }) }
@@ -35,18 +46,26 @@ export function DeliveryBannerManager() {
   }
 
   const handleDelete = async (id: string) => {
-    await deleteDeliveryBanner(id)
+    await fetch(`/api/management/banners?id=${id}`, { method: "DELETE" })
     toast({ title: "Banner removed" })
     load()
   }
 
   const handleToggle = async (id: string, active: boolean) => {
-    await updateDeliveryBanner(id, { active })
+    await fetch("/api/management/banners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active }),
+    })
     load()
   }
 
   const handleUpdate = async (id: string, field: "title" | "link", value: string) => {
-    await updateDeliveryBanner(id, { [field]: value })
+    await fetch("/api/management/banners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, [field]: value }),
+    })
   }
 
   if (loading) return <div className="text-center py-8 text-muted-foreground">Loading banners...</div>

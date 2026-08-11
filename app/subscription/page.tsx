@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { getSubscriptionPlans } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/business-config"
 import type { SubscriptionPlan, SubscriptionFeatures, SubscriptionTier } from "@/lib/firebase/types"
 
@@ -67,8 +67,9 @@ function SubscriptionContent() {
   const [dialogOpen, setDialogOpen] = useState(false)
 
   useEffect(() => {
-    getSubscriptionPlans()
-      .then(p => setPlans(p.filter(pl => pl.isActive)))
+    fetch("/api/management/plans")
+      .then(r => r.json())
+      .then(({ data: p }) => setPlans((p ?? []).filter((pl: any) => pl.isActive)))
       .finally(() => setLoading(false))
   }, [])
 

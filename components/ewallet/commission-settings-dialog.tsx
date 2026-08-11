@@ -8,9 +8,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { updateCommissionSettings } from "@/lib/firebase/services"
 import type { CommissionSettings } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
+import { getStoreId } from "@/lib/store-id"
 
 interface CommissionSettingsDialogProps {
   settings: CommissionSettings
@@ -55,17 +55,22 @@ export function CommissionSettingsDialog({ settings, open, onOpenChange, onSucce
 
     setIsSubmitting(true)
     try {
-      await updateCommissionSettings(settings.id!, {
-        // Preserve xendit/admin values — only store owner's own rates are editable here
-        xenditFlatFee: settings.xenditFlatFee ?? 10,
-        adminChargeRate: settings.adminChargeRate ?? 0.01,
-        sellerCashinRate: sellerCashinRate / 100,
-        gcashCashinRate: gcashCashin / 100,
-        gcashCashoutRate: gcashCashout / 100,
-        mayaCashinRate: mayaCashin / 100,
-        mayaCashoutRate: mayaCashout / 100,
-        eloadFeeType: formData.eloadFeeType as "flat" | "percentage",
-        eloadFeeValue: formData.eloadFeeType === "percentage" ? parseFloat(formData.eloadFeeValue) / 100 : parseFloat(formData.eloadFeeValue),
+      const storeId = getStoreId()
+      await fetch("/api/commission-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId,
+          xenditFlatFee: settings.xenditFlatFee ?? 10,
+          adminChargeRate: settings.adminChargeRate ?? 0.01,
+          sellerCashinRate: sellerCashinRate / 100,
+          gcashCashinRate: gcashCashin / 100,
+          gcashCashoutRate: gcashCashout / 100,
+          mayaCashinRate: mayaCashin / 100,
+          mayaCashoutRate: mayaCashout / 100,
+          eloadFeeType: formData.eloadFeeType,
+          eloadFeeValue: formData.eloadFeeType === "percentage" ? parseFloat(formData.eloadFeeValue) / 100 : parseFloat(formData.eloadFeeValue),
+        }),
       })
       toast({ title: "Commission settings saved" })
       onSuccess()

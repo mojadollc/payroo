@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { getSales, getProducts, updateProduct } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { generateRestockReport, type RestockReport, type RestockSuggestion } from "@/lib/ai-restock-engine"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
@@ -36,7 +36,11 @@ function RestockDialog({ suggestion, onClose, onDone }: {
     if (isNaN(add) || add <= 0) return
     setSaving(true)
     try {
-      await updateProduct(suggestion.productId, { stock: suggestion.currentStock + add })
+      await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: suggestion.productId, stock: suggestion.currentStock + add }),
+      })
       toast({ title: `âœ… Restocked ${suggestion.productName}`, description: `+${add} units added` })
       onDone()
       onClose()
@@ -137,13 +141,16 @@ function RestockPageContent() {
   const runAnalysis = useCallback(async (lat?: number, lon?: number) => {
     if (!hasLoaded.current) setLoading(true)
     try {
+      const storeId = getStoreId()
+      if (!storeId) return
       const today = new Date()
       const ninetyDaysAgo = new Date(today); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
-      const [sales, products] = await Promise.all([
-        getSales(ninetyDaysAgo, today),
-        getProducts(),
+      const [salesRes, productsRes] = await Promise.all([
+        fetch(`/api/sales?storeId=${storeId}&from=${ninetyDaysAgo.toISOString()}&to=${today.toISOString()}`),
+        fetch(`/api/products?storeId=${storeId}`),
       ])
-      const r = await generateRestockReport(sales, products, lat, lon)
+      const [{ data: sales }, { data: products }] = await Promise.all([salesRes.json(), productsRes.json()])
+      const r = await generateRestockReport(sales ?? [], products ?? [], lat, lon)
       setReport(r)
     } catch (e) {
       toast({ title: "Analysis failed", description: "Could not generate restock report", variant: "destructive" })

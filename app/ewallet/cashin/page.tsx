@@ -6,7 +6,7 @@ import Image from "next/image"
 import { CheckCircle, XCircle, AlertTriangle, Loader2, Delete, ChevronLeft, RotateCcw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getStoreId } from "@/lib/store-id"
-import { getCommissionSettings } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 
 const PRESETS = [50, 100, 200, 300, 500, 1000, 2000, 5000]
 const MIN_AMOUNT = 50
@@ -42,14 +42,16 @@ function Kiosk() {
 
   // Load commission rate
   useEffect(() => {
-    getCommissionSettings().then(settings => {
-      if (settings) {
-        setFeeRate(settings.sellerCashinRate || settings.gcashCashinRate || 0.02)
-        setXenditFlatFee(settings.xenditFlatFee ?? 10)
-        setXenditVatRate(settings.xenditVatRate ?? 0.12)
-        setAdminChargeRate(settings.adminChargeRate ?? 0.01)
-      }
-    }).catch(() => {})
+    getStoreId() && fetch(`/api/commission-settings?storeId=${getStoreId()}`)
+      .then(r => r.json())
+      .then(({ data: settings }) => {
+        if (settings) {
+          setFeeRate(settings.sellerCashinRate || settings.gcashCashinRate || 0.02)
+          setXenditFlatFee(settings.xenditFlatFee ?? 10)
+          setXenditVatRate(settings.xenditVatRate ?? 0.12)
+          setAdminChargeRate(settings.adminChargeRate ?? 0.01)
+        }
+      }).catch(() => {})
   }, [])
 
   // Online/offline detection — reset to select if offline mid-transaction

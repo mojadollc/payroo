@@ -12,11 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { addUtang, getUtangList, addUtangPayment, deleteUtang, searchUtangByName, getUtangPayments } from "@/lib/firebase/services"
-import { getStoreSettings } from "@/lib/firebase/services"
 import { getStoreId } from "@/lib/store-id"
 import type { UtangRecord, UtangPayment } from "@/lib/firebase/types"
-import { Timestamp } from "firebase/firestore"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
@@ -66,8 +63,9 @@ function AddUtangDialog({ onClose, onSuccess, storeName, storeId }: { onClose: (
 
   const checkNetwork = useCallback(async (name: string) => {
     if (name.trim().length < 2) { setWarning([]); return }
-    const results = await searchUtangByName(name.trim())
-    setWarning(results)
+    const res = await fetch(`/api/utang?search=${encodeURIComponent(name.trim())}`)
+    const { data } = await res.json()
+    setWarning(data ?? [])
   }, [])
 
   useEffect(() => {
@@ -83,17 +81,17 @@ function AddUtangDialog({ onClose, onSuccess, storeName, storeId }: { onClose: (
     setSaving(true)
     try {
       const total = Number(amount)
-      await addUtang({
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim() || undefined,
-        storeId,
-        storeName,
-        items: [{ productName: notes.trim() || "Credit purchase", quantity: 1, price: total, subtotal: total }],
-        totalAmount: total,
-        amountPaid: 0,
-        balance: total,
-        status: "active",
-        notes: notes.trim() || undefined,
+      await fetch("/api/utang", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim() || undefined,
+          storeId, storeName,
+          items: [{ productName: notes.trim() || "Credit purchase", quantity: 1, price: total, subtotal: total }],
+          totalAmount: total, amountPaid: 0, balance: total, status: "active",
+          notes: notes.trim() || undefined,
+        }),
       })
       toast({ title: "Utang recorded" })
       onSuccess()
@@ -147,18 +145,20 @@ function PayDialog({ utang, onClose, onSuccess }: { utang: UtangRecord; onClose:
   const { toast } = useToast()
 
   const handlePay = async () => {
-    const paid = Number(amount)
-    if (!paid || paid <= 0) { toast({ title: "Enter valid amount", variant: "destructive" }); return }
-    setSaving(true)
     try {
-      const payment: Omit<UtangPayment, "id" | "createdAt"> = {
-        utangId: utang.id!,
-        customerName: utang.customerName,
-        amount: paid,
-        method,
-        referenceNumber: ref.trim() || undefined,
-      }
-      await addUtangPayment(payment, utang.id!, utang.balance - paid)
+      const paid = Number(amount)
+      if (!paid || paid <= 0) { toast({ title: "Enter valid amount", variant: "destructive" }); return }
+      setSaving(true)
+      const newBalance = utang.balance - paid
+      await fetch("/api/utang/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          utangId: utang.id, customerName: utang.customerName,
+          amount: paid, method, referenceNumber: ref.trim() || undefined,
+          newBalance,
+        }),
+      })
       toast({ title: "Payment recorded", description: `₱${paid.toFixed(2)} received` })
       onSuccess()
       onClose()
@@ -213,14 +213,15 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
 
   const loadPayments = async () => {
     if (!expanded) {
-      const p = await getUtangPayments(record.id!)
-      setPayments(p)
+      const res = await fetch(`/api/utang/payments?utangId=${record.id}`)
+      const { data } = await res.json()
+      setPayments(data ?? [])
     }
     setExpanded(e => !e)
   }
 
   const statusColor = record.status === "settled" ? "bg-green-100 text-green-700" : record.status === "partial" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
-  const createdAt = record.createdAt instanceof Timestamp ? record.createdAt.toDate() : new Date()
+  const createdAt = new Date(record.createdAt)
 
   return (
     <MobileCard className="p-3">
@@ -263,7 +264,7 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
           {payments.length === 0 ? (
             <p className="text-xs text-muted-foreground">No payments yet</p>
           ) : payments.map(p => {
-            const pDate = p.createdAt instanceof Timestamp ? p.createdAt.toDate() : new Date()
+            const pDate = new Date(p.createdAt)
             return (
               <div key={p.id} className="flex justify-between text-xs bg-muted/30 rounded-lg p-2">
                 <span className="text-muted-foreground">{pDate.toLocaleDateString()} · {p.method.toUpperCase()}{p.referenceNumber ? ` #${p.referenceNumber}` : ""}</span>
@@ -299,8 +300,10 @@ function UtangPageContent() {
 
   const load = useCallback(async () => {
     try {
-      const data = await getUtangList()
-      setRecords(data)
+      const storeId = getStoreId()
+      const res = await fetch(`/api/utang?storeId=${storeId}`)
+      const { data } = await res.json()
+      setRecords(data ?? [])
     } catch (e) {
       console.error("Utang load error:", e)
       toast({ title: "Error loading utang records", variant: "destructive" })
@@ -309,16 +312,19 @@ function UtangPageContent() {
 
   useEffect(() => {
     load()
-    getStoreSettings().then(s => { if (s?.name) setStoreName(s.name) })
-    const sid = getStoreId()
-    setStoreId(sid || "")
+    const storeId = getStoreId()
+    setStoreId(storeId || "")
+    fetch(`/api/store-settings?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ data }) => { if (data?.name) setStoreName(data.name) })
+      .catch(() => {})
   }, [load])
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this utang record?")) return
     setRecords(prev => prev.filter(r => r.id !== id))
     try {
-      await deleteUtang(id)
+      await fetch(`/api/utang?id=${id}`, { method: "DELETE" })
       toast({ title: "Deleted" })
     } catch {
       load()

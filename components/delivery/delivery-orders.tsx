@@ -5,7 +5,7 @@ import { Package, Phone, MapPin, Clock } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { getDeliveryOrders, updateDeliveryOrderStatus } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { getStoreId } from "@/lib/store-id"
 import type { DeliveryOrder } from "@/lib/firebase/types"
 
@@ -24,7 +24,9 @@ export function DeliveryOrdersList() {
   const [loading, setLoading] = useState(true)
 
   const load = () => {
-    getDeliveryOrders(getStoreId()).then(o => { setOrders(o); setLoading(false) })
+    fetch(`/api/delivery/orders?storeId=${getStoreId()}`)
+      .then(r => r.json())
+      .then(({ data: o }) => { setOrders(o ?? []); setLoading(false) })
   }
 
   useEffect(() => { load() }, [])
@@ -35,7 +37,11 @@ export function DeliveryOrdersList() {
   }
 
   const handleUpdate = async (orderId: string, status: DeliveryOrder["status"]) => {
-    await updateDeliveryOrderStatus(orderId, status)
+    await fetch("/api/delivery/orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: orderId, status }),
+    })
     load()
   }
 

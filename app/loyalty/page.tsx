@@ -12,15 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import {
-  getLoyaltyCustomers, createLoyaltyCustomer, getLoyaltyRules, saveLoyaltyRule,
-  deleteLoyaltyRule, getLoyaltySettings, saveLoyaltySettings, getLoyaltyTransactions,
-  redeemLoyaltyCoins,
-} from "@/lib/firebase/services"
-import { getProducts } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import type { LoyaltyCustomer, LoyaltyRule, LoyaltySettings, LoyaltyTransaction } from "@/lib/firebase/types"
 import type { Product } from "@/lib/firebase/types"
-import { Timestamp } from "firebase/firestore"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
@@ -55,7 +49,11 @@ function AddCustomerDialog({ onClose, onSuccess }: { onClose: () => void; onSucc
     if (!name.trim()) { toast({ title: "Enter customer name", variant: "destructive" }); return }
     setSaving(true)
     try {
-      await createLoyaltyCustomer(name.trim(), phone.trim() || undefined)
+      await fetch("/api/loyalty/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId: getStoreId(), name: name.trim(), phone: phone.trim() || undefined }),
+      })
       toast({ title: "Customer enrolled!" })
       onSuccess()
       onClose()
@@ -96,7 +94,11 @@ function RedeemDialog({ customer, settings, onClose, onSuccess }: {
     if (!canRedeem) return
     setSaving(true)
     try {
-      await redeemLoyaltyCoins(customer.id!, customer.name, coinsNum)
+      await fetch("/api/loyalty/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: customer.id, customerName: customer.name, coins: coinsNum }),
+      })
       toast({ title: `Redeemed ${coinsNum} coins`, description: `₱${discount.toFixed(2)} discount applied` })
       onSuccess()
       onClose()
@@ -142,7 +144,11 @@ function CustomerRow({ customer, settings, onQR, onRedeem, onRefresh }: {
   const [txs, setTxs] = useState<LoyaltyTransaction[]>([])
 
   const loadTxs = async () => {
-    if (!expanded) { const t = await getLoyaltyTransactions(customer.id!); setTxs(t) }
+    if (!expanded) {
+      const res = await fetch(`/api/loyalty/transactions?customerId=${customer.id}`)
+      const { data } = await res.json()
+      setTxs(data ?? [])
+    }
     setExpanded(e => !e)
   }
 
@@ -212,7 +218,9 @@ function RulesTab({ products }: { products: Product[] }) {
   const { toast } = useToast()
 
   const loadRules = useCallback(async () => {
-    setRules(await getLoyaltyRules())
+    const res = await fetch("/api/loyalty/rules")
+    const { data } = await res.json()
+    setRules(data ?? [])
   }, [])
 
   useEffect(() => { loadRules() }, [loadRules])
@@ -222,7 +230,11 @@ function RulesTab({ products }: { products: Product[] }) {
     if (!product || !buyQty || !earnCoins) { toast({ title: "Fill all fields", variant: "destructive" }); return }
     setSaving(true)
     try {
-      await saveLoyaltyRule({ productId: product.id!, productName: product.name, buyQty: Number(buyQty), earnCoins: Number(earnCoins) })
+      await fetch("/api/loyalty/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: product.id, productName: product.name, buyQty: Number(buyQty), earnCoins: Number(earnCoins) }),
+      })
       toast({ title: "Rule saved" })
       setSelectedProductId(""); setBuyQty("5"); setEarnCoins("1")
       loadRules()
@@ -231,7 +243,7 @@ function RulesTab({ products }: { products: Product[] }) {
   }
 
   const handleDelete = async (id: string) => {
-    await deleteLoyaltyRule(id)
+    await fetch(`/api/loyalty/rules?id=${id}`, { method: "DELETE" })
     loadRules()
   }
 
@@ -296,13 +308,22 @@ function SettingsTab() {
   const { toast } = useToast()
 
   useEffect(() => {
-    getLoyaltySettings().then(s => { setMinCoins(String(s.minRedeemCoins)); setCoinValue(String(s.coinValuePeso)) })
+    const storeId = getStoreId()
+    if (!storeId) return
+    fetch(`/api/loyalty/settings?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ data: s }) => { if (s) { setMinCoins(String(s.minRedeemCoins)); setCoinValue(String(s.coinValuePeso)) } })
   }, [])
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await saveLoyaltySettings({ minRedeemCoins: Number(minCoins), coinValuePeso: Number(coinValue) })
+      const storeId = getStoreId()
+      await fetch("/api/loyalty/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId, minRedeemCoins: Number(minCoins), coinValuePeso: Number(coinValue) }),
+      })
       toast({ title: "Settings saved" })
     } catch { toast({ title: "Error saving settings", variant: "destructive" }) }
     finally { setSaving(false) }
@@ -346,8 +367,16 @@ function LoyaltyPageContent() {
 
   const load = useCallback(async () => {
     try {
-      const [c, s, p] = await Promise.all([getLoyaltyCustomers(), getLoyaltySettings(), getProducts()])
-      setCustomers(c); setSettings(s); setProducts(p)
+      const storeId = getStoreId()
+      const [cRes, sRes, pRes] = await Promise.all([
+        fetch(`/api/loyalty/customers?storeId=${storeId}`),
+        fetch(`/api/loyalty/settings?storeId=${storeId}`),
+        fetch(`/api/products?storeId=${storeId}`),
+      ])
+      const [{ data: c }, { data: s }, { data: p }] = await Promise.all([cRes.json(), sRes.json(), pRes.json()])
+      setCustomers(c ?? [])
+      if (s) setSettings(s)
+      setProducts(p ?? [])
     } catch { toast({ title: "Error loading data", variant: "destructive" }) }
   }, [toast])
 

@@ -12,7 +12,6 @@ import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { getStoreUsers, addStoreUser, updateStoreUser, deleteStoreUser } from "@/lib/firebase/services"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
 import type { StoreUser, UserRole, SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
@@ -97,7 +96,9 @@ function UsersPageContent() {
     if (!externalId) return
     setLoading(true)
     try {
-      setUsers(await getStoreUsers(externalId))
+      const res = await fetch(`/api/store-users?externalId=${externalId}`)
+      const { data } = await res.json()
+      setUsers(data ?? [])
     } catch {
       toast({ title: "Failed to load users", variant: "destructive" })
     } finally {
@@ -175,10 +176,10 @@ function UsersPageContent() {
       }
       
       if (editing?.id) {
-        await updateStoreUser(editing.id, payload)
+        await fetch("/api/store-users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editing.id, ...payload }) })
         toast({ title: "User updated" })
       } else {
-        await addStoreUser({ ...payload, externalId })
+        await fetch("/api/store-users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, externalId }) })
         toast({ title: "User created", description: `${form.name} can now log in as ${form.role}` })
       }
       setDialogOpen(false)
@@ -193,7 +194,7 @@ function UsersPageContent() {
   const handleDelete = async (u: StoreUser) => {
     if (u.role === "owner") { toast({ title: "Cannot delete the owner account", variant: "destructive" }); return }
     if (!confirm(`Remove ${u.name}?`)) return
-    await deleteStoreUser(u.id!)
+    await fetch(`/api/store-users?id=${u.id}`, { method: "DELETE" })
     toast({ title: "User removed" })
     load()
   }
@@ -202,7 +203,7 @@ function UsersPageContent() {
     if (u.role === "owner") return
     // Subadmins can only toggle cashiers
     if (!can("owner") && u.role === "subadmin") return
-    await updateStoreUser(u.id!, { isActive: !u.isActive })
+    await fetch("/api/store-users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: u.id, isActive: !u.isActive }) })
     toast({ title: u.isActive ? `${u.name} disabled` : `${u.name} enabled` })
     load()
   }

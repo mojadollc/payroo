@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { getAllDeliveryStores, getDeliveryBanners, searchDeliveryProducts } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import type { DeliverySettings, DeliveryBanner, Product } from "@/lib/firebase/types"
 import StoreDeliveryClient from "@/components/delivery/store-delivery-client"
 
@@ -101,8 +101,11 @@ function DeliveryHomepage() {
   useEffect(() => {
     const saved = localStorage.getItem(ADDRESS_KEY)
     if (saved) setAddress(saved)
-    Promise.all([getAllDeliveryStores(), getDeliveryBanners()])
-      .then(([s, b]) => { setStores(s); setBanners(b) })
+    Promise.all([
+      fetch("/api/delivery/stores").then(r => r.json()),
+      fetch("/api/management/banners").then(r => r.json()),
+    ])
+      .then(([{ data: s }, { data: b }]) => { setStores(s ?? []); setBanners((b ?? []).filter((x: any) => x.active)) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -117,8 +120,9 @@ function DeliveryHomepage() {
     if (!search.trim()) { setSearchResults(null); return }
     const timeout = setTimeout(async () => {
       setSearching(true)
-      const results = await searchDeliveryProducts(search.trim())
-      setSearchResults(results)
+      const res = await fetch(`/api/delivery/search?q=${encodeURIComponent(search.trim())}`)
+      const { data: results } = await res.json()
+      setSearchResults(results ?? [])
       setSearching(false)
     }, 400)
     return () => clearTimeout(timeout)

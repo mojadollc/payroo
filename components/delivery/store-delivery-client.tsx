@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { getDeliverySettings, getDeliveryProducts, addDeliveryOrder } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import type { DeliverySettings, Product } from "@/lib/firebase/types"
 
 interface CartItem { product: Product; quantity: number }
@@ -38,11 +38,15 @@ export default function StoreDeliveryClient({ storeId }: { storeId: string }) {
 
   useEffect(() => {
     const load = async () => {
-      const settings = await getDeliverySettings(storeId)
+      const [sRes, pRes] = await Promise.all([
+        fetch(`/api/delivery/settings?storeId=${storeId}`),
+        fetch(`/api/products?storeId=${storeId}`),
+      ])
+      const [{ data: settings }, { data: prods }] = await Promise.all([sRes.json(), pRes.json()])
       if (!settings) { setLoading(false); return }
       setStore(settings)
-      const prods = await getDeliveryProducts(storeId, settings.enabledProductIds)
-      setProducts(prods.filter(p => p.stock > 0))
+      const enabledIds = new Set(settings.enabledProductIds ?? [])
+      setProducts((prods ?? []).filter((p: any) => p.stock > 0 && enabledIds.has(p.id)))
       setLoading(false)
     }
     load()
@@ -82,16 +86,20 @@ export default function StoreDeliveryClient({ storeId }: { storeId: string }) {
     if (!store || !custName || !custPhone || !custAddress) return
     setSubmitting(true)
     try {
-      await addDeliveryOrder({
-        storeId: store.storeId, storeName: store.storeName,
-        customerName: custName, customerPhone: custPhone, customerAddress: custAddress,
-        items: cart.map(c => ({
-          productId: c.product.id!, productName: c.product.name,
-          price: c.product.onSale && c.product.salePrice ? c.product.salePrice : c.product.price,
-          quantity: c.quantity,
-          subtotal: (c.product.onSale && c.product.salePrice ? c.product.salePrice : c.product.price) * c.quantity,
-        })),
-        total: grandTotal, deliveryFee, status: "pending", notes: custNotes || undefined,
+      await fetch("/api/delivery/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId: store.storeId, storeName: store.storeName,
+          customerName: custName, customerPhone: custPhone, customerAddress: custAddress,
+          items: cart.map(c => ({
+            productId: c.product.id, productName: c.product.name,
+            price: c.product.onSale && c.product.salePrice ? c.product.salePrice : c.product.price,
+            quantity: c.quantity,
+            subtotal: (c.product.onSale && c.product.salePrice ? c.product.salePrice : c.product.price) * c.quantity,
+          })),
+          total: grandTotal, deliveryFee, status: "pending", notes: custNotes || undefined,
+        }),
       })
       setOrderSuccess(true); setCart([]); setCheckoutOpen(false)
     } catch { alert("Failed to place order. Please try again.") }

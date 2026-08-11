@@ -16,12 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import {
-  getMarketTopProducts,
-  getMarketHourlySales,
-  getMarketCityBreakdown,
-  getMarketDistinctValues,
-} from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 
 const HOUR_LABELS = ["12am","1am","2am","3am","4am","5am","6am","7am","8am","9am","10am","11am",
@@ -76,36 +71,30 @@ function MarketIntelligencePageContent() {
 
   const loadFilters = useCallback(async () => {
     try {
-      const [c, r, cat, bt, prod] = await Promise.all([
-        getMarketDistinctValues("city"),
-        getMarketDistinctValues("region"),
-        getMarketDistinctValues("category"),
-        getMarketDistinctValues("businessType"),
-        getMarketDistinctValues("productName"),
-      ])
-      setCities(c); setRegions(r); setCategories(cat)
-      setBusinessTypes(bt); setProducts(prod)
+      const res = await fetch("/api/market-intelligence/distinct")
+      const { data } = await res.json()
+      if (data) {
+        setCities(data.cities ?? []); setRegions(data.regions ?? []); setCategories(data.categories ?? [])
+        setBusinessTypes(data.businessTypes ?? []); setProducts(data.products ?? [])
+      }
     } catch {}
   }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const filters = {
-        city: selectedCity !== "all" ? selectedCity : undefined,
-        region: selectedRegion !== "all" ? selectedRegion : undefined,
-        category: selectedCategory !== "all" ? selectedCategory : undefined,
-        businessType: selectedBusinessType !== "all" ? selectedBusinessType : undefined,
-        month: selectedMonth || undefined,
-      }
-      const [tp, hs, cb] = await Promise.all([
-        getMarketTopProducts({ ...filters, limit: 15 }),
-        getMarketHourlySales({ city: filters.city, month: filters.month, productName: selectedProduct !== "all" ? selectedProduct : undefined }),
-        getMarketCityBreakdown({ region: filters.region, month: filters.month, productName: selectedProduct !== "all" ? selectedProduct : undefined }),
-      ])
-      setTopProducts(tp)
-      setHourlySales(hs.map((h, i) => ({ ...h, label: HOUR_LABELS[i] })))
-      setCityBreakdown(cb.slice(0, 10))
+      const params = new URLSearchParams()
+      if (selectedCity !== "all") params.set("city", selectedCity)
+      if (selectedRegion !== "all") params.set("region", selectedRegion)
+      if (selectedCategory !== "all") params.set("category", selectedCategory)
+      if (selectedBusinessType !== "all") params.set("businessType", selectedBusinessType)
+      if (selectedMonth) params.set("month", selectedMonth)
+      if (selectedProduct !== "all") params.set("productName", selectedProduct)
+      const res = await fetch(`/api/market-intelligence/data?${params}`)
+      const { data } = await res.json()
+      setTopProducts(data?.topProducts ?? [])
+      setHourlySales((data?.hourlySales ?? []).map((h: any, i: number) => ({ ...h, label: HOUR_LABELS[i] })))
+      setCityBreakdown((data?.cityBreakdown ?? []).slice(0, 10))
     } catch (err: any) {
       toast({ title: "Failed to load market data", description: err.message, variant: "destructive" })
     } finally {

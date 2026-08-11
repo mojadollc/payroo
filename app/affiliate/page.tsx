@@ -16,11 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import {
-  registerAffiliate, getAffiliateByEmail,
-  getAffiliateEarnings, requestAffiliateWithdrawal,
-  getAllWithdrawals, AFFILIATE_COMMISSION,
-} from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import type { Affiliate, AffiliateEarning, AffiliateWithdrawal } from "@/lib/firebase/types"
 
 const APP_URL = typeof window !== "undefined" ? window.location.origin : ""
@@ -58,22 +54,22 @@ function AffiliateContent() {
   const loadAffiliate = async (email: string) => {
     setLoading(true)
     try {
-      const aff = await getAffiliateByEmail(email)
+      const res = await fetch(`/api/management/affiliates?email=${encodeURIComponent(email)}`)
+      const { data: aff } = await res.json()
       if (aff) {
         setAffiliate(aff)
         localStorage.setItem("affiliate_email", email)
-        const [e, w] = await Promise.all([
-          getAffiliateEarnings(aff.id!),
-          getAllWithdrawals(),
+        const [eRes, wRes] = await Promise.all([
+          fetch(`/api/management/affiliates/earnings?affiliateId=${aff.id}`),
+          fetch(`/api/management/withdrawals`),
         ])
-        setEarnings(e)
-        setWithdrawals(w.filter(wd => wd.affiliateId === aff.id))
+        const [{ data: e }, { data: w }] = await Promise.all([eRes.json(), wRes.json()])
+        setEarnings(e ?? [])
+        setWithdrawals((w ?? []).filter((wd: any) => wd.affiliateId === aff.id))
       }
     } catch {
       toast({ title: "Error loading account", variant: "destructive" })
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -84,21 +80,25 @@ function AffiliateContent() {
     }
     setSigningUp(true)
     try {
-      const aff = await registerAffiliate(signupForm)
+      const res = await fetch("/api/management/affiliates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(signupForm),
+      })
+      const { data: aff } = await res.json()
       setAffiliate(aff)
       localStorage.setItem("affiliate_email", signupForm.email)
-      const [e, w] = await Promise.all([
-        getAffiliateEarnings(aff.id!),
-        getAllWithdrawals(),
+      const [eRes, wRes] = await Promise.all([
+        fetch(`/api/management/affiliates/earnings?affiliateId=${aff.id}`),
+        fetch("/api/management/withdrawals"),
       ])
-      setEarnings(e)
-      setWithdrawals(w.filter(wd => wd.affiliateId === aff.id))
+      const [{ data: e }, { data: w }] = await Promise.all([eRes.json(), wRes.json()])
+      setEarnings(e ?? [])
+      setWithdrawals((w ?? []).filter((wd: any) => wd.affiliateId === aff.id))
       toast({ title: "Welcome to Payroo Affiliate Program! 🎉" })
     } catch (err: any) {
       toast({ title: "Signup failed", description: err.message, variant: "destructive" })
-    } finally {
-      setSigningUp(false)
-    }
+    } finally { setSigningUp(false) }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -106,25 +106,25 @@ function AffiliateContent() {
     if (!loginEmail.trim()) return
     setLoggingIn(true)
     try {
-      const aff = await getAffiliateByEmail(loginEmail.trim())
+      const res = await fetch(`/api/management/affiliates?email=${encodeURIComponent(loginEmail.trim())}`)
+      const { data: aff } = await res.json()
       if (!aff) {
         toast({ title: "No affiliate account found with that email", variant: "destructive" })
         return
       }
       setAffiliate(aff)
       localStorage.setItem("affiliate_email", loginEmail.trim())
-      const [e, w] = await Promise.all([
-        getAffiliateEarnings(aff.id!),
-        getAllWithdrawals(),
+      const [eRes, wRes] = await Promise.all([
+        fetch(`/api/management/affiliates/earnings?affiliateId=${aff.id}`),
+        fetch("/api/management/withdrawals"),
       ])
-      setEarnings(e)
-      setWithdrawals(w.filter(wd => wd.affiliateId === aff.id))
+      const [{ data: e }, { data: w }] = await Promise.all([eRes.json(), wRes.json()])
+      setEarnings(e ?? [])
+      setWithdrawals((w ?? []).filter((wd: any) => wd.affiliateId === aff.id))
       toast({ title: `Welcome back, ${aff.name}!` })
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" })
-    } finally {
-      setLoggingIn(false)
-    }
+    } finally { setLoggingIn(false) }
   }
 
   const handleLogout = () => {
@@ -163,15 +163,19 @@ function AffiliateContent() {
     }
     setWithdrawing(true)
     try {
-      await requestAffiliateWithdrawal(
-        affiliate.id!,
-        affiliate.name,
-        affiliate.email,
-        amount,
-        withdrawForm.paymentMethod,
-        withdrawForm.accountNumber.trim(),
-        withdrawForm.accountName.trim(),
-      )
+      await fetch("/api/management/withdrawals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          affiliateId: affiliate.id,
+          affiliateName: affiliate.name,
+          affiliateEmail: affiliate.email,
+          amount,
+          paymentMethod: withdrawForm.paymentMethod,
+          accountNumber: withdrawForm.accountNumber.trim(),
+          accountName: withdrawForm.accountName.trim(),
+        }),
+      })
       toast({ title: "Withdrawal request submitted! We'll process it within 1-3 business days." })
       setWithdrawForm({ amount: "", paymentMethod: "gcash", accountNumber: "", accountName: "" })
       // Refresh

@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { addEWalletTransaction } from "@/lib/firebase/services"
 import type { CommissionSettings } from "@/lib/firebase/types"
 import { useToast } from "@/hooks/use-toast"
+import { getStoreId } from "@/lib/store-id"
 
 interface TransactionFormProps {
   commissionSettings: CommissionSettings
@@ -65,6 +65,16 @@ export function TransactionForm({ commissionSettings, onSuccess }: TransactionFo
     return amt * getCommissionRate(type, provider)
   }
 
+  const postTransaction = async (payload: object) => {
+    const storeId = getStoreId()
+    const res = await fetch("/api/ewallet-transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storeId, ...payload }),
+    })
+    if (!res.ok) throw new Error((await res.json()).error || "Failed")
+  }
+
   const handleCashinSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const amount = parseFloat(cashinForm.amount)
@@ -76,30 +86,17 @@ export function TransactionForm({ commissionSettings, onSuccess }: TransactionFo
       toast({ title: "Validation Error", description: "Reference number is required", variant: "destructive" })
       return
     }
-
     setIsSubmitting(true)
     try {
       const charge = getCharge(cashinForm, "cashin")
       const rate = charge / amount
-      await addEWalletTransaction({
-        type: "cashin",
-        provider,
-        amount,
-        commissionRate: rate,
-        customerName: cashinForm.customerName.trim(),
-        customerNumber: cashinForm.customerNumber.trim(),
-        referenceNumber: cashinForm.referenceNumber.trim(),
-        status: "completed",
-      })
+      await postTransaction({ type: "cashin", provider, amount, commissionRate: rate, commission: charge, profit: charge, customerName: cashinForm.customerName.trim(), customerNumber: cashinForm.customerNumber.trim(), referenceNumber: cashinForm.referenceNumber.trim(), status: "completed" })
       toast({ title: "Success", description: `Cash-in completed. Commission: ₱${charge.toFixed(2)}` })
       setCashinForm({ amount: "", charge: "", customerName: "", customerNumber: "", referenceNumber: generateRef() })
       onSuccess()
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Failed to process transaction"
-      toast({ title: "Error", description: msg.includes("Firebase") ? "Firebase not configured." : msg, variant: "destructive" })
-    } finally {
-      setIsSubmitting(false)
-    }
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed", variant: "destructive" })
+    } finally { setIsSubmitting(false) }
   }
 
   const handleCashoutSubmit = async (e: React.FormEvent) => {
@@ -113,30 +110,17 @@ export function TransactionForm({ commissionSettings, onSuccess }: TransactionFo
       toast({ title: "Validation Error", description: "Reference number is required", variant: "destructive" })
       return
     }
-
     setIsSubmitting(true)
     try {
       const charge = getCharge(cashoutForm, "cashout")
       const rate = charge / amount
-      await addEWalletTransaction({
-        type: "cashout",
-        provider,
-        amount,
-        commissionRate: rate,
-        customerName: cashoutForm.customerName.trim(),
-        customerNumber: cashoutForm.customerNumber.trim(),
-        referenceNumber: cashoutForm.referenceNumber.trim(),
-        status: "completed",
-      })
+      await postTransaction({ type: "cashout", provider, amount, commissionRate: rate, commission: charge, profit: charge, customerName: cashoutForm.customerName.trim(), customerNumber: cashoutForm.customerNumber.trim(), referenceNumber: cashoutForm.referenceNumber.trim(), status: "completed" })
       toast({ title: "Success", description: `Cash-out completed. Commission: ₱${charge.toFixed(2)}` })
       setCashoutForm({ amount: "", charge: "", customerName: "", customerNumber: "", referenceNumber: generateRef() })
       onSuccess()
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Failed to process transaction"
-      toast({ title: "Error", description: msg.includes("Firebase") ? "Firebase not configured." : msg, variant: "destructive" })
-    } finally {
-      setIsSubmitting(false)
-    }
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed", variant: "destructive" })
+    } finally { setIsSubmitting(false) }
   }
 
   const handleLoadSubmit = async (e: React.FormEvent) => {
@@ -150,30 +134,17 @@ export function TransactionForm({ commissionSettings, onSuccess }: TransactionFo
       toast({ title: "Validation Error", description: "Reference number is required", variant: "destructive" })
       return
     }
-
     setIsSubmitting(true)
     try {
       const charge = getCharge(loadForm, "load")
       const rate = amount > 0 ? charge / amount : 0
-      await addEWalletTransaction({
-        type: "load",
-        provider,
-        amount,
-        commissionRate: rate,
-        customerName: loadForm.customerName.trim(),
-        customerNumber: loadForm.customerNumber.trim(),
-        referenceNumber: loadForm.referenceNumber.trim(),
-        status: "completed",
-      })
+      await postTransaction({ type: "load", provider, amount, commissionRate: rate, commission: charge, profit: charge, customerName: loadForm.customerName.trim(), customerNumber: loadForm.customerNumber.trim(), referenceNumber: loadForm.referenceNumber.trim(), status: "completed" })
       toast({ title: "Success", description: `Load completed. Commission: ₱${charge.toFixed(2)}` })
       setLoadForm({ amount: "", charge: "", customerName: "", customerNumber: "", referenceNumber: generateRef() })
       onSuccess()
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "Failed to process transaction"
-      toast({ title: "Error", description: msg.includes("Firebase") ? "Firebase not configured." : msg, variant: "destructive" })
-    } finally {
-      setIsSubmitting(false)
-    }
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed", variant: "destructive" })
+    } finally { setIsSubmitting(false) }
   }
 
   const renderChargeField = (form: { amount: string; charge: string }, type: "cashin" | "cashout" | "load", setForm: (f: any) => void) => {

@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getStoreSettings } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { BranchSwitcher } from "@/components/branch-switcher"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
@@ -112,15 +112,19 @@ export function Navbar() {
         }
       } catch {}
 
-    // 3) Firestore storeSettings — only fetch if no cache hit
+    // 3) API store-settings — only fetch if no cache hit
       try {
         const cached2 = localStorage.getItem(STORE_NAME_KEY)
         if (!cached2) {
-          const s = await getStoreSettings()
-          if (s?.name) {
-            setStoreName(s.name)
-            localStorage.setItem(STORE_NAME_KEY, s.name)
-            return
+          const storeId = getStoreId()
+          if (storeId) {
+            const res = await fetch(`/api/store-settings?storeId=${storeId}`)
+            const { data } = await res.json()
+            if (data?.name) {
+              setStoreName(data.name)
+              localStorage.setItem(STORE_NAME_KEY, data.name)
+              return
+            }
           }
         }
       } catch {}

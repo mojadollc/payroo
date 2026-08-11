@@ -12,11 +12,11 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { clearAllData, getStoreSettings, saveStoreSettings } from "@/lib/firebase/services"
 import { DEFAULT_STORE_NAME } from "@/components/navbar"
 import { BUSINESS_TYPE_OPTIONS, getBusinessConfig, type BusinessType } from "@/lib/business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 import { BranchManager } from "@/components/branch-manager"
+import { getStoreId } from "@/lib/store-id"
 
 import type { SubscriptionFeatures } from "@/lib/firebase/types"
 
@@ -68,20 +68,31 @@ export default function SettingsPage() {
   const [editField, setEditField] = useState<"name" | "address" | "phone" | "type" | "location" | null>(null)
 
   useEffect(() => {
-    getStoreSettings().then((s) => {
-      if (s?.name) { setStoreName(s.name); setStoreNameInput(s.name) }
-      if (s?.address) { setStoreAddress(s.address); setStoreAddressInput(s.address) }
-      if (s?.phone) { setStorePhone(s.phone); setStorePhoneInput(s.phone) }
-      if (s?.businessType) setBusinessType(s.businessType as BusinessType)
-      if (s?.region) setRegion(s.region)
-      if (s?.province) setProvince(s.province)
-      if (s?.city) setCity(s.city)
-      if (s?.barangay) setBarangay(s.barangay)
-    })
+    const storeId = getStoreId()
+    if (!storeId) return
+    fetch(`/api/store-settings?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ data: s }) => {
+        if (s?.name) { setStoreName(s.name); setStoreNameInput(s.name) }
+        if (s?.address) { setStoreAddress(s.address); setStoreAddressInput(s.address) }
+        if (s?.phone) { setStorePhone(s.phone); setStorePhoneInput(s.phone) }
+        if (s?.businessType) setBusinessType(s.businessType as BusinessType)
+        if (s?.region) setRegion(s.region)
+        if (s?.province) setProvince(s.province)
+        if (s?.city) setCity(s.city)
+        if (s?.barangay) setBarangay(s.barangay)
+      })
   }, [])
 
+  const saveSettings = (data: object) =>
+    fetch("/api/store-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storeId: getStoreId(), ...data }),
+    })
+
   const handleSaveStoreName = async () => {
-    await saveStoreSettings({ name: storeNameInput })
+    await saveSettings({ name: storeNameInput })
     setStoreName(storeNameInput)
     localStorage.setItem("storeName", storeNameInput)
     localStorage.removeItem("pos_subscription")
@@ -91,7 +102,7 @@ export default function SettingsPage() {
   }
 
   const handleSaveStoreAddress = async () => {
-    await saveStoreSettings({ address: storeAddressInput })
+    await saveSettings({ address: storeAddressInput })
     setStoreAddress(storeAddressInput)
     localStorage.removeItem("pos_subscription")
     toast({ title: "Store address updated" })
@@ -99,7 +110,7 @@ export default function SettingsPage() {
   }
 
   const handleSaveStorePhone = async () => {
-    await saveStoreSettings({ phone: storePhoneInput })
+    await saveSettings({ phone: storePhoneInput })
     setStorePhone(storePhoneInput)
     localStorage.removeItem("pos_subscription")
     toast({ title: "Store phone updated" })
@@ -108,7 +119,7 @@ export default function SettingsPage() {
 
   const handleSaveBusinessType = async (type: BusinessType) => {
     setBusinessType(type)
-    await saveStoreSettings({ businessType: type })
+    await saveSettings({ businessType: type })
     localStorage.setItem("businessType", type)
     localStorage.removeItem("pos_subscription")
     window.dispatchEvent(new Event("businesstype"))
@@ -121,7 +132,7 @@ export default function SettingsPage() {
       toast({ title: "Region and City are required", variant: "destructive" })
       return
     }
-    await saveStoreSettings({ region, province, city, barangay })
+    await saveSettings({ region, province, city, barangay })
     setLocationSaved(true)
     toast({ title: "Store location saved" })
     setEditField(null)
@@ -157,7 +168,15 @@ export default function SettingsPage() {
     if (!window.confirm("DANGER: Delete ALL data? This cannot be undone.")) return
     if (!window.confirm("SECOND CONFIRMATION: Are you absolutely sure?")) return
     try {
-      await clearAllData()
+      const storeId = getStoreId()
+      await Promise.all([
+        fetch(`/api/products?storeId=${storeId}`).then(r => r.json()).then(({ data }) =>
+          Promise.all((data ?? []).map((p: any) => fetch(`/api/products?id=${p.id}`, { method: "DELETE" })))
+        ),
+        fetch(`/api/sales?storeId=${storeId}`).then(r => r.json()).then(({ data }) =>
+          Promise.all((data ?? []).map((s: any) => fetch(`/api/sales`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: s.id, status: "voided" }) })))
+        ),
+      ])
       toast({ title: "All data cleared", description: "Please refresh the page." })
     } catch {
       toast({ title: "Error", description: "Failed to clear data.", variant: "destructive" })

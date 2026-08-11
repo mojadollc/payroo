@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { getDeliverySettings, saveDeliverySettings, getProducts, getStoreSettings, uploadDeliveryImage } from "@/lib/firebase/services"
+import { getStoreId } from "@/lib/store-id"
 import { getStoreId } from "@/lib/store-id"
 import type { Product, DeliverySettings } from "@/lib/firebase/types"
 
@@ -34,8 +34,12 @@ export function DeliverySettingsPanel() {
   useEffect(() => {
     const load = async () => {
       const sid = getStoreId()
-      const [settings, prods] = await Promise.all([getDeliverySettings(sid), getProducts()])
-      setProducts(prods)
+      const [sRes, pRes] = await Promise.all([
+        fetch(`/api/delivery/settings?storeId=${sid}`),
+        fetch(`/api/products?storeId=${sid}`),
+      ])
+      const [{ data: settings }, { data: prods }] = await Promise.all([sRes.json(), pRes.json()])
+      setProducts(prods ?? [])
       if (settings) {
         setEnabled(settings.enabled)
         setDescription(settings.description ?? "")
@@ -56,9 +60,14 @@ export function DeliverySettingsPanel() {
     if (type === "logo") setUploadingLogo(true)
     else setUploadingImage(true)
     try {
-      const url = await uploadDeliveryImage(file, type === "logo" ? "logos" : "banners")
-      if (type === "logo") setStoreLogo(url)
-      else setStoreImage(url)
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      if (type === "logo") setStoreLogo(base64)
+      else setStoreImage(base64)
       toast({ title: `${type === "logo" ? "Logo" : "Cover image"} uploaded` })
     } catch { toast({ title: "Upload failed", variant: "destructive" }) }
     finally {
@@ -83,21 +92,26 @@ export function DeliverySettingsPanel() {
     setSaving(true)
     try {
       const sid = getStoreId()
-      const storeSettings = await getStoreSettings()
-      await saveDeliverySettings({
-        storeId: sid,
-        enabled,
-        storeName: storeSettings?.name ?? "My Store",
-        description: description || "",
-        address: storeSettings?.address || "",
-        phone: storeSettings?.phone || "",
-        storeLogo: storeLogo || undefined,
-        storeImage: storeImage || undefined,
-        openTime,
-        closeTime,
-        minOrder: minOrder ? parseFloat(minOrder) : 0,
-        deliveryFee: deliveryFee ? parseFloat(deliveryFee) : 0,
-        enabledProductIds: Array.from(enabledProductIds),
+      const storeSettingsRes = await fetch(`/api/store-settings?storeId=${sid}`)
+      const { data: storeSettings } = await storeSettingsRes.json()
+      await fetch("/api/delivery/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storeId: sid,
+          enabled,
+          storeName: storeSettings?.name ?? "My Store",
+          description: description || "",
+          address: storeSettings?.address || "",
+          phone: storeSettings?.phone || "",
+          storeLogo: storeLogo || undefined,
+          storeImage: storeImage || undefined,
+          openTime,
+          closeTime,
+          minOrder: minOrder ? parseFloat(minOrder) : 0,
+          deliveryFee: deliveryFee ? parseFloat(deliveryFee) : 0,
+          enabledProductIds: Array.from(enabledProductIds),
+        }),
       })
       toast({ title: "Delivery settings saved" })
     } catch {

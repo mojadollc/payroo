@@ -24,10 +24,8 @@ import { CommissionSettingsDialog } from "@/components/ewallet/commission-settin
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
-import { getEWalletTransactions, getCommissionSettings, getCashinTransactions } from "@/lib/firebase/services"
-import type { EWalletTransaction, CommissionSettings } from "@/lib/firebase/types"
-import { isFirebaseConfigured } from "@/lib/firebase/config"
 import { getStoreId } from "@/lib/store-id"
+import type { EWalletTransaction, CommissionSettings } from "@/lib/firebase/types"
 
 type Period = "today" | "week" | "month" | "all"
 
@@ -67,49 +65,32 @@ export default function EWalletPage() {
   const [showNewTransaction, setShowNewTransaction] = useState(false)
   const allLimitRef = useRef(50)
 
-  if (!isFirebaseConfigured) {
-    router.push("/setup")
-    return null
-  }
-
   const loadData = useCallback(async (opts?: { append?: boolean; nextLimit?: number }) => {
     const isAppend = opts?.append === true
     if (!hasLoaded.current && !isAppend) setIsLoading(true)
     if (isAppend) setIsLoadingMore(true)
-
     try {
       const storeId = getStoreId()
+      if (!storeId) return
       const range = getPeriodRange(period)
-      const maxResults =
-        period === "all" ? (opts?.nextLimit ?? allLimitRef.current) : undefined
+      const params = new URLSearchParams({ storeId })
+      if (range.start) params.set("from", range.start.toISOString())
+      if (range.end) params.set("to", range.end.toISOString())
 
-      // Settings: load once and cache — never re-fetch on transaction refresh
-      const settingsPromise = settingsLoadedRef.current
-        ? Promise.resolve(null)
-        : getCommissionSettings()
-
-      const [transactionsData, settingsData, cashinData] = await Promise.all([
-        getEWalletTransactions(range.start, range.end, maxResults),
-        settingsPromise,
-        getCashinTransactions(storeId, range.start, range.end, maxResults),
+      const [txRes, csRes] = await Promise.all([
+        fetch(`/api/ewallet-transactions?${params}`),
+        settingsLoadedRef.current ? Promise.resolve(null) : fetch(`/api/commission-settings?storeId=${storeId}`),
       ])
-
-      if (settingsData) {
-        setCommissionSettings(settingsData)
-        settingsLoadedRef.current = true
+      const { data: transactionsData } = await txRes.json()
+      if (csRes) {
+        const { data: settingsData } = await csRes.json()
+        if (settingsData) { setCommissionSettings(settingsData); settingsLoadedRef.current = true }
       }
-      setTransactions(transactionsData || [])
-      setCashinTransactions(cashinData || [])
-
-      if (period === "all") {
-        const fetched = (transactionsData?.length || 0) + (cashinData?.length || 0)
-        setHasMore(fetched >= (maxResults || 50))
-        allLimitRef.current = maxResults || 50
-      } else {
-        setHasMore(false)
-      }
+      setTransactions(transactionsData ?? [])
+      setCashinTransactions([])
+      setHasMore(false)
     } catch (error) {
-      console.error("[v0] Error loading e-wallet data:", error)
+      console.error("[ewallet] Error loading data:", error)
     } finally {
       hasLoaded.current = true
       setIsLoading(false)
@@ -137,7 +118,7 @@ export default function EWalletPage() {
     const filteredTransactions = transactions
 
     const todayTransactions = transactions.filter(t => {
-      const transDate = t.createdAt?.toDate?.() ?? new Date(0)
+      const transDate = new Date(t.createdAt as any)
       return transDate >= today
     })
 

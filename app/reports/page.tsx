@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity } from "lucide-react"
+import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity, Cigarette } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -15,6 +15,7 @@ import {
 import { DateRangePicker } from "@/components/reports/date-range-picker"
 import { SalesReport } from "@/components/reports/sales-report"
 import { EWalletReport } from "@/components/reports/ewallet-report"
+import { TobaccoReport } from "@/components/reports/tobacco-report"
 import dynamic from "next/dynamic"
 // recharts pulls in a sizeable chunk of its own — split it out of the main
 // reports bundle so tapping into Reports doesn't wait on chart code to parse.
@@ -511,7 +512,7 @@ export default function ReportsPage() {
           <MobileSectionHeader title="Recent Transactions" />
           <Tabs defaultValue="sales" className="w-full">
             <div className="sticky top-[52px] z-30 bg-background pb-2">
-              <TabsList className="w-full grid grid-cols-2 h-10">
+              <TabsList className="w-full grid grid-cols-3 h-10">
                 <TabsTrigger value="sales" className="gap-1.5 text-[13px]">
                   <ShoppingCart className="h-3.5 w-3.5" />
                   Sales
@@ -520,6 +521,10 @@ export default function ReportsPage() {
                   <Wallet className="h-3.5 w-3.5" />
                   E-Wallet
                 </TabsTrigger>
+                <TabsTrigger value="tobacco" className="gap-1.5 text-[13px]">
+                  <Cigarette className="h-3.5 w-3.5" />
+                  Tobacco
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="sales" className="mt-0">
@@ -527,6 +532,9 @@ export default function ReportsPage() {
             </TabsContent>
             <TabsContent value="ewallet" className="mt-0">
               <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
+            </TabsContent>
+            <TabsContent value="tobacco" className="mt-0">
+              <TobaccoReport dateRange={dateRange} isLoading={isLoading} />
             </TabsContent>
           </Tabs>
         </div>
@@ -652,12 +660,18 @@ export default function ReportsPage() {
             <TabsTrigger value="ewallet" className="gap-2">
               <Wallet className="h-4 w-4" /> E-Wallet Report
             </TabsTrigger>
+            <TabsTrigger value="tobacco" className="gap-2">
+              <Cigarette className="h-4 w-4" /> Tobacco Report
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sales">
             <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
           </TabsContent>
           <TabsContent value="ewallet">
             <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
+          </TabsContent>
+          <TabsContent value="tobacco">
+            <TobaccoReport dateRange={dateRange} isLoading={isLoading} />
           </TabsContent>
         </Tabs>
       </div>

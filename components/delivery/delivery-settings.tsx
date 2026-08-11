@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { getStoreId } from "@/lib/store-id"
-import { getStoreId } from "@/lib/store-id"
 import type { Product, DeliverySettings } from "@/lib/firebase/types"
 
 export function DeliverySettingsPanel() {

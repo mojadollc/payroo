@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getStoreId } from "@/lib/store-id"
-import { getStoreId } from "@/lib/store-id"
 import type { DeliveryOrder } from "@/lib/firebase/types"
 
 const STATUS_FLOW: DeliveryOrder["status"][] = ["pending", "confirmed", "preparing", "delivering", "delivered"]

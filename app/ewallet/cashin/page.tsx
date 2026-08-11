@@ -6,7 +6,6 @@ import Image from "next/image"
 import { CheckCircle, XCircle, AlertTriangle, Loader2, Delete, ChevronLeft, RotateCcw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getStoreId } from "@/lib/store-id"
-import { getStoreId } from "@/lib/store-id"
 
 const PRESETS = [50, 100, 200, 300, 500, 1000, 2000, 5000]
 const MIN_AMOUNT = 50

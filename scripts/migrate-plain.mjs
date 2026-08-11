@@ -277,7 +277,7 @@ async function migrateInventory() {
   console.log(`inventory_transactions: ${n} upserted, ${skipped} skipped`)
 }
 
-// ── Verification: compare Firebase vs PostgreSQL counts ───────────────────────
+// ── Verification ─────────────────────────────────────────────────────────────
 async function verify() {
   const [fbProds, fbSales, fbEwallet, fbInv] = await Promise.all([
     fetchAll("products"),
@@ -286,78 +286,103 @@ async function verify() {
     fetchAll("inventoryTransactions"),
   ])
 
-  const [pgProds, pgSales, pgEwallet, pgInv] = await Promise.all([
-    pool.query("SELECT COUNT(*) FROM products"),
-    pool.query("SELECT COUNT(*) FROM sales"),
-    pool.query("SELECT COUNT(*) FROM ewallet_transactions"),
-    pool.query("SELECT COUNT(*) FROM inventory_transactions"),
-  ])
+  // Firebase sets (storeId filter)
+  const fbProdIds = new Set(fbProds.filter(d => d.storeId).map(d => d._id))
+  const fbSaleIds = new Set(fbSales.filter(d => d.storeId).map(d => d._id))
+  const fbEwIds   = new Set(fbEwallet.filter(d => d.storeId).map(d => d._id))
 
-  // Firebase counts (with storeId only — same filter as migration)
-  const fbProdCount  = fbProds.filter(d => d.storeId).length
-  const fbSaleCount  = fbSales.filter(d => d.storeId).length
-  const fbEwCount    = fbEwallet.filter(d => d.storeId).length
-  const fbInvCount   = fbInv.filter(d => d.storeId).length
-
-  const pgProdCount  = parseInt(pgProds.rows[0].count)
-  const pgSaleCount  = parseInt(pgSales.rows[0].count)
-  const pgEwCount    = parseInt(pgEwallet.rows[0].count)
-  const pgInvCount   = parseInt(pgInv.rows[0].count)
-
-  // Revenue totals
   const fbSalesRevenue = fbSales
     .filter(d => d.storeId && d.status !== "voided")
     .reduce((s, d) => s + (d.total || 0), 0)
-  const { rows: pgRevRows } = await pool.query(
-    `SELECT COALESCE(SUM(total),0) as rev FROM sales WHERE status != 'voided'`
-  )
-  const pgSalesRevenue = parseFloat(pgRevRows[0].rev)
-
   const fbEwRevenue = fbEwallet
     .filter(d => d.storeId)
     .reduce((s, d) => s + (d.amount || 0), 0)
-  const { rows: pgEwRevRows } = await pool.query(
-    `SELECT COALESCE(SUM(amount),0) as rev FROM ewallet_transactions`
+
+  // PG IDs
+  const [pgProdIdRows, pgSaleIdRows, pgEwIdRows] = await Promise.all([
+    pool.query(`SELECT id FROM products`),
+    pool.query(`SELECT id FROM sales`),
+    pool.query(`SELECT id FROM ewallet_transactions`),
+  ])
+  const pgProdIdSet = new Set(pgProdIdRows.rows.map(r => r.id))
+  const pgSaleIdSet = new Set(pgSaleIdRows.rows.map(r => r.id))
+  const pgEwIdSet   = new Set(pgEwIdRows.rows.map(r => r.id))
+
+  // Records in Firebase but missing from PG
+  const missingSales = fbSales.filter(d => d.storeId && !pgSaleIdSet.has(d._id))
+  const missingEw    = fbEwallet.filter(d => d.storeId && !pgEwIdSet.has(d._id))
+  const missingProds = fbProds.filter(d => d.storeId && !pgProdIdSet.has(d._id))
+
+  // Records in PG but NOT in Firebase (created on new app after migration)
+  const pgOnlySales = pgSaleIdRows.rows.filter(r => !fbSaleIds.has(r.id)).length
+  const pgOnlyEw    = pgEwIdRows.rows.filter(r => !fbEwIds.has(r.id)).length
+  const pgOnlyProds = pgProdIdRows.rows.filter(r => !fbProdIds.has(r.id)).length
+
+  // Apples-to-apples revenue: only Firebase IDs that exist in PG
+  const fbMigratedSaleIds = fbSales
+    .filter(d => d.storeId && d.status !== "voided" && pgSaleIdSet.has(d._id))
+    .map(d => d._id)
+  const fbMigratedRevenue = fbSales
+    .filter(d => d.storeId && d.status !== "voided" && pgSaleIdSet.has(d._id))
+    .reduce((s, d) => s + (d.total || 0), 0)
+  const { rows: pgMigRevRows } = await pool.query(
+    `SELECT COALESCE(SUM(total),0) as rev FROM sales WHERE status != 'voided' AND id = ANY($1::text[])`,
+    [fbMigratedSaleIds]
   )
-  const pgEwRevenue = parseFloat(pgEwRevRows[0].rev)
+  const pgMigratedRevenue = parseFloat(pgMigRevRows[0].rev)
 
-  console.log("\n══════════════════════════════════════════════")
-  console.log("  VERIFICATION: Firebase vs PostgreSQL")
-  console.log("══════════════════════════════════════════════")
-  console.log(`  ${"".padEnd(28)} ${"Firebase".padStart(10)} ${"PostgreSQL".padStart(12)} ${"Match?".padStart(8)}`)
-  console.log(`  ${"─".repeat(60)}`)
+  const fbMigratedEwIds = fbEwallet.filter(d => d.storeId && pgEwIdSet.has(d._id)).map(d => d._id)
+  const fbMigratedEwRevenue = fbEwallet
+    .filter(d => d.storeId && pgEwIdSet.has(d._id))
+    .reduce((s, d) => s + (d.amount || 0), 0)
+  const { rows: pgMigEwRows } = await pool.query(
+    `SELECT COALESCE(SUM(amount),0) as rev FROM ewallet_transactions WHERE id = ANY($1::text[])`,
+    [fbMigratedEwIds]
+  )
+  const pgMigratedEwRevenue = parseFloat(pgMigEwRows[0].rev)
 
-  const row = (label, fb, pg) => {
-    const match = fb === pg ? "✅" : "❌"
-    console.log(`  ${label.padEnd(28)} ${String(fb).padStart(10)} ${String(pg).padStart(12)} ${match.padStart(8)}`)
-  }
-  const rowAmt = (label, fb, pg) => {
-    const match = Math.abs(fb - pg) < 0.01 ? "✅" : "❌"
-    console.log(`  ${label.padEnd(28)} ${fb.toFixed(2).padStart(10)} ${pg.toFixed(2).padStart(12)} ${match.padStart(8)}`)
-  }
+  const line = "═".repeat(62)
+  const dash = "─".repeat(62)
+  console.log(`\n${line}`)
+  console.log("  VERIFICATION")
+  console.log(line)
 
-  row("Products (count)",          fbProdCount,  pgProdCount)
-  row("Sales (count)",             fbSaleCount,  pgSaleCount)
-  row("E-Wallet txns (count)",     fbEwCount,    pgEwCount)
-  row("Inventory txns (count)",    fbInvCount,   pgInvCount)
-  rowAmt("Sales Revenue (active)", fbSalesRevenue, pgSalesRevenue)
-  rowAmt("E-Wallet Revenue",       fbEwRevenue,    pgEwRevenue)
+  const row = (label, fb, pg, note = "") =>
+    console.log(`  ${label.padEnd(30)} ${String(fb).padStart(8)} ${String(pg).padStart(10)}  ${note}`)
+  const rowAmt = (label, fb, pg, note = "") =>
+    console.log(`  ${label.padEnd(30)} ${fb.toFixed(2).padStart(8)} ${pg.toFixed(2).padStart(10)}  ${note}`)
 
-  console.log("══════════════════════════════════════════════\n")
+  console.log(`\n  ${"Label".padEnd(30)} ${"Firebase".padStart(8)} ${"PostgreSQL".padStart(10)}`)
+  console.log(`  ${dash}`)
 
-  const allMatch =
-    fbProdCount === pgProdCount &&
-    fbSaleCount === pgSaleCount &&
-    fbEwCount   === pgEwCount   &&
-    Math.abs(fbSalesRevenue - pgSalesRevenue) < 0.01 &&
-    Math.abs(fbEwRevenue    - pgEwRevenue)    < 0.01
+  row("Products", fbProdIds.size, pgProdIdRows.rows.length,
+    pgOnlyProds > 0 ? `(+${pgOnlyProds} new on pntos)` : "")
+  row("Sales", fbSaleIds.size, pgSaleIdRows.rows.length,
+    pgOnlySales > 0 ? `(+${pgOnlySales} new on pntos)` : "")
+  row("E-Wallet txns", fbEwIds.size, pgEwIdRows.rows.length,
+    pgOnlyEw > 0 ? `(+${pgOnlyEw} new on pntos)` : "")
 
-  if (allMatch) {
-    console.log("✅ All counts and totals match!")
-  } else {
-    console.log("⚠️  Some numbers don't match — check warnings above.")
-    console.log("   Re-run the script to retry failed records.")
-  }
+  console.log(`\n  ${"-".repeat(62)}`)
+  console.log("  Revenue (migrated records only — apples-to-apples):")
+  console.log(`  ${"-".repeat(62)}`)
+  rowAmt("Sales Revenue", fbMigratedRevenue, pgMigratedRevenue,
+    Math.abs(fbMigratedRevenue - pgMigratedRevenue) < 0.01 ? "✅ exact match" : "❌ MISMATCH")
+  rowAmt("E-Wallet Revenue", fbMigratedEwRevenue, pgMigratedEwRevenue,
+    Math.abs(fbMigratedEwRevenue - pgMigratedEwRevenue) < 0.01 ? "✅ exact match" : "❌ MISMATCH")
+
+  console.log(`\n  ${"-".repeat(62)}`)
+  console.log("  Migration completeness:")
+  console.log(`  ${"-".repeat(62)}`)
+  if (missingSales.length === 0)  console.log("  ✅ All Firebase sales present in PG")
+  else console.log(`  ❌ ${missingSales.length} Firebase sales MISSING from PG`)
+
+  if (missingEw.length === 0)     console.log("  ✅ All Firebase e-wallet txns present in PG")
+  else console.log(`  ❌ ${missingEw.length} Firebase e-wallet txns MISSING from PG`)
+
+  if (missingProds.length === 0)  console.log("  ✅ All Firebase products present in PG")
+  else console.log(`  ⚠️  ${missingProds.length} Firebase products missing from PG: ${missingProds.map(d => d.name || d._id).join(", ")}`)
+
+  console.log(`${line}\n`)
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────

@@ -46,14 +46,18 @@ export function BranchSwitcher({ className }: { className?: string }) {
     async function load() {
       setLoading(true)
       try {
-        const list = await listBranches(getMainStoreId())
+        const mainId = getMainStoreId()
+        const res = await fetch(`/api/branches?mainExternalId=${mainId}`)
+        const { data } = await res.json()
         if (cancelled) return
-        const mapped = list.map(b => ({
-          externalId: b.branchExternalId,
-          name: b.branchName,
-          isMain: !!b.isMain,
-        }))
-        setBranches(mapped)
+        // Build list with main store first
+        let mainName = "Main Store"
+        try { const s = localStorage.getItem("pos_subscription"); if (s) { const p = JSON.parse(s); if (p?.storeName) mainName = p.storeName } } catch {}
+        const list = [
+          { externalId: mainId, name: mainName, isMain: true },
+          ...(data ?? []).map((b: any) => ({ externalId: b.branchExternalId, name: b.branchName, isMain: false })),
+        ]
+        setBranches(list)
         setActiveId(getStoreId())
       } catch (e) {
         console.warn("[BranchSwitcher]", e)

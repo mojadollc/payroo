@@ -6,6 +6,7 @@ import "./globals.css"
 import { LayoutShell } from "@/components/layout-shell"
 import { VisitorTracker } from "@/components/visitor-tracker"
 import { PWAUpdateManager } from "@/components/pwa-update-manager"
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -240,6 +241,7 @@ export default function RootLayout({
           fbq('track', 'PageView');
         `}</Script>
         <LayoutShell>{children}</LayoutShell>
+        <PWAInstallPrompt />
         <PWAUpdateManager />
         <VisitorTracker />
       </body>

@@ -15,10 +15,10 @@ android {
 
         // Digital Asset Links verification
         manifestPlaceholders = [
-            hostName    : "payroo.xyz",
-            defaultUrl  : "https://payroo.xyz/pos",
+            hostName    : "pntos.payroo.xyz",
+            defaultUrl  : "https://pntos.payroo.xyz/pos",
             launcherName: "Payroo POS",
-            assetStatements: '[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": { "namespace": "web", "site": "https://payroo.xyz" } }]'
+            assetStatements: '[{ "relation": ["delegate_permission/common.handle_all_urls"], "target": { "namespace": "web", "site": "https://pntos.payroo.xyz" } }]'
         ]
     }
 

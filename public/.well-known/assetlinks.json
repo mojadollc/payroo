@@ -8,5 +8,19 @@
         "93:E3:E7:51:95:FD:32:DF:2B:89:E4:F3:20:A9:74:39:49:1E:15:09:CD:C2:25:0F:F4:66:F8:BD:35:75:9D:AE"
       ]
     }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "web",
+      "site": "https://pntos.payroo.xyz"
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "web",
+      "site": "https://pos.payroo.xyz"
+    }
   }
 ]

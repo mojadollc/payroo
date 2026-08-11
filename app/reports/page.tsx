@@ -206,7 +206,8 @@ export default function ReportsPage() {
   const productsLoadedRef = useRef(false)
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(() => {
     const today = new Date()
-    return { from: today, to: today }
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    return { from: firstOfMonth, to: today }
   })
 
   useEffect(() => { loadData() }, [dateRange])

@@ -51,7 +51,7 @@ export async function pushPendingWrites(): Promise<{ synced: number; failed: num
 
   syncing = false
 
-  if (synced > 0) {
+  if (synced > 0 || failed > 0) {
     window.dispatchEvent(new CustomEvent("offline-sync-complete", { detail: { synced, failed } }))
   }
 

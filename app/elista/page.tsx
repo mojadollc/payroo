@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Plus, Minus, Trash2, Edit2, Save, FileText, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,17 +46,30 @@ export default function EListaPage() {
   const [importText, setImportText] = useState("")
   const deletedIds = useState<Set<string>>(() => new Set())[0]
 
-  useEffect(() => {
+  const loadListas = useCallback(async () => {
     if (!user?.id) return
-    offlineGetElistas(user.id).then(data => {
-      if (data.length > 0) setListas(data as Lista[])
-    })
-    if (!isOnline()) return
-    fetch(`/api/elistas?userId=${user.id}`)
-      .then(r => r.json())
-      .then(({ data }) => { if (data?.length) setListas(data) })
-      .catch(() => {})
+    if (isOnline()) {
+      fetch(`/api/elistas?userId=${user.id}`)
+        .then(r => r.json())
+        .then(({ data }) => { if (data?.length) setListas(data) })
+        .catch(() => {})
+    } else {
+      offlineGetElistas(user.id).then(data => {
+        if (data.length > 0) setListas(data as Lista[])
+      })
+    }
   }, [user])
+
+  useEffect(() => {
+    loadListas()
+  }, [loadListas])
+
+  // Refresh when sync completes
+  useEffect(() => {
+    const onSync = () => loadListas()
+    window.addEventListener("elista-sync-complete", onSync)
+    return () => window.removeEventListener("elista-sync-complete", onSync)
+  }, [loadListas])
 
   const resetForm = () => {
     setTitle("")

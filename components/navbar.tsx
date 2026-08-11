@@ -134,7 +134,8 @@ export function Navbar() {
         const subRaw = localStorage.getItem("pos_subscription")
         if (subRaw) {
           const sub = JSON.parse(subRaw)
-          if (sub?.storeName && (!sub.externalId || sub.externalId === activeId)) {
+          // Only use subscription storeName if it belongs to the active store
+          if (sub?.storeName && sub.externalId === activeId) {
             setStoreName(sub.storeName)
             localStorage.setItem(STORE_NAME_KEY, sub.storeName)
           }
@@ -163,7 +164,11 @@ export function Navbar() {
   const handleLogout = () => {
     logout()
     localStorage.removeItem("pos_ext_id")
+    localStorage.removeItem("pos_main_ext_id")
     localStorage.removeItem("pos_current_user")
+    localStorage.removeItem("pos_branches_cache")
+    localStorage.removeItem("storeName")
+    localStorage.removeItem("pos_main_store_name")
     localStorage.removeItem("customer_subscription")
     router.push("/")
   }

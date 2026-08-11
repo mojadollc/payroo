@@ -91,6 +91,9 @@ export default function DashboardPage() {
         localStorage.removeItem(`pos_products_cache_${prevStoreId}`)
         localStorage.removeItem("pos_cart")
         localStorage.removeItem("pos_current_user")
+        localStorage.removeItem("storeName")
+        localStorage.removeItem("pos_main_store_name")
+        localStorage.removeItem("pos_branches_cache")
       }
 
       localStorage.setItem("pos_ext_id", externalId)

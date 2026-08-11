@@ -60,6 +60,9 @@ export default function LoginPage() {
         localStorage.removeItem("pos_cart")
         localStorage.removeItem("pos_current_user")
         localStorage.removeItem("pos_subscription")
+        localStorage.removeItem("storeName")
+        localStorage.removeItem("pos_main_store_name")
+        localStorage.removeItem("pos_branches_cache")
       }
 
       localStorage.setItem("pos_ext_id", storeId.trim())
@@ -84,6 +87,11 @@ export default function LoginPage() {
             endDate: endDate?.toISOString() ?? null,
             externalId: storeId.trim(),
           }))
+          // Write storeName immediately so navbar shows correct name right away
+          if (s.storeName) {
+            localStorage.setItem("storeName", s.storeName)
+            localStorage.setItem("pos_main_store_name", s.storeName)
+          }
         }
       } catch { /* non-fatal — hook will fetch on mount */ }
 

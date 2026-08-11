@@ -5,10 +5,12 @@
  */
 
 import "dotenv/config"
-import admin from "firebase-admin"
 import { PrismaClient } from "@prisma/client"
 import * as fs from "fs"
 import * as path from "path"
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const admin = require("firebase-admin")
 
 // ─── Init Firebase Admin ──────────────────────────────────────────────────────
 

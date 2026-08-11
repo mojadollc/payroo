@@ -51,11 +51,16 @@ export function setMainStoreId(externalId: string) {
 
 export function clearStoreSession() {
   if (typeof window === "undefined") return
+  const storeId = localStorage.getItem(EXT_ID_KEY)
+  if (storeId) localStorage.removeItem(`pos_products_cache_${storeId}`)
   localStorage.removeItem(EXT_ID_KEY)
   localStorage.removeItem(MAIN_STORE_KEY)
   localStorage.removeItem(MAIN_STORE_NAME_KEY)
   localStorage.removeItem(BRANCH_CACHE_KEY)
   localStorage.removeItem(STORE_NAME_KEY)
+  localStorage.removeItem("pos_cart")
+  localStorage.removeItem("pos_current_user")
+  localStorage.removeItem("pos_subscription")
 }
 
 export interface CachedBranch {

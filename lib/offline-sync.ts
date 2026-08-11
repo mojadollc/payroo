@@ -30,6 +30,15 @@ export type OfflineEntry =
 const QUEUE_KEY = "pos_offline_queue"
 const PRODUCTS_CACHE_KEY = "pos_products_cache"
 
+function getProductsCacheKey(): string {
+  try {
+    const storeId = localStorage.getItem("pos_ext_id") ?? "default"
+    return `${PRODUCTS_CACHE_KEY}_${storeId}`
+  } catch {
+    return PRODUCTS_CACHE_KEY
+  }
+}
+
 // ── Online detection ──────────────────────────────────────────────────────────
 
 export function isOnline(): boolean {
@@ -86,13 +95,13 @@ function removeFromQueue(id: string) {
 
 export function cacheProducts(products: any[]) {
   try {
-    localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(products))
+    localStorage.setItem(getProductsCacheKey(), JSON.stringify(products))
   } catch { /* quota exceeded — ignore */ }
 }
 
 export function getCachedProducts(): any[] {
   try {
-    return JSON.parse(localStorage.getItem(PRODUCTS_CACHE_KEY) || "[]")
+    return JSON.parse(localStorage.getItem(getProductsCacheKey()) || "[]")
   } catch {
     return []
   }

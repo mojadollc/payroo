@@ -85,6 +85,14 @@ export default function DashboardPage() {
       const { user: ownerUser, subscription } = data
       const externalId = subscription.externalId
 
+      // Clear any previous store's cached data before setting new store
+      const prevStoreId = localStorage.getItem("pos_ext_id")
+      if (prevStoreId && prevStoreId !== externalId) {
+        localStorage.removeItem(`pos_products_cache_${prevStoreId}`)
+        localStorage.removeItem("pos_cart")
+        localStorage.removeItem("pos_current_user")
+      }
+
       localStorage.setItem("pos_ext_id", externalId)
       localStorage.setItem("pos_main_ext_id", externalId)
 

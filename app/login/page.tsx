@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
+import { buildSession, setSession, clearSession } from "@/lib/pos-session"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -53,47 +54,24 @@ export default function LoginPage() {
 
       const { user } = data
 
-      // Clear any previous store's cached data before setting new store
-      const prevStoreId = localStorage.getItem("pos_ext_id")
-      if (prevStoreId && prevStoreId !== storeId.trim()) {
-        localStorage.removeItem(`pos_products_cache_${prevStoreId}`)
-        localStorage.removeItem("pos_cart")
-        localStorage.removeItem("pos_current_user")
-        localStorage.removeItem("pos_subscription")
-        localStorage.removeItem("storeName")
-        localStorage.removeItem("pos_main_store_name")
-        localStorage.removeItem("pos_branches_cache")
-      }
+      // Clear previous store session completely
+      clearSession()
 
-      localStorage.setItem("pos_ext_id", storeId.trim())
-      localStorage.setItem("pos_main_ext_id", storeId.trim())
-
-      // Fetch and cache subscription immediately so POS page never flashes "expired"
+      // Fetch subscription and write single session object
       try {
         const subRes = await fetch(`/api/subscription?externalId=${storeId.trim()}`)
         const subJson = await subRes.json()
         if (subJson.data) {
-          const s = subJson.data
-          const endDate = s.endDate ? new Date(s.endDate) : null
-          const isActive = s.status === "active" && (!endDate || endDate > new Date())
-          localStorage.setItem("pos_subscription", JSON.stringify({
-            loading: false, isActive,
-            tier: s.tier ?? "basic",
-            features: s.features ?? {},
-            storeName: s.storeName ?? null,
-            businessType: s.businessType ?? null,
-            ownerName: s.ownerName ?? null,
-            ownerEmail: s.ownerEmail ?? null,
-            endDate: endDate?.toISOString() ?? null,
-            externalId: storeId.trim(),
-          }))
-          // Write storeName immediately so navbar shows correct name right away
-          if (s.storeName) {
-            localStorage.setItem("storeName", s.storeName)
-            localStorage.setItem("pos_main_store_name", s.storeName)
-          }
+          setSession(buildSession(storeId.trim(), subJson.data))
+        } else {
+          // No subscription found — still set IDs so app works
+          localStorage.setItem("pos_ext_id", storeId.trim())
+          localStorage.setItem("pos_main_ext_id", storeId.trim())
         }
-      } catch { /* non-fatal — hook will fetch on mount */ }
+      } catch {
+        localStorage.setItem("pos_ext_id", storeId.trim())
+        localStorage.setItem("pos_main_ext_id", storeId.trim())
+      }
 
       login(user)
       toast({ title: `Welcome, ${user.name}!`, description: `Logged in as ${user.role}` })

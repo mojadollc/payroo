@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getStoreId } from "@/lib/store-id"
+import { getSession } from "@/lib/pos-session"
+import { clearSession } from "@/lib/pos-session"
 import { BranchSwitcher } from "@/components/branch-switcher"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
@@ -85,71 +87,31 @@ export function Navbar() {
   const { refresh, isRefreshing } = useAppRefresh()
   const [storeName, setStoreName] = useState(DEFAULT_STORE_NAME)
   const [storeIdDisplay, setStoreIdDisplay] = useState("")
+  const [branchName, setBranchName] = useState<string | null>(null)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
-    // Resolve display name for the ACTIVE branch (not always main)
-    const fetchStoreName = async () => {
-      const activeId =
-        typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") || "" : ""
-      setStoreIdDisplay(activeId)
-
-      // 1) Instant: localStorage name for active store
-      const cached = localStorage.getItem(STORE_NAME_KEY)
-      if (cached) setStoreName(cached)
-
-      // 2) Branch cache (set when listing / switching branches)
-      try {
-        const raw = localStorage.getItem("pos_branches_cache")
-        if (raw && activeId) {
-          const list = JSON.parse(raw) as { externalId: string; name: string }[]
-          const hit = list.find(b => b.externalId === activeId)
-          if (hit?.name) {
-            setStoreName(hit.name)
-            localStorage.setItem(STORE_NAME_KEY, hit.name)
-          }
-        }
-      } catch {}
-
-    // 3) API store-settings — only fetch if no cache hit
-      try {
-        const cached2 = localStorage.getItem(STORE_NAME_KEY)
-        if (!cached2) {
-          const storeId = getStoreId()
-          if (storeId) {
-            const res = await fetch(`/api/store-settings?storeId=${storeId}`)
-            const { data } = await res.json()
-            if (data?.name) {
-              setStoreName(data.name)
-              localStorage.setItem(STORE_NAME_KEY, data.name)
-              return
-            }
-          }
-        }
-      } catch {}
-
-      // 4) Fallback: subscription cache storeName if externalId matches
-      try {
-        const subRaw = localStorage.getItem("pos_subscription")
-        if (subRaw) {
-          const sub = JSON.parse(subRaw)
-          // Only use subscription storeName if it belongs to the active store
-          if (sub?.storeName && sub.externalId === activeId) {
-            setStoreName(sub.storeName)
-            localStorage.setItem(STORE_NAME_KEY, sub.storeName)
-          }
-        }
-      } catch {}
+    const load = () => {
+      const session = getSession()
+      if (session) {
+        setStoreName(session.storeName || DEFAULT_STORE_NAME)
+        setStoreIdDisplay(session.externalId)
+        setBranchName(session.branchName || null)
+        return
+      }
+      // Legacy fallback for sessions created before pos_session_v2
+      const id = localStorage.getItem("pos_ext_id") || ""
+      setStoreIdDisplay(id)
+      const name = localStorage.getItem("storeName")
+      if (name) setStoreName(name)
     }
-    fetchStoreName()
-
-    const onStoreName = () => fetchStoreName()
-    window.addEventListener("storename", onStoreName)
+    load()
+    window.addEventListener("storename", load)
     const beforeInstall = (e: any) => { e.preventDefault(); setInstallPrompt(e) }
     window.addEventListener("beforeinstallprompt", beforeInstall)
     return () => {
-      window.removeEventListener("storename", onStoreName)
+      window.removeEventListener("storename", load)
       window.removeEventListener("beforeinstallprompt", beforeInstall)
     }
   }, [])
@@ -162,14 +124,8 @@ export function Navbar() {
   }
 
   const handleLogout = () => {
+    clearSession()
     logout()
-    localStorage.removeItem("pos_ext_id")
-    localStorage.removeItem("pos_main_ext_id")
-    localStorage.removeItem("pos_current_user")
-    localStorage.removeItem("pos_branches_cache")
-    localStorage.removeItem("storeName")
-    localStorage.removeItem("pos_main_store_name")
-    localStorage.removeItem("customer_subscription")
     router.push("/")
   }
 
@@ -212,14 +168,21 @@ export function Navbar() {
     <nav className="border-b bg-card sticky top-0 z-50 hidden md:block">
       <div className="container mx-auto px-4">
         <div className="flex h-14 items-center gap-3">
-          {/* Logo */}
-          <Link href="/pos" className="flex items-center gap-2 shrink-0">
+          {/* Store Identity */}
+          <Link href="/pos" className="flex items-center gap-2.5 shrink-0 group">
             <img src="/logo.svg" alt="Logo" className="h-7 w-7 rounded" />
             <div className="flex flex-col leading-tight">
-              <span className="font-bold text-sm">{storeName}</span>
-              <span className="text-[9px] text-muted-foreground tracking-wide">
-                ID: {storeIdDisplay}
+              <span className="font-bold text-[13px] text-foreground group-hover:text-primary transition-colors truncate max-w-[140px]">
+                {storeName}
               </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-muted-foreground font-mono">ID {storeIdDisplay}</span>
+                {branchName && (
+                  <span className="text-[9px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded-full">
+                    {branchName}
+                  </span>
+                )}
+              </div>
             </div>
           </Link>
 
@@ -338,13 +301,21 @@ export function Navbar() {
         <SheetContent>
           <SheetHeader>
             <SheetTitle className="text-left">{storeName}</SheetTitle>
-            {user && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${ROLE_BADGE[user.role]}`}>{user.role}</span>
-                {tier && <span className={`text-xs px-2 py-0.5 rounded-full font-medium uppercase ${TIER_BADGE[tier] || TIER_BADGE.basic}`}>{tier}</span>}
-                <span className="text-sm font-medium">{user.name}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <span className="text-xs text-muted-foreground font-mono">ID {storeIdDisplay}</span>
+              {branchName && (
+                <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">
+                  {branchName}
+                </span>
+              )}
+              {user && (
+                <>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${ROLE_BADGE[user.role]}`}>{user.role}</span>
+                  {tier && <span className={`text-xs px-2 py-0.5 rounded-full font-medium uppercase ${TIER_BADGE[tier] || TIER_BADGE.basic}`}>{tier}</span>}
+                  <span className="text-sm font-medium">{user.name}</span>
+                </>
+              )}
+            </div>
           </SheetHeader>
           <div className="mt-6 flex flex-col gap-2">
             {/* Primary items */}

@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { HomeNavbar } from "@/components/home-navbar"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { buildSession, setSession, clearSession } from "@/lib/pos-session"
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -85,42 +86,9 @@ export default function DashboardPage() {
       const { user: ownerUser, subscription } = data
       const externalId = subscription.externalId
 
-      // Clear any previous store's cached data before setting new store
-      const prevStoreId = localStorage.getItem("pos_ext_id")
-      if (prevStoreId && prevStoreId !== externalId) {
-        localStorage.removeItem(`pos_products_cache_${prevStoreId}`)
-        localStorage.removeItem("pos_cart")
-        localStorage.removeItem("pos_current_user")
-        localStorage.removeItem("storeName")
-        localStorage.removeItem("pos_main_store_name")
-        localStorage.removeItem("pos_branches_cache")
-      }
-
-      localStorage.setItem("pos_ext_id", externalId)
-      localStorage.setItem("pos_main_ext_id", externalId)
-
-      const fullFeatures = {
-        pos: false, inventory: false, ewallet: false, reports: false,
-        loyalty: false, utang: false, aiRestock: false, multiUser: false,
-        exportData: false, marketIntelligence: false, delivery: false,
-        ...(subscription.features ?? {}),
-      }
-      localStorage.setItem("pos_subscription", JSON.stringify({
-        loading: false,
-        isActive: subscription.status === "active" && (!subscription.endDate || new Date(subscription.endDate) > new Date()),
-        tier: subscription.tier ?? "basic",
-        features: fullFeatures,
-        storeName: subscription.storeName ?? null,
-        businessType: subscription.businessType ?? null,
-        ownerName: subscription.ownerName ?? null,
-        ownerEmail: subscription.ownerEmail ?? null,
-        endDate: subscription.endDate ?? null,
-        externalId,
-      }))
-      if (subscription.storeName) {
-        localStorage.setItem("storeName", subscription.storeName)
-        localStorage.setItem("pos_main_store_name", subscription.storeName)
-      }
+      // Clear previous store session completely, then write new one
+      clearSession()
+      setSession(buildSession(externalId, subscription))
 
       login(ownerUser)
       toast({ title: `Welcome, ${subscription.ownerName}!`, description: `${subscription.storeName} — ${subscription.tier} plan` })

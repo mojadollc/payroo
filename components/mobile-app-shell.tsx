@@ -1,7 +1,8 @@
 "use client"
 
-import { ReactNode } from "react"
+import { ReactNode, useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { getSession } from "@/lib/pos-session"
 
 interface MobileAppShellProps {
   children: ReactNode
@@ -22,31 +23,61 @@ export function MobileAppShell({
   className,
   noPadding = false,
 }: MobileAppShellProps) {
+  const [session, setSession_] = useState<ReturnType<typeof getSession>>(null)
+
+  useEffect(() => {
+    setSession_(getSession())
+    const handler = () => setSession_(getSession())
+    window.addEventListener("storename", handler)
+    return () => window.removeEventListener("storename", handler)
+  }, [])
+
+  const storeName = session?.storeName
+  const storeId = session?.externalId
+  const branchName = session?.branchName
+
   return (
     <div className="min-h-screen bg-background">
       {/* Native-style header */}
       {(title || headerAction) && (
         <div className="sticky top-0 z-40 bg-background border-b border-border/50 shadow-sm">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between">
+          <div className="container mx-auto px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              {/* Left: page title + store identity */}
               <div className="flex-1 min-w-0">
                 {title && (
-                  <h1 className="text-lg font-bold text-foreground truncate">
+                  <h1 className="text-[15px] font-bold text-foreground truncate leading-tight">
                     {title}
                   </h1>
                 )}
-                {subtitle && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {subtitle}
-                  </p>
+                {/* Store identity row */}
+                {storeName && (
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="text-[11px] font-semibold text-primary truncate max-w-[140px]">
+                      {storeName}
+                    </span>
+                    {storeId && (
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        · ID {storeId}
+                      </span>
+                    )}
+                    {branchName && (
+                      <span className="text-[9px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded-full">
+                        {branchName}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* Fallback subtitle if no session yet */}
+                {!storeName && subtitle && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
                 )}
               </div>
               {headerAction && (
-                <div className="ml-3 flex-shrink-0">{headerAction}</div>
+                <div className="ml-2 flex-shrink-0">{headerAction}</div>
               )}
             </div>
           </div>
-          {/* Optional second sticky bar — sits flush below the title row */}
           {stickyBar && (
             <div className="border-t border-border/40 bg-background px-4 py-2">
               {stickyBar}

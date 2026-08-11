@@ -23,6 +23,7 @@ interface TobaccoData {
   quantitiesSold: TobaccoRow[]
   costCapital: CostRow[]
   totals: { gross: number; net: number; qtySold: number; stockValue: number }
+  today: { gross: number; net: number; qtySold: number }
 }
 
 interface Props {
@@ -134,11 +135,39 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
   }
 
   const totals = data?.totals ?? { gross: 0, net: 0, qtySold: 0, stockValue: 0 }
+  const today = data?.today ?? { gross: 0, net: 0, qtySold: 0 }
 
   return (
     <div className="space-y-4">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Today cards */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Today</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border bg-gradient-to-br from-primary/10 to-primary/5 p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <DollarSign className="h-3 w-3" /> Gross Income
+            </p>
+            <p className="text-[15px] font-bold text-primary">₱{fmt(today.gross)}</p>
+          </div>
+          <div className="rounded-xl border bg-gradient-to-br from-green-50 to-emerald-50 p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <TrendingUp className="h-3 w-3" /> Net Income
+            </p>
+            <p className="text-[15px] font-bold text-green-600">₱{fmt(today.net)}</p>
+          </div>
+          <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-cyan-50 p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <Cigarette className="h-3 w-3" /> Qty Sold
+            </p>
+            <p className="text-[15px] font-bold text-blue-600">{today.qtySold.toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Period summary cards */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Selected Period</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border bg-card p-3">
           <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
             <DollarSign className="h-3 w-3" /> Gross Income
@@ -163,9 +192,8 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
           </p>
           <p className="text-[15px] font-bold text-orange-600">₱{fmt(totals.stockValue)}</p>
         </div>
+        </div>
       </div>
-
-      {/* 4 separate sub-reports */}
       <Tabs defaultValue="gross">
         <TabsList className="w-full grid grid-cols-4 h-9 text-[11px]">
           <TabsTrigger value="gross" className="text-[11px]">Gross</TabsTrigger>

@@ -90,6 +90,24 @@ export async function GET(req: NextRequest) {
     { gross: 0, net: 0, qtySold: 0, stockValue: 0 }
   )
 
+  // Today's stats (always today regardless of date range filter)
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+  const todayItems = await prisma.saleItem.findMany({
+    where: {
+      productId: { in: tobaccoIds },
+      sale: { storeId, status: { not: "voided" }, createdAt: { gte: todayStart, lte: todayEnd } },
+    },
+  })
+  const todayTotals = todayItems.reduce(
+    (acc, i) => ({
+      gross: acc.gross + i.subtotal,
+      net: acc.net + (i.price - i.cost) * i.quantity,
+      qtySold: acc.qtySold + i.quantity,
+    }),
+    { gross: 0, net: 0, qtySold: 0 }
+  )
+
   return NextResponse.json({
     data: {
       grossIncome: rows.map(r => ({ productId: r.productId, productName: r.productName, category: r.category, value: r.grossIncome })),
@@ -97,6 +115,7 @@ export async function GET(req: NextRequest) {
       quantitiesSold: rows.map(r => ({ productId: r.productId, productName: r.productName, category: r.category, value: r.qtySold })),
       costCapital: rows.map(r => ({ productId: r.productId, productName: r.productName, category: r.category, stock: r.currentStock, cost: r.cost, value: r.currentStock * r.cost })),
       totals,
+      today: todayTotals,
     },
   })
 }

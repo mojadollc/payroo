@@ -30,14 +30,11 @@ import type { EWalletTransaction, CommissionSettings } from "@/lib/firebase/type
 type Period = "today" | "week" | "month" | "all"
 
 function getPeriodRange(period: Period): { start?: Date; end?: Date; max?: number } {
-  const end = new Date()
-  end.setHours(23, 59, 59, 999)
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
 
-  if (period === "today") {
-    return { start, end }
-  }
+  if (period === "today") return { start, end }
   if (period === "week") {
     start.setDate(start.getDate() - 6)
     return { start, end }
@@ -46,7 +43,6 @@ function getPeriodRange(period: Period): { start?: Date; end?: Date; max?: numbe
     start.setDate(1)
     return { start, end }
   }
-  // all — still cap initial fetch so the page stays fast
   return { max: 50 }
 }
 
@@ -112,30 +108,26 @@ export default function EWalletPage() {
   }
 
   const calculateStats = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const filteredTransactions = transactions
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
 
     const todayTransactions = transactions.filter(t => {
-      const transDate = new Date(t.createdAt as any)
-      return transDate >= today
+      const d = new Date(t.createdAt as any)
+      return d >= todayStart && d <= todayEnd
     })
 
-    const totalProfit = filteredTransactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
+    const totalProfit = transactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
     const todayProfit = todayTransactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
-    const totalTransactions = filteredTransactions.length
-    const todayTransactionsCount = todayTransactions.length
-
-    const grossCashin = filteredTransactions.filter(t => t.type === "cashin").reduce((sum, t) => sum + t.amount, 0)
-    const grossCashout = filteredTransactions.filter(t => t.type === "cashout").reduce((sum, t) => sum + t.amount, 0)
-    const grossLoad = filteredTransactions.filter(t => t.type === "load").reduce((sum, t) => sum + t.amount, 0)
+    const grossCashin = transactions.filter(t => t.type === "cashin").reduce((sum, t) => sum + t.amount, 0)
+    const grossCashout = transactions.filter(t => t.type === "cashout").reduce((sum, t) => sum + t.amount, 0)
+    const grossLoad = transactions.filter(t => t.type === "load").reduce((sum, t) => sum + t.amount, 0)
 
     return {
       totalProfit,
       todayProfit,
-      totalTransactions,
-      todayTransactionsCount,
+      totalTransactions: transactions.length,
+      todayTransactionsCount: todayTransactions.length,
       grossCashin,
       grossCashout,
       grossLoad,

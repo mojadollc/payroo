@@ -60,7 +60,8 @@ export function clearStoreSession() {
   localStorage.removeItem(STORE_NAME_KEY)
   localStorage.removeItem("pos_cart")
   localStorage.removeItem("pos_current_user")
-  localStorage.removeItem("pos_subscription")
+  // NOTE: pos_subscription is intentionally kept — it will be overwritten on next login
+  // Removing it causes a flash of "Subscription Expired" before the hook re-fetches
 }
 
 export interface CachedBranch {

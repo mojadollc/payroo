@@ -65,6 +65,28 @@ export default function LoginPage() {
       localStorage.setItem("pos_ext_id", storeId.trim())
       localStorage.setItem("pos_main_ext_id", storeId.trim())
 
+      // Fetch and cache subscription immediately so POS page never flashes "expired"
+      try {
+        const subRes = await fetch(`/api/subscription?externalId=${storeId.trim()}`)
+        const subJson = await subRes.json()
+        if (subJson.data) {
+          const s = subJson.data
+          const endDate = s.endDate ? new Date(s.endDate) : null
+          const isActive = s.status === "active" && (!endDate || endDate > new Date())
+          localStorage.setItem("pos_subscription", JSON.stringify({
+            loading: false, isActive,
+            tier: s.tier ?? "basic",
+            features: s.features ?? {},
+            storeName: s.storeName ?? null,
+            businessType: s.businessType ?? null,
+            ownerName: s.ownerName ?? null,
+            ownerEmail: s.ownerEmail ?? null,
+            endDate: endDate?.toISOString() ?? null,
+            externalId: storeId.trim(),
+          }))
+        }
+      } catch { /* non-fatal — hook will fetch on mount */ }
+
       login(user)
       toast({ title: `Welcome, ${user.name}!`, description: `Logged in as ${user.role}` })
       router.push("/pos")

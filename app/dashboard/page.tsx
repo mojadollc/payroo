@@ -104,7 +104,7 @@ export default function DashboardPage() {
       }
       localStorage.setItem("pos_subscription", JSON.stringify({
         loading: false,
-        isActive: true,
+        isActive: subscription.status === "active" && (!subscription.endDate || new Date(subscription.endDate) > new Date()),
         tier: subscription.tier ?? "basic",
         features: fullFeatures,
         storeName: subscription.storeName ?? null,

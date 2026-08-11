@@ -203,7 +203,7 @@ export default function POSPage() {
     if (changed) setCart(updated)
   }, [products])
 
-  // Block entire POS if subscription is expired
+  // Block entire POS if subscription is expired — never show while still loading
   if (!subLoading && !isActive) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">

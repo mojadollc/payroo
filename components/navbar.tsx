@@ -163,7 +163,7 @@ export function Navbar() {
   const handleLogout = () => {
     logout()
     localStorage.removeItem("pos_ext_id")
-    localStorage.removeItem("pos_subscription")
+    localStorage.removeItem("pos_current_user")
     localStorage.removeItem("customer_subscription")
     router.push("/")
   }

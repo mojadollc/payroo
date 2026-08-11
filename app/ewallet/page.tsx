@@ -57,7 +57,7 @@ export default function EWalletPage() {
   const [hasMore, setHasMore] = useState(false)
   const hasLoaded = useRef(false)
   const settingsLoadedRef = useRef(false)
-  const [period, setPeriod] = useState<Period>("today")
+  const [period, setPeriod] = useState<Period>("month")
   const [showNewTransaction, setShowNewTransaction] = useState(false)
   const allLimitRef = useRef(50)
 

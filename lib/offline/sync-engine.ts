@@ -1,7 +1,7 @@
 import { getStoreId } from "@/lib/store-id"
 import {
   localPutMany, localPut, localDelete, localGetByStoreId,
-  getPendingWrites, removePendingWrite, setLastSyncTime,
+  getPendingWrites, removePendingWrite, bumpRetry, setLastSyncTime,
   getPendingWriteCount,
 } from "./store"
 import { startRealtimeSync as startSSESync } from "@/lib/db/realtime"
@@ -43,9 +43,22 @@ export async function pushPendingWrites(): Promise<{ synced: number; failed: num
       await executePendingWrite(pw)
       await removePendingWrite(pw.id)
       synced++
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Sync] Failed to push:", pw.id, err)
-      failed++
+      // Delete that 404s = already gone, clear it
+      const isGone = pw.operation === "delete"
+        && (err.message?.includes("404") || err.message?.includes("not found") || err.message?.includes("P2025"))
+      // Writes that have failed 3+ times are stale — clear them to unblock the queue
+      const retries = (pw.retries ?? 0) + 1
+      const isStale = retries >= 3
+      if (isGone || isStale) {
+        await removePendingWrite(pw.id)
+        synced++
+      } else {
+        // Bump retry count in the queue
+        await bumpRetry(pw.id, retries)
+        failed++
+      }
     }
   }
 

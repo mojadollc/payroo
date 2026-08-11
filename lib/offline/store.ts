@@ -81,6 +81,12 @@ export async function removePendingWrite(id: string): Promise<void> {
   await db.delete("pendingWrites", id)
 }
 
+export async function bumpRetry(id: string, retries: number): Promise<void> {
+  const db = await getDB()
+  const entry = await db.get("pendingWrites", id)
+  if (entry) await db.put("pendingWrites", { ...entry, retries })
+}
+
 export async function getPendingWriteCount(): Promise<number> {
   const db = await getDB()
   return db.count("pendingWrites")

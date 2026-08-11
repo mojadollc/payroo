@@ -34,6 +34,13 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 })
-  await prisma.elista.delete({ where: { id } })
-  return NextResponse.json({ ok: true })
+  try {
+    await prisma.elista.delete({ where: { id } })
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    // P2025 = record not found — already deleted, treat as success
+    if (err.code === "P2025") return NextResponse.json({ ok: true })
+    console.error("[elistas DELETE]", err.message)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

@@ -200,11 +200,14 @@ export default function InventoryPage() {
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
+    const prev = products
+    setProducts(p => p.filter(x => x.id !== id))
     try {
-      await fetch(`/api/products?id=${id}`, { method: "DELETE" })
+      const res = await fetch(`/api/products?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed")
       toast({ title: "Product deleted" })
-      loadProducts()
     } catch (error) {
+      setProducts(prev)
       toast({ title: "Error", description: "Failed to delete product", variant: "destructive" })
     }
   }

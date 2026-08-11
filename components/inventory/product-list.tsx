@@ -40,15 +40,16 @@ export function ProductList({ products, categories, onUpdate, isLoading }: Produ
 
   const handleDelete = async () => {
     if (!deletingProduct) return
+    const id = deletingProduct.id
+    setDeletingProduct(null)
     try {
-      await fetch(`/api/products?id=${deletingProduct.id}`, { method: "DELETE" })
+      const res = await fetch(`/api/products?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed")
       toast({ title: "Product deleted", description: "Product has been successfully removed" })
       onUpdate()
     } catch (error) {
       console.error("[v0] Error deleting product:", error)
       toast({ title: "Error", description: "Failed to delete product", variant: "destructive" })
-    } finally {
-      setDeletingProduct(null)
     }
   }
 

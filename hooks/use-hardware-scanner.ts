@@ -17,7 +17,7 @@ interface UseHardwareScannerOptions {
 export function useHardwareScanner({
   onScan,
   enabled = true,
-  minLength = 4,
+  minLength = 6,
 }: UseHardwareScannerOptions) {
   const buffer = useRef("")
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -38,11 +38,11 @@ export function useHardwareScanner({
     // Method 1: Global keydown for standard keyboard-mode scanners
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
-        if (buffer.current.length >= minLength) {
+        const code = buffer.current.trim()
+        if (code.length >= minLength) {
           e.preventDefault()
           e.stopPropagation()
-          onScanRef.current(buffer.current.trim())
-          // Clear the input field too
+          onScanRef.current(code)
           if (inputRef.current) {
             inputRef.current.value = ""
             inputRef.current.dispatchEvent(new Event("input", { bubbles: true }))
@@ -64,7 +64,8 @@ export function useHardwareScanner({
       if (e.key.length === 1) {
         buffer.current += e.key
         if (timer.current) clearTimeout(timer.current)
-        timer.current = setTimeout(() => { buffer.current = "" }, 500)
+        // Hardware scanners finish in < 100ms; reset buffer after 300ms of silence
+        timer.current = setTimeout(() => { buffer.current = "" }, 300)
       }
     }
 
@@ -83,10 +84,7 @@ export function useHardwareScanner({
       if (added >= minLength) {
         const barcode = val.slice(-added).trim()
         if (barcode.length >= minLength) {
-          // Small delay to let scanner finish (some add Enter after)
-          setTimeout(() => {
-            onScanRef.current(barcode)
-          }, 50)
+          setTimeout(() => { onScanRef.current(barcode) }, 30)
           return
         }
       }
@@ -95,21 +93,19 @@ export function useHardwareScanner({
       const gap = now - lastChangeTime.current
       lastChangeTime.current = now
 
-      // If chars are coming in fast (< 80ms each) it's likely a scanner
-      if (gap < 80 && val.length >= minLength) {
+      // Hardware scanners type < 50ms per char
+      if (gap < 50 && val.length >= minLength) {
         if (timer.current) clearTimeout(timer.current)
         timer.current = setTimeout(() => {
-          // After 200ms of no more input, check if we have a barcode
           const currentVal = inputRef.current?.value || input.value || ""
           if (currentVal.length >= minLength) {
             onScanRef.current(currentVal.trim())
-            // Clear input
             if (inputRef.current) {
               inputRef.current.value = ""
               inputRef.current.dispatchEvent(new Event("input", { bubbles: true }))
             }
           }
-        }, 200)
+        }, 150)
       }
     }
 

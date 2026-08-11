@@ -16,16 +16,17 @@ export async function POST(req: NextRequest) {
       const updated = await prisma.elista.update({ where: { id }, data: { title: rest.title, items: rest.items, updatedAt: new Date() } })
       return NextResponse.json({ data: updated })
     }
-    const created = await prisma.elista.create({
-      data: {
-        userId: rest.userId,
-        storeId: rest.storeId ?? "",
-        title: rest.title,
-        items: rest.items,
-      }
-    })
+    // Build create payload — storeId is optional (column may not exist on older DBs)
+    const createData: any = {
+      userId: rest.userId,
+      title: rest.title,
+      items: rest.items,
+    }
+    try { createData.storeId = rest.storeId ?? "" } catch {}
+    const created = await prisma.elista.create({ data: createData })
     return NextResponse.json({ data: created })
   } catch (err: any) {
+    console.error("[elistas POST]", err.message)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

@@ -144,8 +144,9 @@ export default function EListaPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: title.trim(), items: validItems, userId: user.id, storeId: getStoreId() ?? "" }),
         })
-        const { data } = await res.json()
-        newLista.id = data.id
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "Server error")
+        newLista.id = json.data?.id
       } else {
         await offlineAddElista({ title: title.trim(), items: validItems, userId: user.id })
         const fresh = await offlineGetElistas(user.id)
@@ -184,11 +185,13 @@ export default function EListaPage() {
     setSubmitting(true)
     try {
       if (isOnline()) {
-        await fetch("/api/elistas", {
+        const res = await fetch("/api/elistas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: editingLista.id, title: title.trim(), items: validItems }),
         })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || "Server error")
       } else {
         await offlineUpdateElista(editingLista.id, { title: title.trim(), items: validItems })
       }

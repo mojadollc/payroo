@@ -251,23 +251,33 @@ export default function EWalletPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
+          {period !== "today" && (
+            <MobileCard className="p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[11px] text-muted-foreground">Today's Profit</span>
+              </div>
+              <div className="text-[15px] font-bold text-green-600 truncate">
+                ₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </MobileCard>
+          )}
           <MobileCard className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <History className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">Today&apos;s Profit</span>
-            </div>
-            <div className="text-[15px] font-bold text-green-600 truncate">
-              ₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </MobileCard>
-
-          <MobileCard className="p-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <History className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">Transactions</span>
+              <span className="text-[11px] text-muted-foreground">{periodLabel} Transactions</span>
             </div>
             <div className="text-[15px] font-bold truncate">{stats.totalTransactions.toLocaleString()}</div>
           </MobileCard>
+          {period !== "today" && (
+            <MobileCard className="p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <History className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[11px] text-muted-foreground">Today's Count</span>
+              </div>
+              <div className="text-[15px] font-bold truncate">{stats.todayTransactionsCount.toLocaleString()}</div>
+            </MobileCard>
+          )}
         </div>
 
         <div>
@@ -312,17 +322,19 @@ export default function EWalletPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                Today&apos;s Profit
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold text-secondary">₱{stats.todayProfit.toFixed(2)}</div>
-            </CardContent>
-          </Card>
+          {period !== "today" && (
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  Today's Profit
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-lg font-bold text-secondary">₱{stats.todayProfit.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="p-3 pb-1">
@@ -372,17 +384,19 @@ export default function EWalletPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <History className="h-3 w-3" />
-                Today&apos;s Count
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold">{stats.todayTransactionsCount}</div>
-            </CardContent>
-          </Card>
+          {period !== "today" && (
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <History className="h-3 w-3" />
+                  Today's Count
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-lg font-bold">{stats.todayTransactionsCount}</div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">

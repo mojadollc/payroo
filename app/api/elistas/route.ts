@@ -13,10 +13,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { id, ...rest } = body
     if (id) {
-      const updated = await prisma.elista.update({ where: { id }, data: rest })
+      const updated = await prisma.elista.update({ where: { id }, data: { title: rest.title, items: rest.items, updatedAt: new Date() } })
       return NextResponse.json({ data: updated })
     }
-    const created = await prisma.elista.create({ data: rest })
+    const created = await prisma.elista.create({
+      data: {
+        userId: rest.userId,
+        storeId: rest.storeId ?? "",
+        title: rest.title,
+        items: rest.items,
+      }
+    })
     return NextResponse.json({ data: created })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

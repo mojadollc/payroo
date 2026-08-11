@@ -726,12 +726,14 @@ model Checklist {
 model Elista {
   id        String   @id @default(uuid())
   userId    String
+  storeId   String   @default("")
   title     String
   items     Json     // { name, qty, price, amount, notes }[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([storeId])
   @@map("elistas")
 }
 

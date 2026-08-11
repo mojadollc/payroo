@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Minus, Trash2, Edit2, Save, FileText } from "lucide-react"
+import { Plus, Minus, Trash2, Edit2, Save, FileText, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,14 +11,15 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { offlineGetElistas, offlineAddElista, offlineUpdateElista, offlineDeleteElista } from "@/lib/offline/services"
 import { isOnline } from "@/lib/offline/sync-engine"
+import { getStoreId } from "@/lib/store-id"
 
 interface ListaItem {
   id?: string
   name: string
   qty?: number
-  price?: number
-  amount?: number
-  notes?: string
+  price?: number | null
+  amount?: number | null
+  notes?: string | null
 }
 
 interface Lista {
@@ -41,6 +42,8 @@ export default function EListaPage() {
   const [title, setTitle] = useState("")
   const [items, setItems] = useState<ListaItem[]>([{ name: "", qty: 1, price: undefined, notes: "" }])
   const [submitting, setSubmitting] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [importText, setImportText] = useState("")
   const deletedIds = useState<Set<string>>(() => new Set())[0]
 
   useEffect(() => {
@@ -58,6 +61,39 @@ export default function EListaPage() {
   const resetForm = () => {
     setTitle("")
     setItems([{ name: "", qty: 1, price: undefined, notes: "" }])
+    setImportText("")
+    setShowImport(false)
+  }
+
+  // Parse pasted text into items
+  // Supports lines like: "Coca Cola 2 15" or "Sprite x2 ₱15" or just "Pan"
+  const parseImportText = () => {
+    const lines = importText.split("\n").map(l => l.trim()).filter(Boolean)
+    const parsed: ListaItem[] = lines.map(line => {
+      // Remove leading numbers/bullets like "1." "1)" "- "
+      const clean = line.replace(/^[\d]+[.)\s]+|^[-•*]\s*/, "").trim()
+      // Try to extract qty and price from end: "Item 2 15" or "Item x2 ₱15"
+      const match = clean.match(/^(.+?)\s+[xX×]?(\d+)\s+[₱]?([\d.]+)\s*$/) ||
+                    clean.match(/^(.+?)\s+[₱]?([\d.]+)\s+[xX×]?(\d+)\s*$/)
+      if (match) {
+        const name = match[1].trim()
+        const qty = parseInt(match[2]) || 1
+        const price = parseFloat(match[3]) || undefined
+        return { name, qty, price }
+      }
+      // Try just qty at end: "Sprite 2"
+      const qtyMatch = clean.match(/^(.+?)\s+(\d+)\s*$/)
+      if (qtyMatch && parseInt(qtyMatch[2]) <= 99) {
+        return { name: qtyMatch[1].trim(), qty: parseInt(qtyMatch[2]), price: undefined }
+      }
+      return { name: clean, qty: 1, price: undefined }
+    }).filter(i => i.name.length > 0)
+    if (parsed.length > 0) {
+      setItems(parsed)
+      setShowImport(false)
+      setImportText("")
+      toast({ title: `Imported ${parsed.length} items`, description: "Review and adjust prices as needed" })
+    }
   }
 
   const handleAddItem = () => {
@@ -106,7 +142,7 @@ export default function EListaPage() {
         const res = await fetch("/api/elistas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: title.trim(), items: validItems, userId: user.id }),
+          body: JSON.stringify({ title: title.trim(), items: validItems, userId: user.id, storeId: getStoreId() ?? "" }),
         })
         const { data } = await res.json()
         newLista.id = data.id
@@ -278,6 +314,32 @@ export default function EListaPage() {
             <div>
               <Label className="text-[12px] text-muted-foreground">Title</Label>
               <Input placeholder="e.g., Grocery, Restock" value={title} onChange={(e) => setTitle(e.target.value)} className="h-9 text-[14px] mt-1" />
+            </div>
+
+            {/* Quick Import */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowImport(v => !v)}
+                className="flex items-center gap-1.5 text-[12px] text-primary font-medium hover:underline"
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                {showImport ? "Hide" : "Quick Import"} — paste a list of items
+              </button>
+              {showImport && (
+                <div className="mt-2 space-y-2">
+                  <textarea
+                    className="w-full rounded-lg border bg-muted/40 text-[13px] p-2.5 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder={`Paste items one per line, e.g.:\nCoca Cola 2 20\nSprite 1 15\nPan 3 5`}
+                    value={importText}
+                    onChange={e => setImportText(e.target.value)}
+                  />
+                  <Button type="button" size="sm" onClick={parseImportText} disabled={!importText.trim()} className="w-full h-8 text-[12px]">
+                    <ClipboardList className="h-3.5 w-3.5 mr-1" /> Parse & Fill Items
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground">Format: <code>Item name qty price</code> — price is optional</p>
+                </div>
+              )}
             </div>
 
             {/* Items table */}

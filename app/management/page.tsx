@@ -255,11 +255,20 @@ export default function ManagementPage() {
       let ownerPin = ownerData?.pin ?? ""
       let username = ownerData?.username ?? c.ownerName.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "")
       if (!ownerPin) {
+        // No owner record yet — create one
         ownerPin = String(Math.floor(100000 + Math.random() * 900000))
-        await fetch("/api/auth/staff", {
+        await fetch("/api/store-users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ storeId: c.externalId, pin: ownerPin, name: c.ownerName, username, role: "owner" }),
+          body: JSON.stringify({ externalId: c.externalId, name: c.ownerName, username, pin: ownerPin, role: "owner", isActive: true }),
+        }).catch(() => {})
+      } else {
+        // Owner exists — generate a new PIN and update it
+        ownerPin = String(Math.floor(100000 + Math.random() * 900000))
+        await fetch("/api/store-users", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: ownerData.id, pin: ownerPin }),
         }).catch(() => {})
       }
       const plan = plans.find(p => p.id === c.planId)

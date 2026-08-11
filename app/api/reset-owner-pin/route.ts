@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Resend } from "resend"
+import nodemailer from "nodemailer"
 import { prisma } from "@/lib/db/client"
 
 export async function POST(req: NextRequest) {
-  const resend = new Resend(process.env.RESEND_API_KEY)
   try {
     const { email } = await req.json()
     if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 })
 
+    // Find the subscription + owner user for this email
+    const sub = await prisma.customerSubscription.findFirst({
+      where: { ownerEmail: email.toLowerCase().trim() },
+      orderBy: { createdAt: "desc" },
+    })
+    if (!sub) return NextResponse.json({ error: "No account found with that email." }, { status: 404 })
+
     const tempPin = String(Math.floor(100000 + Math.random() * 900000))
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
 
-    // Invalidate old unused resets for this email
-    await prisma.pinReset.updateMany({ where: { email, used: false }, data: { used: true } })
-
-    // Store new reset record
-    await prisma.pinReset.create({ data: { email, tempPin, expiresAt } })
+    // Update the StoreUser PIN directly so it works immediately on login
+    await prisma.storeUser.updateMany({
+      where: { externalId: sub.externalId, role: "owner" },
+      data: { pin: tempPin },
+    })
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://payroo.xyz"
 
@@ -39,35 +44,46 @@ export async function POST(req: NextRequest) {
           <div class="container">
             <div class="header"><h1 style="margin:0">🔐 PIN Reset Request</h1><p style="margin:10px 0 0;opacity:.9">Payroo POS</p></div>
             <div class="content">
-              <p>You requested to reset your owner PIN. Here is your <strong>temporary PIN</strong>:</p>
+              <p>You requested to reset your owner PIN. Here is your <strong>new temporary PIN</strong>:</p>
               <div class="pin-box">
                 <div class="pin">${tempPin}</div>
-                <p style="margin:10px 0 0;color:#6b7280;font-size:14px">Valid for 1 hour</p>
+                <p style="margin:10px 0 0;color:#6b7280;font-size:14px">Use this to log in now</p>
               </div>
               <div class="warning"><strong>⚠️ Important:</strong> After logging in, go to <strong>User Management</strong> to set a new permanent PIN.</div>
               <ol>
                 <li>Go to <a href="${appUrl}/dashboard">Owner Login</a></li>
                 <li>Enter your email: <strong>${email}</strong></li>
-                <li>Enter the temporary PIN above</li>
-                <li>Set a new PIN in User Management</li>
+                <li>Enter the PIN above</li>
+                <li>Change your PIN in User Management</li>
               </ol>
-              <div style="text-align:center;margin-top:30px"><a href="${appUrl}/dashboard" class="button">Login Now</a></div>
+              <div style="text-align:center;margin-top:30px"><a href="${appUrl}/dashboard" class="button">Login Now →</a></div>
             </div>
           </div>
         </body>
       </html>
     `
 
-    await resend.emails.send({
-      from: "Payroo POS <noreply@payroo.xyz>",
-      to: email,
-      subject: "🔐 Your Temporary PIN - Payroo POS",
-      html: emailHtml,
-    })
+    const smtpUser = process.env.SMTP_USER
+    const smtpPass = process.env.SMTP_PASS
+
+    if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: smtpUser, pass: smtpPass },
+      })
+      await transporter.sendMail({
+        from: `"Payroo POS" <${smtpUser}>`,
+        to: email,
+        subject: `🔐 Your New PIN - Payroo POS (Store ID: ${sub.externalId})`,
+        html: emailHtml,
+      })
+    } else {
+      console.log("⚠️ SMTP not configured. New PIN for", email, ":", tempPin)
+    }
 
     return NextResponse.json({
       success: true,
-      message: "Temporary PIN sent to your email",
+      message: "New PIN sent to your email",
       ...(process.env.NODE_ENV === "development" && { tempPin }),
     })
   } catch (error: any) {

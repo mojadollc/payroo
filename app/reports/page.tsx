@@ -201,6 +201,7 @@ export default function ReportsPage() {
   const [sales, setSales] = useState<Sale[]>([])
   const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(false)
   const hasLoaded = useRef(false)
   const productsLoadedRef = useRef(false)
@@ -248,6 +249,14 @@ export default function ReportsPage() {
         const prodRes = await fetch(`/api/products?storeId=${storeId}`)
         const { data: productsData } = await prodRes.json()
         setProducts(productsData ?? [])
+        // Build tobacco product IDs set
+        const tobaccoIds = new Set<string>(
+          (productsData ?? []).filter((p: any) => {
+            const c = (p.category || "").trim().toLowerCase()
+            return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+          }).map((p: any) => p.id)
+        )
+        setTobaccoProductIds(tobaccoIds)
         productsLoadedRef.current = true
       }
     } catch (error) {
@@ -512,7 +521,7 @@ export default function ReportsPage() {
           <MobileSectionHeader title="Profit Tracker" />
           <MobileCard>
             <div className="p-4">
-              <ProfitChart sales={sales} ewalletTransactions={ewalletTransactions} isLoading={isLoading} />
+              <ProfitChart sales={sales} ewalletTransactions={ewalletTransactions} isLoading={isLoading} tobaccoProductIds={tobaccoProductIds} />
             </div>
           </MobileCard>
         </div>
@@ -657,7 +666,7 @@ export default function ReportsPage() {
             <CardDescription className="text-xs">Daily profit breakdown from sales and e-wallet transactions</CardDescription>
           </CardHeader>
           <CardContent className="p-3 pt-0">
-            <ProfitChart sales={sales} ewalletTransactions={ewalletTransactions} isLoading={isLoading} />
+            <ProfitChart sales={sales} ewalletTransactions={ewalletTransactions} isLoading={isLoading} tobaccoProductIds={tobaccoProductIds} />
           </CardContent>
         </Card>
 

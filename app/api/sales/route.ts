@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
+import { startOfDayPH, endOfDayPH } from "@/lib/ph-time"
 
 export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get("storeId")
@@ -8,9 +9,7 @@ export async function GET(req: NextRequest) {
   const to = req.nextUrl.searchParams.get("to")
   const where: any = { storeId }
   if (from && to) {
-    const start = new Date(from); start.setHours(0, 0, 0, 0)
-    const end = new Date(to); end.setHours(23, 59, 59, 999)
-    where.createdAt = { gte: start, lte: end }
+    where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
   }
   const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } })
   return NextResponse.json({ data: items })

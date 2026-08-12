@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
+import { startOfDayPH, endOfDayPH, todayStartPH, todayEndPH } from "@/lib/ph-time"
 
 function isTobacco(category: string) {
   const c = category.trim().toLowerCase()
@@ -15,9 +16,7 @@ export async function GET(req: NextRequest) {
 
   const dateFilter: any = {}
   if (from && to) {
-    const start = new Date(from); start.setHours(0, 0, 0, 0)
-    const end = new Date(to); end.setHours(23, 59, 59, 999)
-    dateFilter.createdAt = { gte: start, lte: end }
+    dateFilter.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
   }
 
   // 1. Get all tobacco products for this store
@@ -91,12 +90,9 @@ export async function GET(req: NextRequest) {
     { gross: 0, net: 0, qtySold: 0, stockValue: 0 }
   )
 
-  // Today's stats — use client-provided today boundaries to avoid UTC/timezone mismatch
-  const todayFrom = req.nextUrl.searchParams.get("todayFrom")
-  const todayTo   = req.nextUrl.searchParams.get("todayTo")
-  const todayStart = todayFrom ? new Date(todayFrom) : (() => { const d = new Date(); d.setHours(0,0,0,0); return d })()
-  const todayEnd   = todayTo   ? new Date(todayTo)   : (() => { const d = new Date(); d.setHours(23,59,59,999); return d })()
-
+  // Today's stats — always PH timezone today
+  const todayStart = todayStartPH()
+  const todayEnd   = todayEndPH()
   const todayItems = await prisma.saleItem.findMany({
     where: {
       productId: { in: tobaccoIds },

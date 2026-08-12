@@ -451,7 +451,7 @@ export default function ReportsPage() {
                 <span className="text-[11px] text-muted-foreground">Total Earnings</span>
               </div>
               <div className="text-[15px] font-bold text-orange-600 truncate">₱{(today.profit + today.eProfit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">Sales + E-Wallet</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Net profit + E-Wallet comm.</div>
             </div>
           </div>
 
@@ -590,7 +590,7 @@ export default function ReportsPage() {
               <div className="rounded-lg bg-background border p-3">
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><CircleDollarSign className="h-3 w-3" /> Total Earnings</p>
                 <p className="text-xl font-bold text-orange-600">₱{(today.profit + today.eProfit).toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">Sales + E-Wallet profit</p>
+                <p className="text-xs text-muted-foreground">Net profit + E-Wallet comm.</p>
               </div>
             </div>
             {today.topItems.length > 0 && (

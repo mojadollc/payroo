@@ -302,6 +302,9 @@ export default function ReportsPage() {
     const itemsSold = activeTodaySales.reduce((sum, s) => sum + s.items.reduce((n, i) => n + i.quantity, 0), 0)
     const eGross = todayEwallet.reduce((sum, t) => sum + t.amount, 0)
     const eProfit = todayEwallet.reduce((sum, t) => sum + Math.abs(t.profit), 0)
+    // Tobacco today — from same sales array, tobacco products only
+    const tobaccoGross  = activeTodaySales.reduce((sum, s) => sum + s.items.filter(i => tobaccoProductIds.has(i.productId)).reduce((p, i) => p + i.subtotal, 0), 0)
+    const tobaccoProfit = activeTodaySales.reduce((sum, s) => sum + s.items.filter(i => tobaccoProductIds.has(i.productId)).reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
     const topItems = Object.values(
       activeTodaySales.flatMap(s => s.items).reduce((acc, i) => {
         if (!acc[i.productId]) acc[i.productId] = { name: i.productName, qty: 0, revenue: 0 }
@@ -310,7 +313,7 @@ export default function ReportsPage() {
         return acc
       }, {} as Record<string, { name: string; qty: number; revenue: number }>)
     ).sort((a, b) => b.qty - a.qty).slice(0, 5)
-    return { gross, profit, txCount, itemsSold, eGross, eProfit, topItems }
+    return { gross, profit, txCount, itemsSold, eGross, eProfit, tobaccoGross, tobaccoProfit, topItems }
   }
 
   const stats = calculateStats()
@@ -453,6 +456,24 @@ export default function ReportsPage() {
               <div className="text-[15px] font-bold text-orange-600 truncate">₱{(today.profit + today.eProfit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="text-[11px] text-muted-foreground mt-0.5">Net profit + E-Wallet comm.</div>
             </div>
+
+            <div className="bg-background rounded-xl p-3 border col-span-2">
+              <div className="flex items-center gap-1 mb-1">
+                <Cigarette className="h-3 w-3 text-amber-600" />
+                <span className="text-[11px] text-muted-foreground">Tobacco Sales Today</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="text-[13px] font-bold text-amber-600">₱{today.tobaccoGross.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-[10px] text-muted-foreground">Gross (collected)</div>
+                </div>
+                <div className="text-muted-foreground/30">|</div>
+                <div>
+                  <div className="text-[13px] font-bold text-green-600">₱{today.tobaccoProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-[10px] text-muted-foreground">Net profit</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {today.topItems.length > 0 && (
@@ -571,14 +592,14 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 pt-0">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <div className="rounded-lg bg-background border p-3">
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><Receipt className="h-3 w-3" /> Gross Sales</p>
                 <p className="text-xl font-bold text-primary">₱{today.gross.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground">{today.txCount} transaction{today.txCount !== 1 ? "s" : ""}</p>
               </div>
               <div className="rounded-lg bg-background border p-3">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Net Profit</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Net Profit (All)</p>
                 <p className="text-xl font-bold text-green-600">₱{today.profit.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground">{today.itemsSold} item{today.itemsSold !== 1 ? "s" : ""} sold</p>
               </div>
@@ -591,6 +612,11 @@ export default function ReportsPage() {
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><CircleDollarSign className="h-3 w-3" /> Total Earnings</p>
                 <p className="text-xl font-bold text-orange-600">₱{(today.profit + today.eProfit).toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground">Net profit + E-Wallet comm.</p>
+              </div>
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                <p className="text-xs text-muted-foreground flex items-center gap-1"><Cigarette className="h-3 w-3 text-amber-600" /> Tobacco Only</p>
+                <p className="text-xl font-bold text-amber-600">₱{today.tobaccoGross.toFixed(2)}</p>
+                <p className="text-xs text-green-600 font-medium">Net: ₱{today.tobaccoProfit.toFixed(2)}</p>
               </div>
             </div>
             {today.topItems.length > 0 && (

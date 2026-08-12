@@ -138,44 +138,6 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Explanation banner */}
-      <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 flex items-start gap-2">
-        <Cigarette className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-        <div className="text-[11px] text-amber-800 leading-relaxed">
-          <span className="font-semibold">Tobacco-only report.</span>{" "}
-          <span className="font-semibold">Gross</span> = total collected from customers.{" "}
-          <span className="font-semibold">Net</span> = your profit after deducting cost of goods.
-        </div>
-      </div>
-
-      {/* Today cards */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Today — Tobacco Only</p>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200 p-3">
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-              <DollarSign className="h-3 w-3 text-amber-600" /> Gross Revenue
-            </p>
-            <p className="text-[15px] font-bold text-amber-700">₱{fmt(today.gross)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Collected from customers</p>
-          </div>
-          <div className="rounded-xl border bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 p-3">
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-              <TrendingUp className="h-3 w-3 text-green-600" /> Net Profit
-            </p>
-            <p className="text-[15px] font-bold text-green-600">₱{fmt(today.net)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">After cost of goods</p>
-          </div>
-          <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 p-3">
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-              <Cigarette className="h-3 w-3 text-blue-600" /> Sticks Sold
-            </p>
-            <p className="text-[15px] font-bold text-blue-600">{today.qtySold.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Total units today</p>
-          </div>
-        </div>
-      </div>
-
       {/* Period summary cards */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Selected Period — Tobacco Only</p>

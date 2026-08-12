@@ -106,7 +106,7 @@ export function ProfitChart({ sales, ewalletTransactions, isLoading, tobaccoProd
         tobacco: Math.round(d.tobacco * 100) / 100,
         total:   Math.round(d.total * 100) / 100,
       }))
-  }, [sales, ewalletTransactions])
+  }, [sales, ewalletTransactions, tobaccoProductIds])
 
   if (!mounted || isLoading) {
     return <div className="h-[240px] md:h-[320px] bg-muted/40 rounded-xl animate-pulse" />

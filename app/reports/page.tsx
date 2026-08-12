@@ -249,6 +249,7 @@ export default function ReportsPage() {
         const prodRes = await fetch(`/api/products?storeId=${storeId}`)
         const { data: productsData } = await prodRes.json()
         setProducts(productsData ?? [])
+        productsLoadedRef.current = true
         // Build tobacco product IDs set
         const tobaccoIds = new Set<string>(
           (productsData ?? []).filter((p: any) => {
@@ -257,7 +258,6 @@ export default function ReportsPage() {
           }).map((p: any) => p.id)
         )
         setTobaccoProductIds(tobaccoIds)
-        productsLoadedRef.current = true
       }
     } catch (error) {
       console.error("[reports] Error loading data:", error)

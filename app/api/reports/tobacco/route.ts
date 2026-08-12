@@ -91,9 +91,12 @@ export async function GET(req: NextRequest) {
     { gross: 0, net: 0, qtySold: 0, stockValue: 0 }
   )
 
-  // Today's stats (always today regardless of date range filter)
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+  // Today's stats — use client-provided today boundaries to avoid UTC/timezone mismatch
+  const todayFrom = req.nextUrl.searchParams.get("todayFrom")
+  const todayTo   = req.nextUrl.searchParams.get("todayTo")
+  const todayStart = todayFrom ? new Date(todayFrom) : (() => { const d = new Date(); d.setHours(0,0,0,0); return d })()
+  const todayEnd   = todayTo   ? new Date(todayTo)   : (() => { const d = new Date(); d.setHours(23,59,59,999); return d })()
+
   const todayItems = await prisma.saleItem.findMany({
     where: {
       productId: { in: tobaccoIds },

@@ -119,6 +119,11 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
     const params = new URLSearchParams({ storeId })
     if (dateRange?.from) params.set("from", dateRange.from.toISOString())
     if (dateRange?.to) params.set("to", dateRange.to.toISOString())
+    // Send client-local today boundaries so server doesn't use UTC
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999)
+    params.set("todayFrom", todayStart.toISOString())
+    params.set("todayTo",   todayEnd.toISOString())
     fetch(`/api/reports/tobacco?${params}`)
       .then(r => r.json())
       .then(({ data }) => setData(data))

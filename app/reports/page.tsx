@@ -451,10 +451,10 @@ export default function ReportsPage() {
             <div className="bg-background rounded-xl p-3 border">
               <div className="flex items-center gap-1 mb-1">
                 <CircleDollarSign className="h-3 w-3 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Total Earnings</span>
+                <span className="text-[11px] text-muted-foreground">Total Net Profit</span>
               </div>
               <div className="text-[15px] font-bold text-orange-600 truncate">₱{(today.profit + today.eProfit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">Net profit + E-Wallet comm.</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">All products incl. tobacco + E-Wallet comm.</div>
             </div>
 
             <div className="bg-background rounded-xl p-3 border col-span-2">
@@ -609,9 +609,9 @@ export default function ReportsPage() {
                 <p className="text-xs text-muted-foreground">Commission: ₱{today.eProfit.toFixed(2)}</p>
               </div>
               <div className="rounded-lg bg-background border p-3">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><CircleDollarSign className="h-3 w-3" /> Total Earnings</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1"><CircleDollarSign className="h-3 w-3" /> Total Net Profit</p>
                 <p className="text-xl font-bold text-orange-600">₱{(today.profit + today.eProfit).toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">Net profit + E-Wallet comm.</p>
+                <p className="text-xs text-muted-foreground">All products incl. tobacco + E-Wallet comm.</p>
               </div>
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><Cigarette className="h-3 w-3 text-amber-600" /> Tobacco Only</p>

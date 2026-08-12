@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
 
 function isTobacco(category: string) {
-  return category.trim().toLowerCase() === "tobacco"
+  const c = category.trim().toLowerCase()
+  return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
 }
 
 export async function GET(req: NextRequest) {

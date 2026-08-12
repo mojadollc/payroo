@@ -207,7 +207,10 @@ export default function ReportsPage() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(() => {
     const today = new Date()
     const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    return { from: firstOfMonth, to: today }
+    firstOfMonth.setHours(0, 0, 0, 0)
+    const endOfToday = new Date(today)
+    endOfToday.setHours(23, 59, 59, 999)
+    return { from: firstOfMonth, to: endOfToday }
   })
 
   useEffect(() => { loadData() }, [dateRange])
@@ -219,8 +222,14 @@ export default function ReportsPage() {
       if (!storeId) return
 
       const params = new URLSearchParams({ storeId })
-      if (dateRange?.from) params.set("from", dateRange.from.toISOString())
-      if (dateRange?.to) params.set("to", dateRange.to.toISOString())
+      if (dateRange?.from) {
+        const from = new Date(dateRange.from); from.setHours(0, 0, 0, 0)
+        params.set("from", from.toISOString())
+      }
+      if (dateRange?.to) {
+        const to = new Date(dateRange.to); to.setHours(23, 59, 59, 999)
+        params.set("to", to.toISOString())
+      }
 
       const [salesRes, ewalletRes] = await Promise.all([
         fetch(`/api/sales?${params}`),

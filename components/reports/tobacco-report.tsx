@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Cigarette, TrendingUp, Package, DollarSign, Loader2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getStoreId } from "@/lib/store-id"
+import type { Sale } from "@/lib/firebase/types"
 
 interface TobaccoRow {
   productId: string
@@ -29,6 +30,7 @@ interface TobaccoData {
 interface Props {
   dateRange?: { from: Date; to: Date }
   isLoading?: boolean
+  sales?: Sale[]  // pass parent sales so today is computed client-side accurately
 }
 
 function fmt(n: number) {
@@ -47,7 +49,6 @@ function ReportTable({ rows, valueLabel, valuePrefix = "₱", emptyMsg }: {
       <p className="text-sm text-muted-foreground">{emptyMsg}</p>
     </div>
   )
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -78,10 +79,9 @@ function CostCapitalTable({ rows }: { rows: CostRow[] }) {
   if (rows.length === 0) return (
     <div className="flex flex-col items-center justify-center py-10">
       <Cigarette className="h-8 w-8 text-muted-foreground/30 mb-2" />
-      <p className="text-sm text-muted-foreground">No products with category "Tobacco" found</p>
+      <p className="text-sm text-muted-foreground">No tobacco products found</p>
     </div>
   )
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -108,7 +108,12 @@ function CostCapitalTable({ rows }: { rows: CostRow[] }) {
   )
 }
 
-export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
+function isTobaccoCategory(cat: string) {
+  const c = (cat || "").trim().toLowerCase()
+  return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+}
+
+export function TobaccoReport({ dateRange, isLoading: parentLoading, sales = [] }: Props) {
   const [data, setData] = useState<TobaccoData | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -126,6 +131,57 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
       .finally(() => setLoading(false))
   }, [dateRange])
 
+  // Compute today's tobacco stats directly from parent sales (already loaded, correct timezone)
+  const todayFromSales = (() => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
+    let gross = 0, net = 0, qtySold = 0
+
+    for (const sale of sales) {
+      if (sale.status === "voided") continue
+      const d = new Date(sale.createdAt as any)
+      if (d < todayStart || d > todayEnd) continue
+      for (const item of sale.items) {
+        if (!isTobaccoCategory(item.productName)) {
+          // fall back to checking via API data productIds
+        }
+      }
+    }
+
+    // Use API today data if available, otherwise compute from sales
+    return data?.today ?? { gross: 0, net: 0, qtySold: 0 }
+  })()
+
+  // Compute today from sales using tobacco productIds from API data
+  const tobaccoProductIds = new Set([
+    ...(data?.grossIncome ?? []).map(r => r.productId),
+    ...(data?.costCapital ?? []).map(r => r.productId),
+  ])
+
+  const todayComputed = (() => {
+    if (tobaccoProductIds.size === 0) return data?.today ?? { gross: 0, net: 0, qtySold: 0 }
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+    let gross = 0, net = 0, qtySold = 0
+    for (const sale of sales) {
+      if (sale.status === "voided") continue
+      const d = new Date(sale.createdAt as any)
+      if (d < todayStart || d > todayEnd) continue
+      for (const item of sale.items) {
+        if (!tobaccoProductIds.has(item.productId)) continue
+        gross   += item.subtotal
+        net     += (item.price - item.cost) * item.quantity
+        qtySold += item.quantity
+      }
+    }
+    // If we got sales data, use it; otherwise fall back to API today
+    if (gross > 0 || qtySold > 0) return { gross, net, qtySold }
+    return data?.today ?? { gross: 0, net: 0, qtySold: 0 }
+  })()
+
   if (loading || parentLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -135,13 +191,13 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
   }
 
   const totals = data?.totals ?? { gross: 0, net: 0, qtySold: 0, stockValue: 0 }
-  const today = data?.today ?? { gross: 0, net: 0, qtySold: 0 }
+  const today  = todayComputed
 
   return (
     <div className="space-y-4">
       {/* Today cards */}
       <div>
-        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Today</p>
+        <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Today's Tobacco Sales</p>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border bg-gradient-to-br from-primary/10 to-primary/5 p-3">
             <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
@@ -168,34 +224,35 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
       <div>
         <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Selected Period</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border bg-card p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-            <DollarSign className="h-3 w-3" /> Gross Income
-          </p>
-          <p className="text-[15px] font-bold text-primary">₱{fmt(totals.gross)}</p>
-        </div>
-        <div className="rounded-xl border bg-card p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-            <TrendingUp className="h-3 w-3" /> Net Income
-          </p>
-          <p className="text-[15px] font-bold text-green-600">₱{fmt(totals.net)}</p>
-        </div>
-        <div className="rounded-xl border bg-card p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-            <Cigarette className="h-3 w-3" /> Qty Sold
-          </p>
-          <p className="text-[15px] font-bold text-blue-600">{totals.qtySold.toLocaleString()}</p>
-        </div>
-        <div className="rounded-xl border bg-card p-3">
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-            <Package className="h-3 w-3" /> Stock Capital
-          </p>
-          <p className="text-[15px] font-bold text-orange-600">₱{fmt(totals.stockValue)}</p>
-        </div>
+          <div className="rounded-xl border bg-card p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <DollarSign className="h-3 w-3" /> Gross Income
+            </p>
+            <p className="text-[15px] font-bold text-primary">₱{fmt(totals.gross)}</p>
+          </div>
+          <div className="rounded-xl border bg-card p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <TrendingUp className="h-3 w-3" /> Net Income
+            </p>
+            <p className="text-[15px] font-bold text-green-600">₱{fmt(totals.net)}</p>
+          </div>
+          <div className="rounded-xl border bg-card p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <Cigarette className="h-3 w-3" /> Qty Sold
+            </p>
+            <p className="text-[15px] font-bold text-blue-600">{totals.qtySold.toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border bg-card p-3">
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+              <Package className="h-3 w-3" /> Stock Capital
+            </p>
+            <p className="text-[15px] font-bold text-orange-600">₱{fmt(totals.stockValue)}</p>
+          </div>
         </div>
       </div>
+
       <Tabs defaultValue="gross">
-        <TabsList className="w-full grid grid-cols-4 h-9 text-[11px]">
+        <TabsList className="w-full grid grid-cols-4 h-9">
           <TabsTrigger value="gross" className="text-[11px]">Gross</TabsTrigger>
           <TabsTrigger value="net" className="text-[11px]">Net</TabsTrigger>
           <TabsTrigger value="qty" className="text-[11px]">Quantities</TabsTrigger>
@@ -203,35 +260,19 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
         </TabsList>
 
         <TabsContent value="gross" className="mt-3">
-          <p className="text-xs text-muted-foreground mb-2">Gross income per tobacco/cigarette product</p>
-          <ReportTable
-            rows={data?.grossIncome ?? []}
-            valueLabel="Gross (₱)"
-            emptyMsg="No tobacco sales in selected period"
-          />
+          <p className="text-xs text-muted-foreground mb-2">Gross income per tobacco product</p>
+          <ReportTable rows={data?.grossIncome ?? []} valueLabel="Gross (₱)" emptyMsg="No tobacco sales in selected period" />
         </TabsContent>
-
         <TabsContent value="net" className="mt-3">
           <p className="text-xs text-muted-foreground mb-2">Net income (after cost) per product</p>
-          <ReportTable
-            rows={data?.netIncome ?? []}
-            valueLabel="Net (₱)"
-            emptyMsg="No tobacco sales in selected period"
-          />
+          <ReportTable rows={data?.netIncome ?? []} valueLabel="Net (₱)" emptyMsg="No tobacco sales in selected period" />
         </TabsContent>
-
         <TabsContent value="qty" className="mt-3">
-          <p className="text-xs text-muted-foreground mb-2">Units sold per tobacco/cigarette product</p>
-          <ReportTable
-            rows={data?.quantitiesSold ?? []}
-            valueLabel="Qty Sold"
-            valuePrefix=""
-            emptyMsg="No tobacco sales in selected period"
-          />
+          <p className="text-xs text-muted-foreground mb-2">Units sold per tobacco product</p>
+          <ReportTable rows={data?.quantitiesSold ?? []} valueLabel="Qty Sold" valuePrefix="" emptyMsg="No tobacco sales in selected period" />
         </TabsContent>
-
         <TabsContent value="capital" className="mt-3">
-          <p className="text-xs text-muted-foreground mb-2">Current stock × cost price (capital tied up)</p>
+          <p className="text-xs text-muted-foreground mb-2">Current stock × cost price</p>
           <CostCapitalTable rows={data?.costCapital ?? []} />
         </TabsContent>
       </Tabs>

@@ -544,7 +544,7 @@ export default function ReportsPage() {
               <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
             </TabsContent>
             <TabsContent value="tobacco" className="mt-0">
-              <TobaccoReport dateRange={dateRange} isLoading={isLoading} />
+              <TobaccoReport dateRange={dateRange} isLoading={isLoading} sales={sales} />
             </TabsContent>
           </Tabs>
         </div>
@@ -681,7 +681,7 @@ export default function ReportsPage() {
             <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
           </TabsContent>
           <TabsContent value="tobacco">
-            <TobaccoReport dateRange={dateRange} isLoading={isLoading} />
+            <TobaccoReport dateRange={dateRange} isLoading={isLoading} sales={sales} />
           </TabsContent>
         </Tabs>
       </div>

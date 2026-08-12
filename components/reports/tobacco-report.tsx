@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Cigarette, TrendingUp, Package, DollarSign, Loader2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getStoreId } from "@/lib/store-id"
-import type { Sale } from "@/lib/firebase/types"
 
 interface TobaccoRow {
   productId: string
@@ -30,7 +29,6 @@ interface TobaccoData {
 interface Props {
   dateRange?: { from: Date; to: Date }
   isLoading?: boolean
-  sales?: Sale[]  // pass parent sales so today is computed client-side accurately
 }
 
 function fmt(n: number) {
@@ -108,12 +106,7 @@ function CostCapitalTable({ rows }: { rows: CostRow[] }) {
   )
 }
 
-function isTobaccoCategory(cat: string) {
-  const c = (cat || "").trim().toLowerCase()
-  return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
-}
-
-export function TobaccoReport({ dateRange, isLoading: parentLoading, sales = [] }: Props) {
+export function TobaccoReport({ dateRange, isLoading: parentLoading }: Props) {
   const [data, setData] = useState<TobaccoData | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -131,57 +124,6 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading, sales = [] 
       .finally(() => setLoading(false))
   }, [dateRange])
 
-  // Compute today's tobacco stats directly from parent sales (already loaded, correct timezone)
-  const todayFromSales = (() => {
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-    const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-
-    let gross = 0, net = 0, qtySold = 0
-
-    for (const sale of sales) {
-      if (sale.status === "voided") continue
-      const d = new Date(sale.createdAt as any)
-      if (d < todayStart || d > todayEnd) continue
-      for (const item of sale.items) {
-        if (!isTobaccoCategory(item.productName)) {
-          // fall back to checking via API data productIds
-        }
-      }
-    }
-
-    // Use API today data if available, otherwise compute from sales
-    return data?.today ?? { gross: 0, net: 0, qtySold: 0 }
-  })()
-
-  // Compute today from sales using tobacco productIds from API data
-  const tobaccoProductIds = new Set([
-    ...(data?.grossIncome ?? []).map(r => r.productId),
-    ...(data?.costCapital ?? []).map(r => r.productId),
-  ])
-
-  const todayComputed = (() => {
-    if (tobaccoProductIds.size === 0) return data?.today ?? { gross: 0, net: 0, qtySold: 0 }
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-    const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-    let gross = 0, net = 0, qtySold = 0
-    for (const sale of sales) {
-      if (sale.status === "voided") continue
-      const d = new Date(sale.createdAt as any)
-      if (d < todayStart || d > todayEnd) continue
-      for (const item of sale.items) {
-        if (!tobaccoProductIds.has(item.productId)) continue
-        gross   += item.subtotal
-        net     += (item.price - item.cost) * item.quantity
-        qtySold += item.quantity
-      }
-    }
-    // If we got sales data, use it; otherwise fall back to API today
-    if (gross > 0 || qtySold > 0) return { gross, net, qtySold }
-    return data?.today ?? { gross: 0, net: 0, qtySold: 0 }
-  })()
-
   if (loading || parentLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -191,7 +133,8 @@ export function TobaccoReport({ dateRange, isLoading: parentLoading, sales = [] 
   }
 
   const totals = data?.totals ?? { gross: 0, net: 0, qtySold: 0, stockValue: 0 }
-  const today  = todayComputed
+  // Always use server-computed today — it queries only tobacco saleItems directly
+  const today  = data?.today  ?? { gross: 0, net: 0, qtySold: 0 }
 
   return (
     <div className="space-y-4">

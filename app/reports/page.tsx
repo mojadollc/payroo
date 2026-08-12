@@ -523,15 +523,15 @@ export default function ReportsPage() {
           <Tabs defaultValue="sales" className="w-full">
             <div className="sticky top-[52px] z-30 bg-background pb-2">
               <TabsList className="w-full grid grid-cols-3 h-10">
-                <TabsTrigger value="sales" className="gap-1.5 text-[13px]">
+                <TabsTrigger value="sales" className="gap-1.5 text-[13px] data-[state=active]:bg-green-500 data-[state=active]:text-white">
                   <ShoppingCart className="h-3.5 w-3.5" />
                   Sales
                 </TabsTrigger>
-                <TabsTrigger value="ewallet" className="gap-1.5 text-[13px]">
+                <TabsTrigger value="ewallet" className="gap-1.5 text-[13px] data-[state=active]:bg-blue-500 data-[state=active]:text-white">
                   <Wallet className="h-3.5 w-3.5" />
                   E-Wallet
                 </TabsTrigger>
-                <TabsTrigger value="tobacco" className="gap-1.5 text-[13px]">
+                <TabsTrigger value="tobacco" className="gap-1.5 text-[13px] data-[state=active]:bg-amber-500 data-[state=active]:text-white">
                   <Cigarette className="h-3.5 w-3.5" />
                   Tobacco
                 </TabsTrigger>
@@ -664,13 +664,13 @@ export default function ReportsPage() {
         {/* Detailed Reports */}
         <Tabs defaultValue="sales" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="sales" className="gap-2">
+            <TabsTrigger value="sales" className="gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white">
               <ShoppingCart className="h-4 w-4" /> Sales Report
             </TabsTrigger>
-            <TabsTrigger value="ewallet" className="gap-2">
+            <TabsTrigger value="ewallet" className="gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Wallet className="h-4 w-4" /> E-Wallet Report
             </TabsTrigger>
-            <TabsTrigger value="tobacco" className="gap-2">
+            <TabsTrigger value="tobacco" className="gap-2 data-[state=active]:bg-amber-500 data-[state=active]:text-white">
               <Cigarette className="h-4 w-4" /> Tobacco Report
             </TabsTrigger>
           </TabsList>

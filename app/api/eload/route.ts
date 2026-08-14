@@ -105,18 +105,21 @@ export async function POST(req: NextRequest) {
     if (!storeId) {
       return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
     }
-    if (!promoId || !address) return NextResponse.json({ error: "promoId and address are required" }, { status: 400 })
+    if (!address || !amount) return NextResponse.json({ error: "address and amount are required" }, { status: 400 })
 
     if (!cachedToken) cachedToken = await authenticate()
 
     const txnId = generateTxnId()
-    const params = new URLSearchParams({ promoId: String(promoId), address, transactionId: txnId, amount: String(amount) })
+    const params = new URLSearchParams({ address, transactionId: txnId, amount: String(amount) })
+    // Only include promoId if it's a real SKU (non-zero)
+    if (promoId) params.append("promoId", String(promoId))
 
     const r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
       method: "POST",
-      headers: { Authorization: cachedToken, Accept: "application/json", "User-Agent": UA },
+      headers: { Authorization: cachedToken!, Accept: "application/json", "User-Agent": UA },
     })
     const result = await r.json()
+    console.log("[eload] buy response:", JSON.stringify(result))
 
     if (result.errorCode === 0) {
       const gbitsRef = result.content?.referenceId || result.content?.transactionId || txnId
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
     }
     if (result.errorCode === 105) return NextResponse.json({ status: "pending", txnId })
     return NextResponse.json(
-      { status: "failed", txnId, error: result.content?.description || result.message || "Failed" },
+      { status: "failed", txnId, error: result.content?.description || result.message || `GBits error ${result.errorCode}` },
       { status: 422 }
     )
   } catch (error: any) {

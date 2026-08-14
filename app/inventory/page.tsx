@@ -1,10 +1,25 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import {
-  Plus, Search, LayoutGrid, List as ListIcon, Barcode, Download,
-  Printer, Trash2, Edit, Package, AlertTriangle, XCircle, DollarSign,
-  RefreshCw, Upload, FileText, CheckCircle2, XCircle as XCircleIcon,
+import { useState, useEffect } from "react"
+import { 
+  Plus, 
+  Search, 
+  LayoutGrid, 
+  List as ListIcon, 
+  Barcode, 
+  Download, 
+  Printer, 
+  Trash2, 
+  Edit,
+  Package,
+  AlertTriangle,
+  XCircle,
+  DollarSign,
+  RefreshCw,
+  Upload,
+  FileText,
+  CheckCircle2,
+  XCircle as XCircleIcon,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,9 +27,17 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { offlineGetProducts, offlineGetCategories } from "@/lib/offline/services"
+import { isOnline } from "@/lib/offline/sync-engine"
 import { Label } from "@/components/ui/label"
 import type { Product, Category } from "@/lib/firebase/types"
 import { getStoreId } from "@/lib/store-id"
@@ -22,26 +45,24 @@ import { AddProductDialog } from "@/components/inventory/add-product-dialog"
 import { EditProductDialog } from "@/components/inventory/edit-product-dialog"
 import { CategoryManager } from "@/components/inventory/category-manager"
 import { DefaultProductImage } from "@/components/ui/default-product-image"
-import { MobileAppShell } from "@/components/mobile-app-shell"
+import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 
-// ── Shimmer skeleton ──────────────────────────────────────────────────────────
+// ── Shimmer skeleton ─────────────────────────────────────────────────────────
 function Shimmer({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded-xl ${className ?? ""}`} />
 }
 
-function StatsSkeleton() {
+function MobileStatsSkeleton() {
   return (
     <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-      {[1, 2, 3, 4].map(i => (
+      {[1,2,3,4].map(i => (
         <div key={i} className="shrink-0 bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5 shadow-sm min-w-[120px] space-y-2">
-          <div className="flex items-center gap-1.5">
-            <Shimmer className="w-6 h-6 rounded-md" />
-            <Shimmer className="w-16 h-3" />
-          </div>
+          <div className="flex items-center gap-1.5"><Shimmer className="w-6 h-6 rounded-md" /><Shimmer className="w-16 h-3" /></div>
           <Shimmer className="w-20 h-4" />
         </div>
       ))}
@@ -49,33 +70,68 @@ function StatsSkeleton() {
   )
 }
 
-function ProductRowSkeleton() {
+function MobileRowSkeleton() {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm flex items-center gap-3 px-3 py-2.5">
       <Shimmer className="shrink-0 w-14 h-14 rounded-xl" />
-      <div className="flex-1 space-y-2">
-        <Shimmer className="w-3/4 h-3.5" />
-        <Shimmer className="w-1/2 h-3" />
-      </div>
-      <div className="shrink-0 flex flex-col gap-1">
-        {[1, 2, 3, 4].map(i => <Shimmer key={i} className="w-7 h-7 rounded-lg" />)}
-      </div>
+      <div className="flex-1 space-y-2"><Shimmer className="w-3/4 h-3.5" /><Shimmer className="w-1/2 h-3" /></div>
+      <div className="shrink-0 flex flex-col gap-1">{[1,2,3,4].map(i => <Shimmer key={i} className="w-7 h-7 rounded-lg" />)}</div>
     </div>
   )
 }
 
-function DesktopRowSkeleton() {
+function DesktopStatsSkeleton() {
   return (
-    <TableRow>
-      <TableCell><Shimmer className="h-4 w-40" /></TableCell>
-      <TableCell><Shimmer className="h-4 w-28" /></TableCell>
-      <TableCell><Shimmer className="h-4 w-10" /></TableCell>
-      <TableCell><Shimmer className="h-4 w-14" /></TableCell>
-      <TableCell><Shimmer className="h-4 w-14" /></TableCell>
-      <TableCell><div className="flex justify-end gap-2"><Shimmer className="h-8 w-16" /><Shimmer className="h-8 w-20" /><Shimmer className="h-8 w-20" /></div></TableCell>
-    </TableRow>
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {[1,2,3,4].map(i => (
+        <div key={i} className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between"><Shimmer className="h-8 w-8" /><div className="space-y-1"><Shimmer className="h-5 w-20" /><Shimmer className="h-3 w-16" /></div></div>
+          <Shimmer className="h-3 w-28" />
+        </div>
+      ))}
+    </div>
   )
 }
+
+function DesktopGridSkeleton({ count }: { count: number }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="rounded-lg border overflow-hidden bg-card">
+          <Shimmer className="w-full h-28 sm:h-32 rounded-none" />
+          <div className="p-2 space-y-2">
+            <Shimmer className="w-3/4 h-3" /><Shimmer className="w-16 h-4" /><Shimmer className="w-20 h-3" />
+            <div className="flex gap-1">{[1,2,3,4].map(j => <Shimmer key={j} className="h-7 w-7" />)}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DesktopTableSkeleton({ count }: { count: number }) {
+  return (
+    <div className="border rounded-md">
+      <Table>
+        <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Barcode</TableHead><TableHead>Stock</TableHead><TableHead>Cost</TableHead><TableHead>Price</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+        <TableBody>
+          {Array.from({ length: count }).map((_, i) => (
+            <TableRow key={i}>
+              <TableCell><Shimmer className="h-4 w-40" /></TableCell>
+              <TableCell><Shimmer className="h-4 w-28" /></TableCell>
+              <TableCell><Shimmer className="h-4 w-10" /></TableCell>
+              <TableCell><Shimmer className="h-4 w-14" /></TableCell>
+              <TableCell><Shimmer className="h-4 w-14" /></TableCell>
+              <TableCell><div className="flex justify-end gap-2"><Shimmer className="h-8 w-16" /><Shimmer className="h-8 w-20" /><Shimmer className="h-8 w-20" /></div></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+// ── CSV helpers ────────────────────────────────────────────────────────────────
 
 const SAMPLE_CSV_HEADERS = ["name", "barcode", "category", "unit", "cost", "price", "stock", "description"]
 
@@ -469,13 +525,6 @@ export default function InventoryPage() {
     )
   }
 
-  const handlePageChange = (p: number) => {
-    setPageChanging(true)
-    setCurrentPage(p)
-    window.scrollTo({ top: 0, behavior: "smooth" })
-    setTimeout(() => setPageChanging(false), 300)
-  }
-
   const renderProductList = (list: typeof filteredProducts) => {
     const { items, total, page } = paginate(list)
     return (
@@ -511,19 +560,9 @@ export default function InventoryPage() {
       </div>
 
       {pageChanging ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-            <div key={i} className="rounded-lg border overflow-hidden bg-card">
-              <Shimmer className="w-full h-28 sm:h-32 rounded-none" />
-              <div className="p-2 space-y-2">
-                <Shimmer className="w-3/4 h-3" />
-                <Shimmer className="w-16 h-4" />
-                <Shimmer className="w-20 h-3" />
-                <div className="flex gap-1 mt-1">{[1,2,3,4].map(j => <Shimmer key={j} className="h-7 w-7" />)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        viewMode === "grid"
+          ? <DesktopGridSkeleton count={PAGE_SIZE} />
+          : <DesktopTableSkeleton count={PAGE_SIZE} />
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {items.map((product) => (
@@ -579,24 +618,6 @@ export default function InventoryPage() {
               </div>
             </div>
           ))}
-        </div>
-      ) : pageChanging ? (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Barcode</TableHead>
-                <TableHead>{cfg.stockLabel}</TableHead>
-                <TableHead>{cfg.costLabel}</TableHead>
-                <TableHead>{cfg.priceLabel}</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: PAGE_SIZE }).map((_, i) => <DesktopRowSkeleton key={i} />)}
-            </TableBody>
-          </Table>
         </div>
       ) : (
         <div className="border rounded-md">
@@ -716,6 +737,13 @@ export default function InventoryPage() {
   const handleSearchChange = (val: string) => { setSearchTerm(val); setCurrentPage(1) }
   const handleTabChange = (val: string) => { setActiveTab(val); setCurrentPage(1) }
 
+  const handlePageChange = (p: number) => {
+    setPageChanging(true)
+    setCurrentPage(p)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+    setTimeout(() => setPageChanging(false), 300)
+  }
+
   return (
     <MobileAppShell
       title="Inventory"
@@ -747,7 +775,7 @@ export default function InventoryPage() {
       <div className="md:hidden space-y-3">
 
         {/* Stats — horizontal scroll strip */}
-        {loading ? <StatsSkeleton /> : (
+        {loading ? <MobileStatsSkeleton /> : (
           <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
             {[
               { icon: <DollarSign className="h-3.5 w-3.5 text-white" />, bg: "bg-blue-500", label: "Stock Value", value: `₱${totalStockValue.toLocaleString("en-PH")}`, color: "text-blue-700" },
@@ -815,18 +843,14 @@ export default function InventoryPage() {
             <CategoryManager categories={categories} onUpdate={loadCategories} />
           </div>
         ) : loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <ProductRowSkeleton key={i} />
-            ))}
-          </div>
+          <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <MobileRowSkeleton key={i} />)}</div>
         ) : (() => {
           const mobileList = tabProducts[activeTab] ?? filteredProducts
           const { items: mobileItems, total: mobileTotal, page: mobilePage } = paginate(mobileList)
           return (
             <div className="space-y-2">
               {pageChanging ? (
-                Array.from({ length: 6 }).map((_, i) => <ProductRowSkeleton key={i} />)
+                Array.from({ length: 6 }).map((_, i) => <MobileRowSkeleton key={i} />)
               ) : mobileItems.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-2xl py-12 flex flex-col items-center gap-2 shadow-sm">
                   <Package className="h-8 w-8 text-gray-300" />
@@ -906,22 +930,7 @@ export default function InventoryPage() {
       {/* ── Desktop View ── */}
       <div className="hidden md:block space-y-6">
         {/* Stats */}
-        {loading ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {[1,2,3,4].map(i => (
-              <div key={i} className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between mb-2">
-                  <Shimmer className="h-8 w-8" />
-                  <div className="text-right space-y-1">
-                    <Shimmer className="h-6 w-20" />
-                    <Shimmer className="h-3 w-16" />
-                  </div>
-                </div>
-                <Shimmer className="h-3 w-32" />
-              </div>
-            ))}
-          </div>
-        ) : (
+        {loading ? <DesktopStatsSkeleton /> : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardContent className="p-4">
@@ -978,30 +987,11 @@ export default function InventoryPage() {
         )}
 
         {loading ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg gap-1">
               {[1,2,3,4].map(i => <Shimmer key={i} className="h-9 rounded-md" />)}
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <Shimmer className="h-9 flex-1 max-w-sm" />
-              <div className="flex gap-1">
-                <Shimmer className="h-9 w-9" />
-                <Shimmer className="h-9 w-9" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-                <div key={i} className="rounded-lg border overflow-hidden bg-card">
-                  <Shimmer className="w-full h-28 sm:h-32 rounded-none" />
-                  <div className="p-2 space-y-2">
-                    <Shimmer className="w-3/4 h-3" />
-                    <Shimmer className="w-16 h-4" />
-                    <Shimmer className="w-20 h-3" />
-                    <div className="flex gap-1 mt-1">{[1,2,3,4].map(j => <Shimmer key={j} className="h-7 w-7" />)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <DesktopGridSkeleton count={PAGE_SIZE} />
           </div>
         ) : (
         <Tabs defaultValue="products" className="space-y-6">
@@ -1020,11 +1010,18 @@ export default function InventoryPage() {
       </div>
 
       {/* Floating Add Button (Mobile) */}
-      <FloatingActionButton
-        icon={<Plus className="h-5 w-5" />}
-        onClick={() => setIsAddDialogOpen(true)}
-        size="sm"
-      />
+      <div className="md:hidden fixed bottom-6 right-4 z-50 flex items-center gap-2">
+        <span className="bg-white text-primary text-xs font-semibold px-3 py-1.5 rounded-full shadow-md border border-primary/20 animate-bounce">
+          Add Product
+        </span>
+        <button
+          onClick={() => setIsAddDialogOpen(true)}
+          className="relative w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <span className="absolute inset-0 rounded-full bg-primary opacity-30 animate-ping" />
+          <Plus className="h-6 w-6 relative z-10" />
+        </button>
+      </div>
 
       {/* ── Dialogs (shared) ── */}
       <AddProductDialog

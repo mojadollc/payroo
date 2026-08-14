@@ -54,6 +54,7 @@ export default function EWalletPage() {
   const settingsLoadedRef = useRef(false)
   const [period, setPeriod] = useState<Period>("month")
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>("none")
+  const [gbitsBalance, setGbitsBalance] = useState<number | null>(null)
   const allLimitRef = useRef(50)
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
@@ -98,6 +99,15 @@ export default function EWalletPage() {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period])
+
+  useEffect(() => {
+    const storeId = getStoreId()
+    if (!storeId) return
+    fetch(`/api/eload?action=balance&storeId=${storeId}`)
+      .then(r => r.json())
+      .then(d => { if (d.balance != null) setGbitsBalance(d.balance) })
+      .catch(() => {})
+  }, [])
 
   const handleLoadMore = () => {
     const next = allLimitRef.current + 50
@@ -159,7 +169,11 @@ export default function EWalletPage() {
             <Zap className="h-6 w-6" />
           </div>
           <span className="text-[13px] font-bold">E-Load</span>
-          <span className="text-[10px] opacity-75">GBits · All Networks</span>
+          {gbitsBalance != null ? (
+            <span className="text-[10px] font-bold opacity-90">₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          ) : (
+            <span className="text-[10px] opacity-75">GBits · All Networks</span>
+          )}
           <div className="absolute top-2.5 right-2.5 bg-white/25 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide">
             LIVE
           </div>
@@ -287,6 +301,30 @@ export default function EWalletPage() {
           )}
         </div>
 
+        {/* GBits wallet balance */}
+        {canUseELoad && (
+          <button
+            onClick={() => router.push("/ewallet/load")}
+            className="w-full flex items-center justify-between bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl px-4 py-3 active:scale-[0.98] transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-violet-600 rounded-xl">
+                <Zap className="h-4 w-4 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-semibold text-violet-500 uppercase tracking-wide">GBits Wallet Balance</p>
+                <p className="text-lg font-black text-violet-700">
+                  {gbitsBalance != null
+                    ? `₱${gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : <span className="text-sm font-medium text-violet-400">Loading...</span>}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-violet-400" />
+          </button>
+        )}
+        </div>
+
         {period !== "today" && (
           <div className="grid grid-cols-2 gap-3">
             <MobileCard className="p-3">
@@ -410,6 +448,21 @@ export default function EWalletPage() {
                   <div className="text-lg font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
                 </CardContent>
               </Card>
+            )}
+
+            {canUseELoad && gbitsBalance != null && (
+              <button onClick={() => router.push("/ewallet/load")} className="text-left">
+                <Card className="border-violet-200 hover:border-violet-400 hover:shadow-md transition-all cursor-pointer h-full">
+                  <CardHeader className="p-3 pb-1">
+                    <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-violet-500" />GBits Balance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-lg font-bold text-violet-600">₱{gbitsBalance.toFixed(2)}</div>
+                  </CardContent>
+                </Card>
+              </button>
             )}
 
             <Card>

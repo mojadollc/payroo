@@ -110,14 +110,26 @@ export async function POST(req: NextRequest) {
     if (!cachedToken) cachedToken = await authenticate()
 
     const txnId = generateTxnId()
-    const params = new URLSearchParams({ address, transactionId: txnId, amount: String(amount) })
-    // Only include promoId if it's a real SKU (non-zero)
-    if (promoId) params.append("promoId", String(promoId))
+    const params = new URLSearchParams({ address, transactionId: txnId })
+    if (promoId) {
+      // SKU-based load — amount is fixed by the promo, do NOT send amount
+      params.append("promoId", String(promoId))
+    } else {
+      // Open-amount regular load — amount is required
+      params.append("amount", String(amount))
+    }
 
-    const r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
+    let r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
       method: "POST",
       headers: { Authorization: cachedToken!, Accept: "application/json", "User-Agent": UA },
     })
+    if (r.status === 401) {
+      cachedToken = await authenticate()
+      r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
+        method: "POST",
+        headers: { Authorization: cachedToken!, Accept: "application/json", "User-Agent": UA },
+      })
+    }
     const result = await r.json()
     console.log("[eload] buy response:", JSON.stringify(result))
 

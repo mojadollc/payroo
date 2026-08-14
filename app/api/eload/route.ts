@@ -50,8 +50,23 @@ async function saveBalanceToDB(storeId: string, balance: number) {
     await prisma.commissionSettings.upsert({
       where: { storeId },
       update: { gbitsBalance: balance, gbitsBalanceAt: new Date() },
-      create: { storeId, gbitsBalance: balance, gbitsBalanceAt: new Date() },
+      create: {
+        storeId,
+        gbitsBalance: balance,
+        gbitsBalanceAt: new Date(),
+        xenditFlatFee: 10,
+        xenditVatRate: 0.12,
+        adminChargeRate: 0.01,
+        sellerCashinRate: 0.02,
+        gcashCashinRate: 0.02,
+        gcashCashoutRate: 0.02,
+        mayaCashinRate: 0.02,
+        mayaCashoutRate: 0.02,
+        eloadFeeType: "flat",
+        eloadFeeValue: 5,
+      },
     })
+    console.log("[eload] balance saved to DB:", balance, "for storeId:", storeId)
   } catch (e) {
     console.error("[eload] failed to save balance to DB:", e)
   }

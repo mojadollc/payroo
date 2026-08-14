@@ -105,15 +105,9 @@ export default function EWalletPage() {
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) { setGbitsBalanceLoading(false); setGbitsBalanceError(true); return }
-    setGbitsBalanceLoading(true)
-    fetch(`/api/eload?action=balance&storeId=${storeId}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.balance != null) { setGbitsBalance(d.balance); setGbitsBalanceError(false) }
-        else setGbitsBalanceError(true)
-      })
-      .catch(() => setGbitsBalanceError(true))
-      .finally(() => setGbitsBalanceLoading(false))
+    // GBits has no balance endpoint — balance is only available after a buy transaction
+    setGbitsBalanceLoading(false)
+    setGbitsBalanceError(true)
   }, [])
 
   const handleLoadMore = () => {
@@ -253,7 +247,7 @@ export default function EWalletPage() {
                     <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
                   </div>
                 ) : gbitsBalanceError ? (
-                  <p className="text-white/50 text-base font-semibold">Balance unavailable</p>
+                  <p className="text-white/60 text-sm font-medium">Updated after each transaction</p>
                 ) : (
                   <p className="text-white text-3xl font-black tracking-tight">
                     ₱{gbitsBalance!.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

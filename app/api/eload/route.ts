@@ -74,25 +74,20 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === "balance") {
-      const data = await gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`)
-      const balance = data.content?.balance ?? data.content?.availableBalance ?? null
-      return NextResponse.json({ balance })
+      // GBits has no dedicated balance endpoint.
+      // Balance is only returned in buy transaction responses (content.balance).
+      // We return null so the UI shows a graceful fallback.
+      return NextResponse.json({ balance: null, unavailable: true })
     }
 
-    const [skuData, balData] = await Promise.allSettled([
-      gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`),
-      gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`),
-    ])
-    if (skuData.status === "fulfilled") {
-      console.log("[eload] SKU response errorCode:", skuData.value.errorCode, "count:", (skuData.value.content || []).length)
+    const skuData = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`)
+    if (skuData.errorCode === 0) {
+      console.log("[eload] SKU count:", (skuData.content || []).length)
     } else {
-      console.error("[eload] SKU fetch failed:", skuData.reason)
+      console.error("[eload] SKU fetch error:", skuData.message)
     }
-    const products = mapSkus(skuData.status === "fulfilled" ? skuData.value.content || [] : [])
-    const balance = balData.status === "fulfilled"
-      ? (balData.value.content?.balance ?? balData.value.content?.availableBalance ?? null)
-      : null
-    return NextResponse.json({ products, balance })
+    const products = mapSkus(skuData.errorCode === 0 ? skuData.content || [] : [])
+    return NextResponse.json({ products, balance: null })
   } catch (error: any) {
     console.error("eload GET error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -134,8 +129,9 @@ export async function POST(req: NextRequest) {
     console.log("[eload] buy response:", JSON.stringify(result))
 
     if (result.errorCode === 0) {
-      const gbitsRef = result.content?.referenceId || result.content?.transactionId || txnId
-      return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId })
+      const gbitsRef = result.content?.transactionId || txnId
+      const balanceAfter = result.content?.balance ?? null
+      return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId, balance: balanceAfter })
     }
     if (result.errorCode === 105) return NextResponse.json({ status: "pending", txnId })
     return NextResponse.json(

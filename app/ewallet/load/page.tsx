@@ -118,6 +118,7 @@ export default function ELoadPage() {
 
       if (data.status === "completed") {
         setTxnId(data.txnId || "")
+        if (data.balance != null) setWalletBalance(data.balance)
         await recordEloadTransaction(data.txnId || "")
         setStep("success")
       } else if (data.status === "pending") {

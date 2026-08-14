@@ -74,20 +74,29 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === "balance") {
-      // GBits has no dedicated balance endpoint.
-      // Balance is only returned in buy transaction responses (content.balance).
-      // We return null so the UI shows a graceful fallback.
+      const balData = await gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`)
+      if (balData.errorCode === 0) {
+        const balance = balData.content?.balance ?? balData.content?.availableBalance ?? null
+        return NextResponse.json({ balance })
+      }
       return NextResponse.json({ balance: null, unavailable: true })
     }
 
-    const skuData = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`)
+    // Fetch SKUs and balance in parallel
+    const [skuData, balData] = await Promise.all([
+      gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`),
+      gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`).catch(() => null),
+    ])
     if (skuData.errorCode === 0) {
       console.log("[eload] SKU count:", (skuData.content || []).length)
     } else {
       console.error("[eload] SKU fetch error:", skuData.message)
     }
     const products = mapSkus(skuData.errorCode === 0 ? skuData.content || [] : [])
-    return NextResponse.json({ products, balance: null })
+    const balance = balData?.errorCode === 0
+      ? (balData.content?.balance ?? balData.content?.availableBalance ?? null)
+      : null
+    return NextResponse.json({ products, balance })
   } catch (error: any) {
     console.error("eload GET error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })

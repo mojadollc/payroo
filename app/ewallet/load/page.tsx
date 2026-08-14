@@ -52,6 +52,7 @@ export default function ELoadPage() {
     const saved = localStorage.getItem("gbits_balance")
     return saved != null ? parseFloat(saved) : null
   })
+  const [balanceLoading, setBalanceLoading] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -71,7 +72,10 @@ export default function ELoadPage() {
         const nets = [...new Set(prods.map(p => p.network))]
         setNetworks(nets)
         if (nets.length > 0) setSelectedNetwork(nets[0])
-        if (data.balance != null) setWalletBalance(data.balance)
+        if (data.balance != null) {
+          setWalletBalance(data.balance)
+          localStorage.setItem("gbits_balance", String(data.balance))
+        }
       })
       .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
@@ -81,6 +85,21 @@ export default function ELoadPage() {
       .then(({ data }) => { if (data) setCommSettings(data) })
       .catch(() => {})
   }, [])
+
+  const refreshBalance = async () => {
+    setBalanceLoading(true)
+    try {
+      const storeId = getStoreId()
+      const r = await fetch(`/api/eload?storeId=${storeId}&action=balance`)
+      const data = await r.json()
+      if (data.balance != null) {
+        setWalletBalance(data.balance)
+        localStorage.setItem("gbits_balance", String(data.balance))
+        window.dispatchEvent(new StorageEvent("storage", { key: "gbits_balance", newValue: String(data.balance) }))
+      }
+    } catch {}
+    finally { setBalanceLoading(false) }
+  }
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
 
@@ -212,10 +231,19 @@ export default function ELoadPage() {
           </div>
           <div className="text-right">
             {walletBalance != null ? (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1">
-                <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide">E-Load Balance</p>
+              <button
+                onClick={refreshBalance}
+                disabled={balanceLoading}
+                className="bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1 text-left active:opacity-70"
+              >
+                <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide flex items-center gap-1">
+                  E-Load Balance
+                  {balanceLoading
+                    ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    : <RotateCcw className="h-2.5 w-2.5" />}
+                </p>
                 <p className="text-sm font-black text-indigo-700">₱{walletBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              </div>
+              </button>
             ) : <div className="w-14" />}
           </div>
         </div>

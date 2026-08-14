@@ -54,11 +54,7 @@ export default function EWalletPage() {
   const settingsLoadedRef = useRef(false)
   const [period, setPeriod] = useState<Period>("month")
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>("none")
-  const [gbitsBalance, setGbitsBalance] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null
-    const saved = localStorage.getItem("gbits_balance")
-    return saved != null ? parseFloat(saved) : null
-  })
+  const [gbitsBalance, setGbitsBalance] = useState<number | null>(null)
   const [gbitsBalanceError, setGbitsBalanceError] = useState(false)
   const [gbitsBalanceLoading, setGbitsBalanceLoading] = useState(false)
   const allLimitRef = useRef(50)

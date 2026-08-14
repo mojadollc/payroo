@@ -26,7 +26,7 @@ import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mo
 import { getStoreId } from "@/lib/store-id"
 import type { EWalletTransaction, CommissionSettings } from "@/lib/types"
 
-const ELOAD_STORE_ID = "8807"
+const ELOAD_STORE_ID = "8807" // kept for reference, no longer used as gate
 
 type Period = "today" | "week" | "month" | "all"
 type ActiveSheet = "none" | "cashin" | "cashout"
@@ -57,7 +57,7 @@ export default function EWalletPage() {
   const allLimitRef = useRef(50)
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
-  const canUseELoad = getStoreId() === ELOAD_STORE_ID
+  const canUseELoad = true
 
   const loadData = useCallback(async (opts?: { append?: boolean; nextLimit?: number }) => {
     const isAppend = opts?.append === true

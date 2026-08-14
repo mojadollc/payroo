@@ -52,10 +52,6 @@ export default function ELoadPage() {
 
   useEffect(() => {
     const storeId = getStoreId()
-    if (storeId !== "8807") {
-      router.replace("/ewallet")
-      return
-    }
 
     fetch(`/api/eload?storeId=${storeId}`)
       .then(r => {

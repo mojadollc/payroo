@@ -46,7 +46,7 @@ function generateTxnId(): string {
 
 function mapSkus(skus: any[]) {
   return skus
-    .filter((s) => s.skuStatus === true)
+    .filter((s) => s.skuStatus === true || s.skuStatus === 1 || s.skuStatus === "true" || s.skuStatus === "active")
     .map((s) => ({
       promoId: s.promoId, name: s.skuName, network: s.serviceGroup,
       service: s.service, category: s.category, amount: s.amount,
@@ -56,12 +56,10 @@ function mapSkus(skus: any[]) {
     .sort((a, b) => a.amount - b.amount)
 }
 
-const ALLOWED_STORE_ID = "8807"
-
 export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get("storeId")
-  if (storeId !== ALLOWED_STORE_ID) {
-    return NextResponse.json({ error: "E-Load is not available for your store." }, { status: 403 })
+  if (!storeId) {
+    return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
   }
   try {
     const action = req.nextUrl.searchParams.get("action")
@@ -85,6 +83,11 @@ export async function GET(req: NextRequest) {
       gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`),
       gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`),
     ])
+    if (skuData.status === "fulfilled") {
+      console.log("[eload] SKU response errorCode:", skuData.value.errorCode, "count:", (skuData.value.content || []).length)
+    } else {
+      console.error("[eload] SKU fetch failed:", skuData.reason)
+    }
     const products = mapSkus(skuData.status === "fulfilled" ? skuData.value.content || [] : [])
     const balance = balData.status === "fulfilled"
       ? (balData.value.content?.balance ?? balData.value.content?.availableBalance ?? null)
@@ -99,8 +102,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { promoId, address, amount, storeId } = await req.json()
-    if (storeId !== ALLOWED_STORE_ID) {
-      return NextResponse.json({ error: "E-Load is not available for your store." }, { status: 403 })
+    if (!storeId) {
+      return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
     }
     if (!promoId || !address) return NextResponse.json({ error: "promoId and address are required" }, { status: 400 })
 

@@ -181,7 +181,7 @@ export default function EWalletPage() {
         </button>
       )}
 
-      {/* Cash-In */}
+      {/* Cash-In Cash-out Record */}
       <button
         onClick={() => setActiveSheet("cashin")}
         className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white py-4 px-2 shadow-lg shadow-blue-500/25 active:scale-[0.97] transition-all hover:from-blue-600 hover:to-cyan-700"
@@ -189,8 +189,8 @@ export default function EWalletPage() {
         <div className="p-2.5 bg-white/20 rounded-xl">
           <ArrowDownToLine className="h-6 w-6" />
         </div>
-        <span className="text-[13px] font-bold">Cash-In</span>
-        <span className="text-[10px] opacity-75">GCash · Maya</span>
+        <span className="text-[13px] font-bold">Cash-in/out</span>
+        <span className="text-[10px] opacity-75">Record</span>
       </button>
 
       {/* Kiosk */}

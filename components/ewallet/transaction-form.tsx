@@ -4,7 +4,7 @@ import type React from "react"
 import { cn } from "@/lib/utils"
 
 import { useState } from "react"
-import { ArrowDownToLine, ArrowUpFromLine, Signal } from "lucide-react"
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -207,7 +207,7 @@ export function TransactionForm({ commissionSettings, onSuccess, defaultTab }: T
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1">
+        <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1">
           <TabsTrigger
             value="cashin"
             className={cn(
@@ -231,18 +231,6 @@ export function TransactionForm({ commissionSettings, onSuccess, defaultTab }: T
           >
             <ArrowUpFromLine className="h-3.5 w-3.5" />
             Cash-Out
-          </TabsTrigger>
-          <TabsTrigger
-            value="load"
-            className={cn(
-              "gap-1.5 text-xs sm:text-sm font-semibold transition-all",
-              activeTab === "load"
-                ? "bg-purple-500 text-white shadow-md data-[state=active]:bg-purple-500 data-[state=active]:text-white"
-                : "hover:bg-purple-50 hover:text-purple-600"
-            )}
-          >
-            <Signal className="h-3.5 w-3.5" />
-            Load
           </TabsTrigger>
         </TabsList>
 

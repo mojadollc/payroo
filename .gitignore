@@ -37,3 +37,6 @@ next-env.d.ts
 88sevenstore/
 
 /lib/generated/prisma
+
+# Local product image uploads (persisted on VPS outside build dir)
+uploads/

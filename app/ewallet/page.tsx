@@ -55,6 +55,8 @@ export default function EWalletPage() {
   const [period, setPeriod] = useState<Period>("month")
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>("none")
   const [gbitsBalance, setGbitsBalance] = useState<number | null>(null)
+  const [gbitsBalanceError, setGbitsBalanceError] = useState(false)
+  const [gbitsBalanceLoading, setGbitsBalanceLoading] = useState(true)
   const allLimitRef = useRef(50)
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
@@ -102,11 +104,16 @@ export default function EWalletPage() {
 
   useEffect(() => {
     const storeId = getStoreId()
-    if (!storeId) return
+    if (!storeId) { setGbitsBalanceLoading(false); setGbitsBalanceError(true); return }
+    setGbitsBalanceLoading(true)
     fetch(`/api/eload?action=balance&storeId=${storeId}`)
       .then(r => r.json())
-      .then(d => { if (d.balance != null) setGbitsBalance(d.balance) })
-      .catch(() => {})
+      .then(d => {
+        if (d.balance != null) { setGbitsBalance(d.balance); setGbitsBalanceError(false) }
+        else setGbitsBalanceError(true)
+      })
+      .catch(() => setGbitsBalanceError(true))
+      .finally(() => setGbitsBalanceLoading(false))
   }, [])
 
   const handleLoadMore = () => {
@@ -222,6 +229,45 @@ export default function EWalletPage() {
 
         {QuickActions}
 
+        {/* GBits Wallet Card — GCash/GoTyme style */}
+        {canUseELoad && (
+          <button
+            onClick={() => router.push("/ewallet/load")}
+            className="w-full rounded-3xl overflow-hidden shadow-lg active:scale-[0.98] transition-all text-left"
+            style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)" }}
+          >
+            <div className="px-5 pt-5 pb-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-white font-bold text-sm tracking-wide">GBits E-Load Wallet</span>
+                </div>
+                <span className="text-[10px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">LIVE</span>
+              </div>
+              <div className="mb-1">
+                <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest mb-0.5">Available Balance</p>
+                {gbitsBalanceLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
+                  </div>
+                ) : gbitsBalanceError ? (
+                  <p className="text-white/50 text-base font-semibold">Unable to load balance</p>
+                ) : (
+                  <p className="text-white text-3xl font-black tracking-tight">
+                    ₱{gbitsBalance!.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
+                <span className="text-white/60 text-[11px]">Tap to send load</span>
+                <ChevronRight className="h-4 w-4 text-white/60" />
+              </div>
+            </div>
+          </button>
+        )}
+
         {/* Cash-Out shortcut row */}
         <button
           onClick={() => setActiveSheet("cashout")}
@@ -300,29 +346,6 @@ export default function EWalletPage() {
             </MobileCard>
           )}
         </div>
-
-        {/* GBits wallet balance */}
-        {canUseELoad && (
-          <button
-            onClick={() => router.push("/ewallet/load")}
-            className="w-full flex items-center justify-between bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-2xl px-4 py-3 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-violet-600 rounded-xl">
-                <Zap className="h-4 w-4 text-white" />
-              </div>
-              <div className="text-left">
-                <p className="text-xs font-semibold text-violet-500 uppercase tracking-wide">GBits Wallet Balance</p>
-                <p className="text-lg font-black text-violet-700">
-                  {gbitsBalance != null
-                    ? `₱${gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : <span className="text-sm font-medium text-violet-400">Loading...</span>}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-violet-400" />
-          </button>
-        )}
 
         {period !== "today" && (
           <div className="grid grid-cols-2 gap-3">
@@ -449,7 +472,7 @@ export default function EWalletPage() {
               </Card>
             )}
 
-            {canUseELoad && gbitsBalance != null && (
+            {canUseELoad && (
               <button onClick={() => router.push("/ewallet/load")} className="text-left">
                 <Card className="border-violet-200 hover:border-violet-400 hover:shadow-md transition-all cursor-pointer h-full">
                   <CardHeader className="p-3 pb-1">
@@ -458,7 +481,9 @@ export default function EWalletPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 pt-0">
-                    <div className="text-lg font-bold text-violet-600">₱{gbitsBalance.toFixed(2)}</div>
+                    <div className="text-lg font-bold text-violet-600">
+                      {gbitsBalanceLoading ? "..." : gbitsBalanceError ? "N/A" : `₱${gbitsBalance!.toFixed(2)}`}
+                    </div>
                   </CardContent>
                 </Card>
               </button>

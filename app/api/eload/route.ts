@@ -110,8 +110,7 @@ export async function POST(req: NextRequest) {
     if (!cachedToken) cachedToken = await authenticate()
 
     const txnId = generateTxnId()
-    const params = new URLSearchParams({ promoId: String(promoId), address, transactionId: txnId })
-    if (amount) params.append("amount", String(amount))
+    const params = new URLSearchParams({ promoId: String(promoId), address, transactionId: txnId, amount: String(amount) })
 
     const r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
       method: "POST",

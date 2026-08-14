@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ChevronLeft, CheckCircle, XCircle, AlertTriangle,
-  Loader2, Delete, ChevronRight, RotateCcw,
+  Loader2, Delete, RotateCcw, Zap,
 } from "lucide-react"
 import type { CommissionSettings } from "@/lib/types"
 import { getStoreId } from "@/lib/store-id"
 
-type Step = "browse" | "phone" | "confirm" | "processing" | "success" | "failed"
+type Step = "browse" | "custom-amount" | "phone" | "confirm" | "processing" | "success" | "failed"
 
 interface Product {
   promoId: number
@@ -31,6 +31,12 @@ const NETWORK_COLORS: Record<string, string> = {
   "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16", CIGNAL: "#0EA5E9",
 }
 
+// Networks that support open-amount regular load via GBits
+const REGULAR_LOAD_NETWORKS = ["SMART", "GLOBE", "TNT", "TM", "SUN", "DITO", "GOMO"]
+const REGULAR_LOAD_PROMO_ID: Record<string, number> = {
+  SMART: 1, GLOBE: 2, TNT: 3, TM: 4, SUN: 5, DITO: 6, GOMO: 7,
+}
+
 export default function ELoadPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>("browse")
@@ -47,6 +53,7 @@ export default function ELoadPage() {
   const [error, setError] = useState("")
   const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [customAmount, setCustomAmount] = useState("")
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -93,6 +100,39 @@ export default function ELoadPage() {
     setSelectedProduct(p)
     setPhone("")
     setSearch("")
+    setStep("phone")
+  }
+
+  const handleRegularLoad = () => {
+    setCustomAmount("")
+    setStep("custom-amount")
+  }
+
+  const handleCustomAmountInput = (val: string) => {
+    if (val === "⌫") { setCustomAmount(n => n.slice(0, -1)); return }
+    if (val === "C") { setCustomAmount(""); return }
+    if (customAmount.length >= 5) return
+    setCustomAmount(n => n + val)
+  }
+
+  const confirmCustomAmount = () => {
+    const amt = parseInt(customAmount, 10)
+    if (!amt || amt < 1) return
+    // Build a synthetic product for regular load
+    setSelectedProduct({
+      promoId: REGULAR_LOAD_PROMO_ID[selectedNetwork] ?? 0,
+      name: "Regular Load",
+      network: selectedNetwork,
+      service: "ELOAD",
+      category: "Regular",
+      amount: amt,
+      description: `₱${amt} regular load`,
+      validity: "",
+      addressType: "PN",
+      addressMin: 10,
+      addressMax: 11,
+    })
+    setPhone("")
     setStep("phone")
   }
 
@@ -181,12 +221,14 @@ export default function ELoadPage() {
     setError("")
     setFilter("all")
     setSearch("")
+    setCustomAmount("")
   }
 
   const networkColor = selectedProduct ? (NETWORK_COLORS[selectedProduct.network] || "#6366F1") : "#6366F1"
 
   // ── BROWSE ──────────────────────────────────────────────────────────────────
   if (step === "browse") {
+    const netColor = NETWORK_COLORS[selectedNetwork] || "#6366F1"
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         {/* Header */}
@@ -204,21 +246,19 @@ export default function ELoadPage() {
                 <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide">GBits Wallet</p>
                 <p className="text-sm font-black text-indigo-700">₱{walletBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
-            ) : (
-              <div className="w-14" />
-            )}
+            ) : <div className="w-14" />}
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Network sidebar */}
-          <aside className="w-[76px] bg-white border-r border-gray-100 flex flex-col overflow-y-auto shrink-0">
+        <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Network selector — horizontal scrollable chips */}
+          <div className="bg-white border-b border-gray-100 px-3 py-3">
             {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
+              <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+                {[1,2,3,4].map(i => <div key={i} className="h-14 w-20 rounded-2xl bg-gray-100 animate-pulse shrink-0" />)}
               </div>
             ) : (
-              <div className="py-2 px-1.5 space-y-1">
+              <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
                 {networks.map(net => {
                   const color = NETWORK_COLORS[net] || "#6366F1"
                   const active = selectedNetwork === net
@@ -226,25 +266,20 @@ export default function ELoadPage() {
                     <button
                       key={net}
                       onClick={() => { setSelectedNetwork(net); setFilter("all") }}
-                      className={`w-full p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${
-                        active ? "bg-indigo-50 ring-1 ring-indigo-300" : "hover:bg-gray-50"
+                      className={`shrink-0 flex flex-col items-center justify-center gap-1 px-4 py-2.5 rounded-2xl transition-all border-2 min-w-[72px] ${
+                        active ? "border-transparent shadow-md" : "border-gray-100 bg-white"
                       }`}
+                      style={active ? { backgroundColor: color } : {}}
                     >
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-[9px] font-black"
-                        style={{ backgroundColor: color }}
-                      >
-                        {net.length > 5 ? net.slice(0, 4) : net}
-                      </div>
-                      <span className={`text-[9px] font-semibold text-center leading-tight ${active ? "text-indigo-600" : "text-gray-400"}`}>
-                        {net.length > 7 ? net.slice(0, 7) : net}
+                      <span className={`text-sm font-black tracking-tight ${active ? "text-white" : "text-gray-700"}`}>
+                        {net}
                       </span>
                     </button>
                   )
                 })}
               </div>
             )}
-          </aside>
+          </div>
 
           {/* Products */}
           <main className="flex-1 flex flex-col overflow-hidden">
@@ -255,7 +290,7 @@ export default function ELoadPage() {
                 placeholder={`Search ${selectedNetwork} promos...`}
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full h-9 px-3 rounded-xl bg-gray-100 text-[13px] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                className="w-full h-10 px-4 rounded-2xl bg-gray-100 text-[13px] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
               />
             </div>
 
@@ -267,9 +302,9 @@ export default function ELoadPage() {
                     key={c}
                     onClick={() => setFilter(c)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
-                      filter === c ? "text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      filter === c ? "text-white shadow-sm" : "bg-gray-100 text-gray-500"
                     }`}
-                    style={filter === c ? { backgroundColor: NETWORK_COLORS[selectedNetwork] || "#6366F1" } : {}}
+                    style={filter === c ? { backgroundColor: netColor } : {}}
                   >
                     {c === "all" ? "All" : c}
                   </button>
@@ -283,47 +318,140 @@ export default function ELoadPage() {
                 <div className="flex items-center justify-center h-40">
                   <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : error && filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-                  {error ? (
-                    <>
-                      <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
-                      <p className="text-sm font-medium text-gray-600">E-Load not available</p>
-                      <p className="text-xs text-gray-400 mt-1">{error}</p>
-                      <p className="text-xs text-gray-400 mt-2">Check your GBits API credentials in environment settings.</p>
-                    </>
-                  ) : (
-                    <p className="text-gray-400 text-sm">No products available</p>
-                  )}
+                  <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
+                  <p className="text-sm font-medium text-gray-600">E-Load not available</p>
+                  <p className="text-xs text-gray-400 mt-1">{error}</p>
+                  <p className="text-xs text-gray-400 mt-2">Check your GBits API credentials in environment settings.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2.5">
-                  {filtered.map(p => (
+                  {/* Regular Load card — shown first for supported networks */}
+                  {REGULAR_LOAD_NETWORKS.includes(selectedNetwork) && (
                     <button
-                      key={p.promoId}
-                      onClick={() => handleBuy(p)}
-                      className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 active:scale-[0.97] transition-all text-left flex flex-col"
+                      onClick={handleRegularLoad}
+                      className="bg-white rounded-2xl p-3.5 border-2 shadow-sm active:scale-[0.97] transition-all text-left flex flex-col col-span-2"
+                      style={{ borderColor: netColor }}
                     >
-                      <p className="text-xs font-bold text-gray-800 leading-tight flex-1">{p.name}</p>
-                      {p.description && (
-                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{p.description}</p>
-                      )}
-                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-50">
-                        <span className="text-base font-black" style={{ color: NETWORK_COLORS[p.network] || "#6366F1" }}>
-                          ₱{p.amount}
-                        </span>
-                        {p.validity && (
-                          <span className="text-[9px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">
-                            {p.validity.replace("Valid for ", "")}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ backgroundColor: netColor }}>
+                          <Zap className="h-4 w-4 text-white" />
+                        </div>
+                        <p className="text-sm font-extrabold text-gray-800">Regular Load</p>
+                        <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: netColor }}>Custom ₱</span>
                       </div>
+                      <p className="text-[11px] text-gray-400">Enter any amount — send regular load directly to any {selectedNetwork} number</p>
                     </button>
-                  ))}
+                  )}
+                  {filtered.length === 0 && !REGULAR_LOAD_NETWORKS.includes(selectedNetwork) ? (
+                    <div className="col-span-2 flex items-center justify-center h-32">
+                      <p className="text-gray-400 text-sm">No products available</p>
+                    </div>
+                  ) : (
+                    filtered.map(p => (
+                      <button
+                        key={p.promoId}
+                        onClick={() => handleBuy(p)}
+                        className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 active:scale-[0.97] transition-all text-left flex flex-col"
+                      >
+                        <p className="text-xs font-bold text-gray-800 leading-tight flex-1">{p.name}</p>
+                        {p.description && (
+                          <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{p.description}</p>
+                        )}
+                        <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-50">
+                          <span className="text-base font-black" style={{ color: netColor }}>₱{p.amount}</span>
+                          {p.validity && (
+                            <span className="text-[9px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">
+                              {p.validity.replace("Valid for ", "")}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
           </main>
+        </div>
+      </div>
+    )
+  }
+
+  // ── CUSTOM AMOUNT ────────────────────────────────────────────────────────────
+  if (step === "custom-amount") {
+    const netColor = NETWORK_COLORS[selectedNetwork] || "#6366F1"
+    const amt = parseInt(customAmount, 10) || 0
+    const quickAmounts = [10, 20, 50, 100, 150, 300]
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
+          <button onClick={() => setStep("browse")} className="flex items-center gap-1 text-gray-400 text-sm font-medium">
+            <ChevronLeft className="h-5 w-5" /> Back
+          </button>
+          <p className="font-bold text-gray-800">Regular Load Amount</p>
+          <div className="w-14" />
+        </div>
+
+        <div className="flex-1 px-4 pb-6 pt-4 space-y-4">
+          {/* Network badge */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black" style={{ backgroundColor: netColor }}>
+              {selectedNetwork.slice(0, 3)}
+            </div>
+            <p className="font-bold text-gray-700">{selectedNetwork} Regular Load</p>
+          </div>
+
+          {/* Amount display */}
+          <div className="bg-white rounded-2xl shadow-sm p-5 text-center border border-gray-100">
+            <p className="text-xs text-gray-400 mb-1">Enter Amount</p>
+            <p className="text-4xl font-extrabold tracking-widest" style={{ color: amt > 0 ? netColor : undefined }}>
+              {amt > 0 ? `₱${amt}` : <span className="text-gray-300">₱0</span>}
+            </p>
+          </div>
+
+          {/* Quick amount chips */}
+          <div className="grid grid-cols-3 gap-2">
+            {quickAmounts.map(q => (
+              <button
+                key={q}
+                onClick={() => setCustomAmount(String(q))}
+                className={`py-2.5 rounded-2xl text-sm font-bold border-2 transition-all ${
+                  amt === q ? "text-white border-transparent" : "bg-white border-gray-100 text-gray-700"
+                }`}
+                style={amt === q ? { backgroundColor: netColor } : {}}
+              >
+                ₱{q}
+              </button>
+            ))}
+          </div>
+
+          {/* Numpad */}
+          <div className="grid grid-cols-3 gap-2">
+            {["1","2","3","4","5","6","7","8","9","C","0","⌫"].map(key => (
+              <button
+                key={key}
+                onClick={() => handleCustomAmountInput(key)}
+                className={`h-14 rounded-2xl text-xl font-bold transition-all active:scale-90 active:opacity-70 ${
+                  key === "C" ? "bg-red-50 text-red-500 border border-red-100" :
+                  key === "⌫" ? "bg-gray-100 text-gray-500 flex items-center justify-center" :
+                  "bg-white text-gray-800 shadow-sm border border-gray-100"
+                }`}
+              >
+                {key === "⌫" ? <Delete className="h-5 w-5" /> : key}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={confirmCustomAmount}
+            disabled={amt < 1}
+            className="w-full py-4 rounded-2xl text-white font-extrabold text-lg shadow-xl transition-all active:scale-[0.98] disabled:opacity-40"
+            style={{ backgroundColor: netColor }}
+          >
+            Next →
+          </button>
         </div>
       </div>
     )

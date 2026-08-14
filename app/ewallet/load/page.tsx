@@ -364,12 +364,23 @@ export default function ELoadPage() {
             <p className="text-xl font-black" style={{ color: networkColor }}>₱{selectedProduct?.amount}</p>
           </div>
 
-          {/* Number display */}
-          <div className="bg-white rounded-2xl shadow-sm p-5 text-center border border-gray-100">
-            <p className="text-3xl font-extrabold text-gray-800 min-h-[40px] tracking-widest">
-              {phone || <span className="text-gray-300">{isAN ? "Account #" : "09XX XXX XXXX"}</span>}
-            </p>
-            {phone.length > 0 && <p className="text-xs text-gray-400 mt-1">{phone.length} / {maxLen} digits</p>}
+          {/* Number display — tappable input supports paste & type */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <input
+              type="tel"
+              inputMode="numeric"
+              maxLength={maxLen}
+              value={phone}
+              onChange={e => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, maxLen)
+                setPhone(val)
+              }}
+              placeholder={isAN ? "Account #" : "09XX XXX XXXX"}
+              className="w-full text-3xl font-extrabold text-gray-800 tracking-widest text-center px-4 py-5 bg-transparent focus:outline-none placeholder:text-gray-300"
+            />
+            {phone.length > 0 && (
+              <p className="text-xs text-gray-400 text-center pb-3">{phone.length} / {maxLen} digits</p>
+            )}
           </div>
 
           {/* Numpad */}

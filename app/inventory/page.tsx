@@ -1012,10 +1012,10 @@ export default function InventoryPage() {
 
       {/* Floating Add Button (Mobile) */}
       <FloatingActionButton
-        icon={<Plus className="h-7 w-7" />}
-        label="Add Product"
+        icon={<Plus className="h-5 w-5" />}
         onClick={() => setIsAddDialogOpen(true)}
         className="z-[55]"
+        pulse
       />
 
       {/* ── Dialogs (shared) ── */}

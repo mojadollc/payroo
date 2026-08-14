@@ -11,6 +11,7 @@ interface FloatingActionButtonProps {
   className?: string
   size?: "default" | "sm"
   position?: "bottom-right" | "bottom-left" | "bottom-center"
+  pulse?: boolean
 }
 
 export function FloatingActionButton({
@@ -21,6 +22,7 @@ export function FloatingActionButton({
   className,
   size = "default",
   position = "bottom-right",
+  pulse = false,
 }: FloatingActionButtonProps) {
   const positionClasses = {
     "bottom-right": "bottom-24 right-4",
@@ -32,7 +34,7 @@ export function FloatingActionButton({
     size === "sm"
       ? label
         ? "rounded-full px-3 h-10 text-xs gap-1.5 shadow-lg"
-        : "rounded-full w-10 h-10 shadow-lg"
+        : "rounded-full w-11 h-11 shadow-lg"
       : label
         ? "rounded-full px-4 h-12 text-sm gap-1.5 shadow-xl shadow-primary/40"
         : "rounded-full w-12 h-12 shadow-xl shadow-primary/40"
@@ -51,6 +53,9 @@ export function FloatingActionButton({
         className
       )}
     >
+      {pulse && (
+        <span className="absolute inset-0 rounded-full bg-primary opacity-40 animate-ping" />
+      )}
       <div className="relative flex items-center justify-center">
         {icon}
         {badge !== undefined && badge > 0 && (

@@ -3,17 +3,17 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
-  Smartphone,
   Settings,
   TrendingUp,
   History,
-  Wallet,
   ArrowDownToLine,
   ArrowUpFromLine,
   Signal,
   Calendar,
-  Plus,
   Zap,
+  Wallet,
+  ChevronRight,
+  Smartphone,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,27 +22,22 @@ import { TransactionForm } from "@/components/ewallet/transaction-form"
 import { TransactionHistory } from "@/components/ewallet/transaction-history"
 import { CommissionSettingsDialog } from "@/components/ewallet/commission-settings-dialog"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
-import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { getStoreId } from "@/lib/store-id"
-import type { EWalletTransaction, CommissionSettings } from "@/lib/firebase/types"
+import type { EWalletTransaction, CommissionSettings } from "@/lib/types"
+
+const ELOAD_STORE_ID = "8807"
 
 type Period = "today" | "week" | "month" | "all"
+type ActiveSheet = "none" | "cashin" | "cashout"
 
 function getPeriodRange(period: Period): { start?: Date; end?: Date; max?: number } {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-
   if (period === "today") return { start, end }
-  if (period === "week") {
-    start.setDate(start.getDate() - 6)
-    return { start, end }
-  }
-  if (period === "month") {
-    start.setDate(1)
-    return { start, end }
-  }
+  if (period === "week") { start.setDate(start.getDate() - 6); return { start, end } }
+  if (period === "month") { start.setDate(1); return { start, end } }
   return { max: 50 }
 }
 
@@ -58,8 +53,11 @@ export default function EWalletPage() {
   const hasLoaded = useRef(false)
   const settingsLoadedRef = useRef(false)
   const [period, setPeriod] = useState<Period>("month")
-  const [showNewTransaction, setShowNewTransaction] = useState(false)
+  const [activeSheet, setActiveSheet] = useState<ActiveSheet>("none")
   const allLimitRef = useRef(50)
+
+  // Evaluated once on render — storeId is set at login and doesn't change mid-session
+  const canUseELoad = getStoreId() === ELOAD_STORE_ID
 
   const loadData = useCallback(async (opts?: { append?: boolean; nextLimit?: number }) => {
     const isAppend = opts?.append === true
@@ -94,7 +92,6 @@ export default function EWalletPage() {
     }
   }, [period])
 
-  // Single load on mount + whenever period changes
   useEffect(() => {
     hasLoaded.current = false
     allLimitRef.current = 50
@@ -111,42 +108,27 @@ export default function EWalletPage() {
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
     const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-
     const todayTransactions = transactions.filter(t => {
       const d = new Date(t.createdAt as any)
       return d >= todayStart && d <= todayEnd
     })
-
     const totalProfit = transactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
     const todayProfit = todayTransactions.reduce((sum, t) => sum + Math.abs(t.profit || 0), 0)
     const grossCashin = transactions.filter(t => t.type === "cashin").reduce((sum, t) => sum + t.amount, 0)
     const grossCashout = transactions.filter(t => t.type === "cashout").reduce((sum, t) => sum + t.amount, 0)
     const grossLoad = transactions.filter(t => t.type === "load").reduce((sum, t) => sum + t.amount, 0)
-
-    return {
-      totalProfit,
-      todayProfit,
-      totalTransactions: transactions.length,
-      todayTransactionsCount: todayTransactions.length,
-      grossCashin,
-      grossCashout,
-      grossLoad,
-    }
+    return { totalProfit, todayProfit, totalTransactions: transactions.length, todayTransactionsCount: todayTransactions.length, grossCashin, grossCashout, grossLoad }
   }
 
   const stats = calculateStats()
+  const periodLabel = period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "All Time"
+  const historyTitle = period === "today" ? "Today's Transactions" : `Transactions · ${periodLabel}`
 
-  const periodLabel =
-    period === "today"
-      ? "Today"
-      : period === "week"
-        ? "This Week"
-        : period === "month"
-          ? "This Month"
-          : "All Time"
-
-  const historyTitle =
-    period === "today" ? "Today's Transactions" : `Transactions · ${periodLabel}`
+  const onTxSuccess = () => {
+    hasLoaded.current = false
+    loadData()
+    setActiveSheet("none")
+  }
 
   const PeriodSelect = (
     <Select value={period} onValueChange={v => setPeriod(v as Period)}>
@@ -163,41 +145,93 @@ export default function EWalletPage() {
     </Select>
   )
 
+  // ── Quick Action Bar ────────────────────────────────────────────────────────
+  const QuickActions = (
+    <div className={`grid gap-3 ${canUseELoad ? "grid-cols-3" : "grid-cols-2"}`}>
+
+      {/* E-Load — only visible to store 8807 */}
+      {canUseELoad && (
+        <button
+          onClick={() => router.push("/ewallet/load")}
+          className="relative flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-purple-600 to-violet-700 text-white py-4 px-2 shadow-lg shadow-purple-500/30 active:scale-[0.97] transition-all hover:from-purple-700 hover:to-violet-800"
+        >
+          <div className="p-2.5 bg-white/20 rounded-xl">
+            <Zap className="h-6 w-6" />
+          </div>
+          <span className="text-[13px] font-bold">E-Load</span>
+          <span className="text-[10px] opacity-75">GBits · All Networks</span>
+          <div className="absolute top-2.5 right-2.5 bg-white/25 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wide">
+            LIVE
+          </div>
+        </button>
+      )}
+
+      {/* Cash-In */}
+      <button
+        onClick={() => setActiveSheet("cashin")}
+        className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white py-4 px-2 shadow-lg shadow-blue-500/25 active:scale-[0.97] transition-all hover:from-blue-600 hover:to-cyan-700"
+      >
+        <div className="p-2.5 bg-white/20 rounded-xl">
+          <ArrowDownToLine className="h-6 w-6" />
+        </div>
+        <span className="text-[13px] font-bold">Cash-In</span>
+        <span className="text-[10px] opacity-75">GCash · Maya</span>
+      </button>
+
+      {/* Kiosk */}
+      <button
+        onClick={() => router.push("/ewallet/cashin")}
+        className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white py-4 px-2 shadow-lg shadow-emerald-500/25 active:scale-[0.97] transition-all hover:from-emerald-600 hover:to-teal-700"
+      >
+        <div className="p-2.5 bg-white/20 rounded-xl">
+          <Wallet className="h-6 w-6" />
+        </div>
+        <span className="text-[13px] font-bold">Kiosk</span>
+        <span className="text-[10px] opacity-75">Self-service</span>
+      </button>
+    </div>
+  )
+
   return (
     <MobileAppShell
       title="E-Wallet"
       subtitle="GCash & Maya services"
       headerAction={
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setShowSettings(true)} variant="outline" size="sm" className="h-9 gap-1.5">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Settings</span>
-          </Button>
-          <Button
-            onClick={() => router.push("/ewallet/load")}
-            size="sm"
-            className="h-9 gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold"
-          >
-            <Zap className="h-4 w-4" />
-            <span className="hidden sm:inline">Load</span>
-          </Button>
-          <Button onClick={() => router.push("/ewallet/cashin")} size="sm" className="h-9 gap-1.5">
-            <Wallet className="h-4 w-4" />
-            <span className="hidden sm:inline">Kiosk</span>
-          </Button>
-        </div>
+        <Button onClick={() => setShowSettings(true)} variant="outline" size="sm" className="h-9 gap-1.5">
+          <Settings className="h-4 w-4" />
+          <span className="hidden sm:inline">Settings</span>
+        </Button>
       }
     >
-      {/* Mobile View */}
+      {/* ── MOBILE ─────────────────────────────────────────────────────────── */}
       <div className="md:hidden space-y-4">
+
+        {QuickActions}
+
+        {/* Cash-Out shortcut row */}
+        <button
+          onClick={() => setActiveSheet("cashout")}
+          className="w-full flex items-center justify-between bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl px-4 py-3 active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-500 rounded-xl">
+              <ArrowUpFromLine className="h-4 w-4 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-orange-700">Cash-Out</p>
+              <p className="text-[11px] text-orange-500">Record a cash-out transaction</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-orange-400" />
+        </button>
+
         {PeriodSelect}
 
+        {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3">
           <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-green-500 rounded-md">
-                <TrendingUp className="h-3.5 w-3.5 text-white" />
-              </div>
+              <div className="p-1.5 bg-green-500 rounded-md"><TrendingUp className="h-3.5 w-3.5 text-white" /></div>
               <span className="text-[11px] text-muted-foreground">{periodLabel} Profit</span>
             </div>
             <div className="text-[15px] font-bold text-green-600 truncate">
@@ -207,9 +241,7 @@ export default function EWalletPage() {
 
           <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-blue-500 rounded-md">
-                <ArrowDownToLine className="h-3.5 w-3.5 text-white" />
-              </div>
+              <div className="p-1.5 bg-blue-500 rounded-md"><ArrowDownToLine className="h-3.5 w-3.5 text-white" /></div>
               <span className="text-[11px] text-muted-foreground">Cash-In</span>
             </div>
             <div className="text-[15px] font-bold text-blue-600 truncate">
@@ -219,9 +251,7 @@ export default function EWalletPage() {
 
           <MobileCard className="p-3 bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-orange-500 rounded-md">
-                <ArrowUpFromLine className="h-3.5 w-3.5 text-white" />
-              </div>
+              <div className="p-1.5 bg-orange-500 rounded-md"><ArrowUpFromLine className="h-3.5 w-3.5 text-white" /></div>
               <span className="text-[11px] text-muted-foreground">Cash-Out</span>
             </div>
             <div className="text-[15px] font-bold text-orange-600 truncate">
@@ -229,21 +259,36 @@ export default function EWalletPage() {
             </div>
           </MobileCard>
 
-          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-purple-500 rounded-md">
-                <Signal className="h-3.5 w-3.5 text-white" />
+          {/* Load stat card — tappable only for store 8807, plain card for others */}
+          {canUseELoad ? (
+            <button
+              onClick={() => router.push("/ewallet/load")}
+              className="text-left p-3 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl active:scale-[0.97] transition-all"
+            >
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="p-1.5 bg-purple-500 rounded-md"><Signal className="h-3.5 w-3.5 text-white" /></div>
+                <span className="text-[11px] text-muted-foreground">Load</span>
+                <ChevronRight className="h-3 w-3 text-purple-400 ml-auto" />
               </div>
-              <span className="text-[11px] text-muted-foreground">Load</span>
-            </div>
-            <div className="text-[15px] font-bold text-purple-600 truncate">
-              ₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </MobileCard>
+              <div className="text-[15px] font-bold text-purple-600 truncate">
+                ₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </button>
+          ) : (
+            <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="p-1.5 bg-purple-500 rounded-md"><Signal className="h-3.5 w-3.5 text-white" /></div>
+                <span className="text-[11px] text-muted-foreground">Load</span>
+              </div>
+              <div className="text-[15px] font-bold text-purple-600 truncate">
+                ₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </MobileCard>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {period !== "today" && (
+        {period !== "today" && (
+          <div className="grid grid-cols-2 gap-3">
             <MobileCard className="p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -253,15 +298,6 @@ export default function EWalletPage() {
                 ₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </MobileCard>
-          )}
-          <MobileCard className="p-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <History className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">{periodLabel} Transactions</span>
-            </div>
-            <div className="text-[15px] font-bold truncate">{stats.totalTransactions.toLocaleString()}</div>
-          </MobileCard>
-          {period !== "today" && (
             <MobileCard className="p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <History className="h-3.5 w-3.5 text-muted-foreground" />
@@ -269,8 +305,8 @@ export default function EWalletPage() {
               </div>
               <div className="text-[15px] font-bold truncate">{stats.todayTransactionsCount.toLocaleString()}</div>
             </MobileCard>
-          )}
-        </div>
+          </div>
+        )}
 
         <div>
           <MobileSectionHeader title={historyTitle} />
@@ -284,111 +320,109 @@ export default function EWalletPage() {
                 hasMore={hasMore}
                 onLoadMore={handleLoadMore}
                 isLoadingMore={isLoadingMore}
-                emptyHint={
-                  period === "today"
-                    ? "No transactions today"
-                    : `No transactions for ${periodLabel.toLowerCase()}`
-                }
+                emptyHint={period === "today" ? "No transactions today" : `No transactions for ${periodLabel.toLowerCase()}`}
               />
             </div>
           </MobileCard>
         </div>
       </div>
 
-      {/* Desktop View */}
-      <div className="hidden md:block">
-        <div className="mb-6">
-          <div className="flex items-center gap-2 flex-wrap">{PeriodSelect}</div>
+      {/* ── DESKTOP ────────────────────────────────────────────────────────── */}
+      <div className="hidden md:block space-y-6">
+
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Quick Actions</p>
+          {QuickActions}
         </div>
 
-        <div className="mb-4 grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                {periodLabel} Profit
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold text-secondary">₱{stats.totalProfit.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          {period !== "today" && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">{PeriodSelect}</div>
+          <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             <Card>
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3" />
-                  Today's Profit
+                  <TrendingUp className="h-3 w-3" />{periodLabel} Profit
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-secondary">₱{stats.todayProfit.toFixed(2)}</div>
+                <div className="text-lg font-bold text-secondary">₱{stats.totalProfit.toFixed(2)}</div>
               </CardContent>
             </Card>
-          )}
 
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <ArrowDownToLine className="h-3 w-3" />
-                Cash-In
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold text-blue-600">₱{stats.grossCashin.toFixed(2)}</div>
-            </CardContent>
-          </Card>
+            {period !== "today" && (
+              <Card>
+                <CardHeader className="p-3 pb-1">
+                  <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />Today's Profit
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                  <div className="text-lg font-bold text-secondary">₱{stats.todayProfit.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+            )}
 
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <ArrowUpFromLine className="h-3 w-3" />
-                Cash-Out
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold text-orange-600">₱{stats.grossCashout.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Signal className="h-3 w-3" />
-                Load
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="p-3 pb-1">
-              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <History className="h-3 w-3" />
-                Transactions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-lg font-bold">{stats.totalTransactions}</div>
-            </CardContent>
-          </Card>
-
-          {period !== "today" && (
             <Card>
               <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <History className="h-3 w-3" />
-                  Today's Count
+                  <ArrowDownToLine className="h-3 w-3" />Cash-In
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold">{stats.todayTransactionsCount}</div>
+                <div className="text-lg font-bold text-blue-600">₱{stats.grossCashin.toFixed(2)}</div>
               </CardContent>
             </Card>
-          )}
+
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <ArrowUpFromLine className="h-3 w-3" />Cash-Out
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-lg font-bold text-orange-600">₱{stats.grossCashout.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+
+            {/* Load stat — tappable only for store 8807 */}
+            {canUseELoad ? (
+              <button onClick={() => router.push("/ewallet/load")} className="text-left">
+                <Card className="border-purple-200 hover:border-purple-400 hover:shadow-md transition-all cursor-pointer h-full">
+                  <CardHeader className="p-3 pb-1">
+                    <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Signal className="h-3 w-3" />Load
+                      <ChevronRight className="h-3 w-3 ml-auto text-purple-400" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-lg font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
+                  </CardContent>
+                </Card>
+              </button>
+            ) : (
+              <Card>
+                <CardHeader className="p-3 pb-1">
+                  <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Signal className="h-3 w-3" />Load
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                  <div className="text-lg font-bold text-purple-600">₱{stats.grossLoad.toFixed(2)}</div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <History className="h-3 w-3" />Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-lg font-bold">{stats.totalTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -396,13 +430,12 @@ export default function EWalletPage() {
             <Card>
               <CardHeader className="p-3 pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm">
-                  <Smartphone className="h-4 w-4" />
-                  New Transaction
+                  <Smartphone className="h-4 w-4" />New Transaction
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 pt-0">
                 {commissionSettings ? (
-                  <TransactionForm commissionSettings={commissionSettings} onSuccess={() => { hasLoaded.current = false; loadData() }} />
+                  <TransactionForm commissionSettings={commissionSettings} onSuccess={onTxSuccess} />
                 ) : (
                   <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>
                 )}
@@ -424,11 +457,7 @@ export default function EWalletPage() {
                   hasMore={hasMore}
                   onLoadMore={handleLoadMore}
                   isLoadingMore={isLoadingMore}
-                  emptyHint={
-                    period === "today"
-                      ? "No transactions today"
-                      : `No transactions for ${periodLabel.toLowerCase()}`
-                  }
+                  emptyHint={period === "today" ? "No transactions today" : `No transactions for ${periodLabel.toLowerCase()}`}
                 />
               </CardContent>
             </Card>
@@ -445,29 +474,19 @@ export default function EWalletPage() {
         )}
       </div>
 
-      {/* Smaller FAB on mobile */}
-      <FloatingActionButton
-        size="sm"
-        icon={<Plus className="h-5 w-5" />}
-        label="New"
-        onClick={() => setShowNewTransaction(true)}
-      />
-
+      {/* ── Bottom Sheets ──────────────────────────────────────────────────── */}
       <BottomSheet
-        open={showNewTransaction}
-        onClose={() => setShowNewTransaction(false)}
-        title="New Transaction"
-        description="Record a new e-wallet transaction"
+        open={activeSheet === "cashin" || activeSheet === "cashout"}
+        onClose={() => setActiveSheet("none")}
+        title={activeSheet === "cashin" ? "Cash-In" : "Cash-Out"}
+        description={activeSheet === "cashin" ? "Record a GCash or Maya cash-in" : "Record a GCash or Maya cash-out"}
       >
-        <div className="pb-24 md:pb-0">
+        <div className="pb-24">
           {commissionSettings ? (
             <TransactionForm
               commissionSettings={commissionSettings}
-              onSuccess={() => {
-                hasLoaded.current = false
-                loadData()
-                setShowNewTransaction(false)
-              }}
+              onSuccess={onTxSuccess}
+              defaultTab={activeSheet === "cashout" ? "cashout" : "cashin"}
             />
           ) : (
             <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>

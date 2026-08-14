@@ -6,7 +6,7 @@ import {
   ChevronLeft, CheckCircle, XCircle, AlertTriangle,
   Loader2, Delete, ChevronRight, RotateCcw,
 } from "lucide-react"
-import type { CommissionSettings } from "@/lib/firebase/types"
+import type { CommissionSettings } from "@/lib/types"
 import { getStoreId } from "@/lib/store-id"
 
 type Step = "browse" | "phone" | "confirm" | "processing" | "success" | "failed"
@@ -50,7 +50,13 @@ export default function ELoadPage() {
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
   useEffect(() => {
-    fetch("/api/eload")
+    const storeId = getStoreId()
+    if (storeId !== "8807") {
+      router.replace("/ewallet")
+      return
+    }
+
+    fetch(`/api/eload?storeId=${storeId}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const ct = r.headers.get("content-type") || ""
@@ -111,7 +117,7 @@ export default function ELoadPage() {
       const res = await fetch("/api/eload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ promoId: selectedProduct.promoId, address: phone, amount: selectedProduct.amount }),
+        body: JSON.stringify({ promoId: selectedProduct.promoId, address: phone, amount: selectedProduct.amount, storeId: getStoreId() }),
       })
       const data = await res.json()
 
@@ -279,7 +285,7 @@ export default function ELoadPage() {
                       <AlertTriangle className="h-8 w-8 text-amber-500 mb-2" />
                       <p className="text-sm font-medium text-gray-600">E-Load not available</p>
                       <p className="text-xs text-gray-400 mt-1">{error}</p>
-                      <p className="text-xs text-gray-400 mt-2">Deploy Cloud Functions: <span className="font-mono">firebase deploy --only functions</span></p>
+                      <p className="text-xs text-gray-400 mt-2">Check your GBits API credentials in environment settings.</p>
                     </>
                   ) : (
                     <p className="text-gray-400 text-sm">No products available</p>

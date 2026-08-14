@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowDownToLine, ArrowUpFromLine, Clock, Signal, Smartphone, Trash2 } from "lucide-react"
-import type { EWalletTransaction } from "@/lib/firebase/types"
+import type { EWalletTransaction } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 
 interface TransactionHistoryProps {
@@ -19,7 +19,7 @@ interface TransactionHistoryProps {
 }
 
 function fmtDate(timestamp: any) {
-  const date = timestamp instanceof Date ? timestamp : (timestamp?.toDate?.() ?? new Date(timestamp))
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
   return new Intl.DateTimeFormat("en-PH", {
     month: "short",
     day: "numeric",
@@ -80,12 +80,12 @@ export function TransactionHistory({
     ...transactions.map(t => ({
       kind: "manual" as const,
       data: t,
-      date: t.createdAt?.toDate?.() ?? new Date(0),
+      date: t.createdAt ? new Date(t.createdAt as any) : new Date(0),
     })),
     ...cashinTransactions.map(t => ({
       kind: "kiosk" as const,
       data: t,
-      date: t.createdAt?.toDate?.() ?? new Date(0),
+      date: t.createdAt ? new Date(t.createdAt) : new Date(0),
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime())
 

@@ -9,19 +9,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { CommissionSettings } from "@/lib/firebase/types"
+import type { CommissionSettings } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { getStoreId } from "@/lib/store-id"
 
 interface TransactionFormProps {
   commissionSettings: CommissionSettings
   onSuccess: () => void
+  defaultTab?: "cashin" | "cashout" | "load"
 }
 
-export function TransactionForm({ commissionSettings, onSuccess }: TransactionFormProps) {
+export function TransactionForm({ commissionSettings, onSuccess, defaultTab }: TransactionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [provider, setProvider] = useState<"gcash" | "maya">("gcash")
-  const [activeTab, setActiveTab] = useState("cashin")
+  const [activeTab, setActiveTab] = useState(defaultTab ?? "cashin")
   const { toast } = useToast()
 
   const generateRef = () => "MJD_000" + Math.random().toString().slice(2, 9)

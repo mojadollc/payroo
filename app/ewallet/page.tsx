@@ -287,23 +287,6 @@ export default function EWalletPage() {
           </button>
         )}
 
-        {/* Cash-Out shortcut row */}
-        <button
-          onClick={() => setActiveSheet("cashout")}
-          className="w-full flex items-center justify-between bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl px-4 py-3 active:scale-[0.98] transition-all"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-500 rounded-xl">
-              <ArrowUpFromLine className="h-4 w-4 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-bold text-orange-700">Cash-Out</p>
-              <p className="text-[11px] text-orange-500">Record a cash-out transaction</p>
-            </div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-orange-400" />
-        </button>
-
         {PeriodSelect}
 
         {/* Stats grid */}

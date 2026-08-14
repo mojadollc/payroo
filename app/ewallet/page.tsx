@@ -242,7 +242,7 @@ export default function EWalletPage() {
                   <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
                     <Zap className="h-4 w-4 text-white" />
                   </div>
-                  <span className="text-white font-bold text-sm tracking-wide">GBits E-Load Wallet</span>
+                  <span className="text-white font-bold text-sm tracking-wide">E-Load Wallet</span>
                 </div>
                 <span className="text-[10px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">LIVE</span>
               </div>
@@ -253,7 +253,7 @@ export default function EWalletPage() {
                     <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
                   </div>
                 ) : gbitsBalanceError ? (
-                  <p className="text-white/50 text-base font-semibold">Unable to load balance</p>
+                  <p className="text-white/50 text-base font-semibold">Balance unavailable</p>
                 ) : (
                   <p className="text-white text-3xl font-black tracking-tight">
                     ₱{gbitsBalance!.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

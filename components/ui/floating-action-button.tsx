@@ -31,11 +31,11 @@ export function FloatingActionButton({
   const sizeClasses =
     size === "sm"
       ? label
-        ? "rounded-full px-3.5 h-11 text-sm gap-1.5 shadow-lg"
-        : "rounded-full w-12 h-12 shadow-lg"
+        ? "rounded-full px-3 h-10 text-xs gap-1.5 shadow-lg"
+        : "rounded-full w-10 h-10 shadow-lg"
       : label
-        ? "rounded-full px-6 h-14 shadow-2xl shadow-primary/50"
-        : "rounded-full w-16 h-16 shadow-2xl shadow-primary/50"
+        ? "rounded-full px-4 h-12 text-sm gap-1.5 shadow-xl shadow-primary/40"
+        : "rounded-full w-12 h-12 shadow-xl shadow-primary/40"
 
   return (
     <button

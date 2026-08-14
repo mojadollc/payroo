@@ -52,30 +52,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 
-// ── Shimmer skeleton ─────────────────────────────────────────────────────────
-function Shimmer({ className }: { className?: string }) {
+// ── Shimmer skeletons ────────────────────────────────────────────────────────
+function S({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded-xl ${className ?? ""}`} />
 }
 
 function MobileStatsSkeleton() {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+    <div className="grid grid-cols-2 gap-3">
       {[1,2,3,4].map(i => (
-        <div key={i} className="shrink-0 bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5 shadow-sm min-w-[120px] space-y-2">
-          <div className="flex items-center gap-1.5"><Shimmer className="w-6 h-6 rounded-md" /><Shimmer className="w-16 h-3" /></div>
-          <Shimmer className="w-20 h-4" />
+        <div key={i} className="p-3 border rounded-xl space-y-2">
+          <div className="flex items-center gap-1.5"><S className="w-7 h-7 rounded-md" /><S className="w-16 h-3" /></div>
+          <S className="w-20 h-5" />
         </div>
       ))}
     </div>
   )
 }
 
-function MobileRowSkeleton() {
+function MobileGridSkeleton() {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm flex items-center gap-3 px-3 py-2.5">
-      <Shimmer className="shrink-0 w-14 h-14 rounded-xl" />
-      <div className="flex-1 space-y-2"><Shimmer className="w-3/4 h-3.5" /><Shimmer className="w-1/2 h-3" /></div>
-      <div className="shrink-0 flex flex-col gap-1">{[1,2,3,4].map(i => <Shimmer key={i} className="w-7 h-7 rounded-lg" />)}</div>
+    <div className="grid grid-cols-2 gap-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="border rounded-xl overflow-hidden">
+          <S className="w-full h-28 rounded-none" />
+          <div className="p-3 space-y-2"><S className="w-3/4 h-3.5" /><S className="w-16 h-5" /><S className="w-24 h-3" />
+            <div className="flex gap-1">{[1,2,3,4].map(j => <S key={j} className="h-8 w-8" />)}</div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -85,8 +90,8 @@ function DesktopStatsSkeleton() {
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {[1,2,3,4].map(i => (
         <div key={i} className="border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between"><Shimmer className="h-8 w-8" /><div className="space-y-1"><Shimmer className="h-5 w-20" /><Shimmer className="h-3 w-16" /></div></div>
-          <Shimmer className="h-3 w-28" />
+          <div className="flex items-center justify-between"><S className="h-8 w-8" /><div className="space-y-1 text-right"><S className="h-5 w-20" /><S className="h-3 w-16" /></div></div>
+          <S className="h-3 w-28" />
         </div>
       ))}
     </div>
@@ -97,11 +102,10 @@ function DesktopGridSkeleton({ count }: { count: number }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-lg border overflow-hidden bg-card">
-          <Shimmer className="w-full h-28 sm:h-32 rounded-none" />
-          <div className="p-2 space-y-2">
-            <Shimmer className="w-3/4 h-3" /><Shimmer className="w-16 h-4" /><Shimmer className="w-20 h-3" />
-            <div className="flex gap-1">{[1,2,3,4].map(j => <Shimmer key={j} className="h-7 w-7" />)}</div>
+        <div key={i} className="rounded-lg border overflow-hidden">
+          <S className="w-full h-28 sm:h-32 rounded-none" />
+          <div className="p-2 space-y-2"><S className="w-3/4 h-3" /><S className="w-16 h-4" /><S className="w-20 h-3" />
+            <div className="flex gap-1">{[1,2,3,4].map(j => <S key={j} className="h-7 w-7" />)}</div>
           </div>
         </div>
       ))}
@@ -117,12 +121,12 @@ function DesktopTableSkeleton({ count }: { count: number }) {
         <TableBody>
           {Array.from({ length: count }).map((_, i) => (
             <TableRow key={i}>
-              <TableCell><Shimmer className="h-4 w-40" /></TableCell>
-              <TableCell><Shimmer className="h-4 w-28" /></TableCell>
-              <TableCell><Shimmer className="h-4 w-10" /></TableCell>
-              <TableCell><Shimmer className="h-4 w-14" /></TableCell>
-              <TableCell><Shimmer className="h-4 w-14" /></TableCell>
-              <TableCell><div className="flex justify-end gap-2"><Shimmer className="h-8 w-16" /><Shimmer className="h-8 w-20" /><Shimmer className="h-8 w-20" /></div></TableCell>
+              <TableCell><S className="h-4 w-40" /></TableCell>
+              <TableCell><S className="h-4 w-28" /></TableCell>
+              <TableCell><S className="h-4 w-10" /></TableCell>
+              <TableCell><S className="h-4 w-14" /></TableCell>
+              <TableCell><S className="h-4 w-14" /></TableCell>
+              <TableCell><div className="flex justify-end gap-2"><S className="h-8 w-16" /><S className="h-8 w-20" /><S className="h-8 w-20" /></div></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -772,157 +776,154 @@ export default function InventoryPage() {
       }
     >
       {/* ── Mobile View ── */}
-      <div className="md:hidden space-y-3">
-
-        {/* Stats — horizontal scroll strip */}
+      <div className="md:hidden space-y-4">
+        {/* Stats Grid */}
         {loading ? <MobileStatsSkeleton /> : (
-          <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-            {[
-              { icon: <DollarSign className="h-3.5 w-3.5 text-white" />, bg: "bg-blue-500", label: "Stock Value", value: `₱${totalStockValue.toLocaleString("en-PH")}`, color: "text-blue-700" },
-              { icon: <Package className="h-3.5 w-3.5 text-white" />, bg: "bg-green-500", label: "Total Items", value: totalItems.toLocaleString(), color: "text-green-700" },
-              { icon: <LayoutGrid className="h-3.5 w-3.5 text-white" />, bg: "bg-violet-500", label: "Products", value: products.length.toLocaleString(), color: "text-violet-700" },
-              { icon: <AlertTriangle className="h-3.5 w-3.5 text-white" />, bg: "bg-orange-500", label: "Alerts", value: `${lowStockCount + outOfStockCount}`, sub: `${lowStockCount} low · ${outOfStockCount} out`, color: "text-orange-700" },
-            ].map(s => (
-              <div key={s.label} className="shrink-0 bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5 shadow-sm min-w-[120px]">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className={`p-1 ${s.bg} rounded-md`}>{s.icon}</div>
-                  <span className="text-[10px] text-gray-400 font-medium">{s.label}</span>
-                </div>
-                <div className={`text-sm font-black ${s.color}`}>{s.value}</div>
-                {s.sub && <div className="text-[10px] text-gray-400 mt-0.5">{s.sub}</div>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Search + Filter row */}
-        {activeTab !== "categories" && (
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-9 h-10 rounded-xl border-gray-200 bg-white text-sm"
-              />
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-blue-500 rounded-md"><DollarSign className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Stock Value</span>
             </div>
-            <Select value={activeTab} onValueChange={handleTabChange}>
-              <SelectTrigger className="h-10 w-auto min-w-[110px] rounded-xl border-gray-200 bg-white text-xs font-semibold">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="products">All ({products.length})</SelectItem>
-                <SelectItem value="low-stock">Low ({lowStockCount})</SelectItem>
-                <SelectItem value="out-of-stock">Out ({outOfStockCount})</SelectItem>
-                <SelectItem value="categories">Categories</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="text-[15px] font-bold text-blue-600 truncate">₱{totalStockValue.toLocaleString("en-PH")}</div>
+          </MobileCard>
+
+          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-green-500 rounded-md"><Package className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Total Items</span>
+            </div>
+            <div className="text-[15px] font-bold text-green-600 truncate">{totalItems.toLocaleString()}</div>
+          </MobileCard>
+
+          <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-purple-500 rounded-md"><LayoutGrid className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Products</span>
+            </div>
+            <div className="text-[15px] font-bold text-purple-600 truncate">{products.length.toLocaleString()}</div>
+          </MobileCard>
+
+          <MobileCard className="p-3 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-orange-500 rounded-md"><AlertTriangle className="h-3.5 w-3.5 text-white" /></div>
+              <span className="text-[11px] text-muted-foreground">Alerts</span>
+            </div>
+            <div className="text-[15px] font-bold text-orange-600 truncate">{lowStockCount + outOfStockCount}</div>
+            <div className="text-[11px] text-orange-600/80 mt-0.5">{lowStockCount} low • {outOfStockCount} out</div>
+          </MobileCard>
+        </div>
         )}
 
-        {activeTab === "categories" && (
-          <div className="flex justify-end">
-            <Select value={activeTab} onValueChange={handleTabChange}>
-              <SelectTrigger className="h-10 w-auto min-w-[130px] rounded-xl border-gray-200 bg-white text-xs font-semibold">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="products">All ({products.length})</SelectItem>
-                <SelectItem value="low-stock">Low ({lowStockCount})</SelectItem>
-                <SelectItem value="out-of-stock">Out ({outOfStockCount})</SelectItem>
-                <SelectItem value="categories">Categories</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Tab Filter */}
+        <Select value={activeTab} onValueChange={handleTabChange}>
+          <SelectTrigger className="w-full h-12 rounded-xl border-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="products">All {cfg.itemLabelPlural}</SelectItem>
+            <SelectItem value="low-stock">Low Stock ({lowStockCount})</SelectItem>
+            <SelectItem value="out-of-stock">Out of Stock ({outOfStockCount})</SelectItem>
+            <SelectItem value="categories">Categories</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Search */}
+        {activeTab !== "categories" && (
+          <MobileCard className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
+            <div className="p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
+                />
+              </div>
+            </div>
+          </MobileCard>
         )}
 
         {/* Product List / Categories */}
         {activeTab === "categories" ? (
-          <div className="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
-            <CategoryManager categories={categories} onUpdate={loadCategories} />
-          </div>
+          <MobileCard>
+            <div className="p-3">
+              <CategoryManager categories={categories} onUpdate={loadCategories} />
+            </div>
+          </MobileCard>
         ) : loading ? (
-          <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <MobileRowSkeleton key={i} />)}</div>
+          <MobileGridSkeleton />
         ) : (() => {
           const mobileList = tabProducts[activeTab] ?? filteredProducts
           const { items: mobileItems, total: mobileTotal, page: mobilePage } = paginate(mobileList)
           return (
-            <div className="space-y-2">
-              {pageChanging ? (
-                Array.from({ length: 6 }).map((_, i) => <MobileRowSkeleton key={i} />)
-              ) : mobileItems.length === 0 ? (
-                <div className="bg-white border border-gray-100 rounded-2xl py-12 flex flex-col items-center gap-2 shadow-sm">
-                  <Package className="h-8 w-8 text-gray-300" />
-                  <p className="text-sm text-gray-400">No products found</p>
-                </div>
-              ) : (
-                mobileItems.map((product) => (
-                  <div key={product.id} className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex items-center gap-3 px-3 py-2.5">
-                    {/* Thumbnail */}
-                    <div className="relative shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-gray-100">
-                      {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      ) : (
-                        <DefaultProductImage />
-                      )}
-                      {product.stock === 0 && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <span className="text-[8px] font-bold text-white text-center leading-tight">OUT</span>
-                        </div>
-                      )}
+          <div>
+            <MobileSectionHeader title={activeTab === "products" ? `All ${cfg.itemLabelPlural}` : activeTab === "low-stock" ? "Low Stock" : "Out of Stock"} />
+            <div className="grid grid-cols-2 gap-3">
+              {pageChanging
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="border rounded-xl overflow-hidden">
+                      <S className="w-full h-28 rounded-none" />
+                      <div className="p-3 space-y-2"><S className="w-3/4 h-3.5" /><S className="w-16 h-5" /><S className="w-24 h-3" /></div>
                     </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-1">
-                        <p className="text-sm font-semibold text-gray-900 truncate leading-snug" title={product.name}>{product.name}</p>
-                        {product.onSale && product.salePrice ? (
-                          <div className="shrink-0 flex items-center gap-1">
-                            <span className="text-[10px] line-through text-gray-400">₱{product.price}</span>
-                            <span className="text-sm font-black text-red-500">₱{product.salePrice}</span>
-                          </div>
-                        ) : (
-                          <span className="shrink-0 text-sm font-black text-gray-800">₱{product.price}</span>
-                        )}
+                  ))
+                : mobileItems.map((product) => (
+                <MobileCard key={product.id}>
+                  <div className="relative h-28 bg-muted">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                    ) : (
+                      <DefaultProductImage />
+                    )}
+                    {product.stock === 0 && (
+                      <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
+                        <span className="text-sm font-bold text-destructive">Out of Stock</span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-gray-400">Stock: <span className={`font-semibold ${product.stock === 0 ? "text-red-500" : product.stock <= 5 ? "text-yellow-600" : "text-gray-600"}`}>{product.stock}</span></span>
-                        <span className="text-[11px] text-gray-400">Cost: ₱{product.cost}</span>
-                        {product.onSale && product.salePrice && product.stock > 0 && (
-                          <span className="text-[9px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full">SALE</span>
-                        )}
-                        {product.stock > 0 && product.stock <= 5 && (
-                          <span className="text-[9px] font-bold text-white bg-yellow-500 px-1.5 py-0.5 rounded-full">LOW</span>
-                        )}
+                    )}
+                    {product.onSale && product.salePrice && product.stock > 0 && (
+                      <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">SALE</div>
+                    )}
+                    {product.stock > 0 && product.stock <= 5 && (
+                      <div className="absolute top-2 right-2 bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-lg">LOW</div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <div className="font-semibold text-sm truncate mb-1" title={product.name}>{product.name}</div>
+                    {product.onSale && product.salePrice ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-base font-bold text-red-500">₱{product.salePrice}</div>
+                        <div className="text-xs line-through text-muted-foreground">₱{product.price}</div>
                       </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="shrink-0 flex flex-col gap-1">
-                      <button onClick={() => setEditProduct(product)} className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 active:scale-90 transition-all">
+                    ) : (
+                      <div className="text-base font-bold text-primary">₱{product.price}</div>
+                    )}
+                    <div className="text-xs text-muted-foreground mt-0.5">Stock: {product.stock} • Cost: ₱{product.cost}</div>
+                    <div className="flex gap-1 mt-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 rounded-lg" onClick={() => setEditProduct(product)}>
                         <Edit className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={() => { setRestockProduct(product); setRestockQty("") }} className="w-7 h-7 rounded-lg bg-green-50 flex items-center justify-center text-green-600 active:scale-90 transition-all">
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-lg" onClick={() => { setRestockProduct(product); setRestockQty("") }}>
                         <RefreshCw className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={() => setSelectedProductForBarcode(product)} className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-500 active:scale-90 transition-all">
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 hover:bg-gray-50 rounded-lg" onClick={() => setSelectedProductForBarcode(product)}>
                         <Barcode className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={() => handleDeleteProduct(product.id!)} className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-500 active:scale-90 transition-all">
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-lg ml-auto" onClick={() => handleDeleteProduct(product.id!)}>
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
-                ))
-              )}
-              <PaginationBar total={mobileTotal} page={mobilePage} onChange={handlePageChange} />
-              {mobileList.length > 0 && (
-                <p className="text-center text-[11px] text-gray-400">
-                  {Math.min((mobilePage - 1) * PAGE_SIZE + 1, mobileList.length)}–{Math.min(mobilePage * PAGE_SIZE, mobileList.length)} of {mobileList.length} products
-                </p>
-              )}
+                </MobileCard>
+                ))}
             </div>
+            <PaginationBar total={mobileTotal} page={mobilePage} onChange={handlePageChange} />
+            {mobileList.length > 0 && (
+              <p className="text-center text-xs text-muted-foreground pt-1">
+                Showing {Math.min((mobilePage - 1) * PAGE_SIZE + 1, mobileList.length)}–{Math.min(mobilePage * PAGE_SIZE, mobileList.length)} of {mobileList.length}
+              </p>
+            )}
+          </div>
           )
         })()}
       </div>
@@ -989,7 +990,7 @@ export default function InventoryPage() {
         {loading ? (
           <div className="space-y-4">
             <div className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg gap-1">
-              {[1,2,3,4].map(i => <Shimmer key={i} className="h-9 rounded-md" />)}
+              {[1,2,3,4].map(i => <S key={i} className="h-9 rounded-md" />)}
             </div>
             <DesktopGridSkeleton count={PAGE_SIZE} />
           </div>
@@ -1010,18 +1011,12 @@ export default function InventoryPage() {
       </div>
 
       {/* Floating Add Button (Mobile) */}
-      <div className="md:hidden fixed bottom-6 right-4 z-50 flex items-center gap-2">
-        <span className="bg-white text-primary text-xs font-semibold px-3 py-1.5 rounded-full shadow-md border border-primary/20 animate-bounce">
-          Add Product
-        </span>
-        <button
-          onClick={() => setIsAddDialogOpen(true)}
-          className="relative w-14 h-14 rounded-full bg-primary text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-        >
-          <span className="absolute inset-0 rounded-full bg-primary opacity-30 animate-ping" />
-          <Plus className="h-6 w-6 relative z-10" />
-        </button>
-      </div>
+      <FloatingActionButton
+        icon={<Plus className="h-7 w-7" />}
+        label="Add Product"
+        onClick={() => setIsAddDialogOpen(true)}
+        className="z-[55]"
+      />
 
       {/* ── Dialogs (shared) ── */}
       <AddProductDialog

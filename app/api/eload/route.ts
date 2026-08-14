@@ -44,7 +44,27 @@ function generateTxnId(): string {
   return `${GBITS_BUSINESS_CODE}${date}${rand}`
 }
 
-function mapSkus(skus: any[]) {
+async function fetchGbitsBalance(): Promise<number | null> {
+  // Try known GBits balance endpoint paths
+  const paths = [
+    `/account/balance/${GBITS_BUSINESS_ID}`,
+    `/eload/balance/${GBITS_BUSINESS_ID}`,
+    `/account/${GBITS_BUSINESS_ID}/balance`,
+    `/business/balance/${GBITS_BUSINESS_ID}`,
+  ]
+  for (const path of paths) {
+    try {
+      const data = await gbitsGet(path)
+      console.log(`[eload] balance path ${path}:`, JSON.stringify(data))
+      if (data.errorCode === 0) {
+        const bal = data.content?.balance ?? data.content?.availableBalance ?? data.content?.currentBalance ?? null
+        if (bal != null) return bal
+      }
+    } catch {}
+  }
+  return null
+}
+
   return skus
     .filter((s) => s.skuStatus === true || s.skuStatus === 1 || s.skuStatus === "true" || s.skuStatus === "active")
     .map((s) => ({
@@ -76,18 +96,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === "balance") {
-      const balData = await gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`)
-      if (balData.errorCode === 0) {
-        const balance = balData.content?.balance ?? balData.content?.availableBalance ?? null
-        return NextResponse.json({ balance })
-      }
-      return NextResponse.json({ balance: null, unavailable: true })
+      const balance = await fetchGbitsBalance()
+      return NextResponse.json({ balance })
     }
 
     // Fetch SKUs and balance in parallel
-    const [skuData, balData] = await Promise.all([
+    const [skuData, balance] = await Promise.all([
       gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`),
-      gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`).catch(() => null),
+      fetchGbitsBalance(),
     ])
     if (skuData.errorCode === 0) {
       console.log("[eload] SKU count:", (skuData.content || []).length)
@@ -95,9 +111,6 @@ export async function GET(req: NextRequest) {
       console.error("[eload] SKU fetch error:", skuData.message)
     }
     const products = mapSkus(skuData.errorCode === 0 ? skuData.content || [] : [])
-    const balance = balData?.errorCode === 0
-      ? (balData.content?.balance ?? balData.content?.availableBalance ?? null)
-      : null
     return NextResponse.json({ products, balance })
   } catch (error: any) {
     console.error("eload GET error:", error.message)
@@ -142,7 +155,14 @@ export async function POST(req: NextRequest) {
     if (result.errorCode === 0) {
       const gbitsRef = result.content?.transactionId || txnId
       const balanceAfter = result.content?.balance ?? null
-      return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId, balance: balanceAfter })
+      console.log("[eload] buy success, balance from response:", balanceAfter, "full content:", JSON.stringify(result.content))
+      // If GBits didn\'t return balance in buy response, fetch it separately
+      let finalBalance = balanceAfter
+      if (finalBalance == null) {
+        finalBalance = await fetchGbitsBalance()
+        console.log("[eload] fetched balance separately:", finalBalance)
+      }
+      return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId, balance: finalBalance })
     }
     if (result.errorCode === 105)
       return NextResponse.json({ status: "pending", txnId, gbitsRef: result.content?.transactionId || txnId })

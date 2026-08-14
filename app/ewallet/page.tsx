@@ -277,12 +277,12 @@ export default function EWalletPage() {
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
                   </div>
-                ) : gbitsBalanceError ? (
-                  <p className="text-white/60 text-sm font-medium">Send a load to see balance</p>
-                ) : (
+                ) : gbitsBalance != null ? (
                   <p className="text-white text-3xl font-black tracking-tight">
-                    ₱{(gbitsBalance ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
+                ) : (
+                  <p className="text-white/60 text-sm font-medium">Tap to load & check balance</p>
                 )}
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
@@ -507,7 +507,7 @@ export default function EWalletPage() {
                   </CardHeader>
                   <CardContent className="p-3 pt-0">
                     <div className="text-lg font-bold text-violet-600">
-                      {gbitsBalanceLoading ? "..." : gbitsBalanceError ? "N/A" : `₱${(gbitsBalance ?? 0).toFixed(2)}`}
+                      {gbitsBalanceLoading ? "..." : gbitsBalance != null ? `₱${gbitsBalance.toFixed(2)}` : "N/A"}
                     </div>
                   </CardContent>
                 </Card>

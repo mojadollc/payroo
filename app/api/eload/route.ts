@@ -65,6 +65,7 @@ async function fetchGbitsBalance(): Promise<number | null> {
   return null
 }
 
+function mapSkus(skus: any[]) {
   return skus
     .filter((s) => s.skuStatus === true || s.skuStatus === 1 || s.skuStatus === "true" || s.skuStatus === "active")
     .map((s) => ({

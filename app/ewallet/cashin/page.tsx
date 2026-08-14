@@ -79,7 +79,10 @@ function Kiosk() {
   const adminFee = numAmount >= 100 ? Math.ceil(numAmount * adminChargeRate) : 0
   const sellerEarning = Math.ceil(numAmount * feeRate)
   const fee = xenditTotal + adminFee + sellerEarning
-  const sendAmount = Math.max(0, numAmount - fee)
+  // sendAmount = what the customer wants to send (the entered amount)
+  // totalToCollect = what you collect from the customer (send amount + fee)
+  const sendAmount = numAmount
+  const totalToCollect = numAmount + fee
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
 
@@ -120,7 +123,7 @@ function Kiosk() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amountInserted: numAmount, fee, xenditCost, xenditVat, xenditTotal, adminFee, sellerEarning, sendAmount,
+          amountInserted: totalToCollect, fee, xenditCost, xenditVat, xenditTotal, adminFee, sellerEarning, sendAmount,
           channel: selectedChannel, accountNumber: customerNumber.trim(),
           accountName: customerName.trim() || "Customer", storeId, storeName,
         }),
@@ -370,15 +373,26 @@ function Kiosk() {
                 {selectedChannelName}
               </div>
               <h2 className="text-2xl font-bold text-gray-800">Enter Amount</h2>
-              <p className="text-gray-400 text-sm mt-1">Cash received from customer</p>
+              <p className="text-gray-400 text-sm mt-1">Amount the customer wants to send</p>
             </div>
 
             {/* Amount display */}
             <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
               <p className="text-5xl font-extrabold text-gray-800 min-h-[56px]">₱{amount || "0"}</p>
               {numAmount > 0 && (
-                <div className="mt-2 text-sm text-gray-400">
-                  Service Fee: ₱{fee} · Customer receives: <span className="font-bold text-blue-600">₱{sendAmount.toLocaleString()}</span>
+                <div className="mt-3 space-y-1 text-sm">
+                  <div className="flex justify-between text-gray-400">
+                    <span>Send Amount</span>
+                    <span className="font-semibold text-blue-600">₱{sendAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>Service Fee</span>
+                    <span className="font-semibold text-orange-500">+₱{fee}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-gray-700 border-t pt-1">
+                    <span>Collect from Customer</span>
+                    <span className="text-green-600">₱{totalToCollect.toLocaleString()}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -454,19 +468,18 @@ function Kiosk() {
                 </div>
                 <div className="border-t pt-3 space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-400 text-sm">Cash Inserted</span>
-                    <span className="font-bold text-gray-800">₱{numAmount.toLocaleString()}</span>
+                    <span className="text-gray-400 text-sm">Send Amount</span>
+                    <span className="font-bold text-gray-800">₱{sendAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400 text-sm">Service Fee</span>
-                    <span className="text-red-400 font-medium">-₱{fee}</span>
+                    <span className="text-orange-500 font-medium">+₱{fee}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
-                    <span className="text-gray-400 text-sm">Receiver Gets</span>
-                    <span className="font-bold text-blue-600">₱{sendAmount.toLocaleString()}</span>
+                    <span className="text-gray-700 text-sm font-semibold">Total to Collect</span>
+                    <span className="font-extrabold text-green-600 text-lg">₱{totalToCollect.toLocaleString()}</span>
                   </div>
                 </div>
-
               </div>
             </div>
 
@@ -502,8 +515,8 @@ function Kiosk() {
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Sending ₱{sendAmount.toLocaleString()}</h2>
-              <p className="text-gray-400 mt-2">to {selectedChannelName} · {customerNumber}</p>
+              <h2 className="text-2xl font-bold text-gray-800">Sending ₱{sendAmount.toLocaleString()} to {selectedChannelName}</h2>
+              <p className="text-gray-400 mt-2">{customerNumber}</p>
               <p className="text-sm text-gray-300 mt-4">Please wait... do not close this screen.</p>
             </div>
             <button onClick={reset}

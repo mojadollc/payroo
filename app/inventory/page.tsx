@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { 
   Plus, 
   Search, 
@@ -245,32 +245,49 @@ export default function InventoryPage() {
   const [bulkUploading, setBulkUploading] = useState(false)
   const [activeTab, setActiveTab] = useState("products")
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [pageChanging, setPageChanging] = useState(false)
+  const [stats, setStats] = useState({ productCount: 0, totalItems: 0, stockValue: 0, lowStock: 0, outOfStock: 0 })
   const PAGE_SIZE = 20
   const { toast } = useToast()
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    loadProducts()
-    loadCategories()
+    const storeId = getStoreId()
+    if (!storeId) return
+    // Parallel fetch on mount
+    Promise.all([
+      fetchProducts(1, "", "all"),
+      fetch(`/api/categories?storeId=${storeId}`)
+        .then(r => r.json())
+        .then(({ data }) => { if (data?.length) setCategories(data) })
+        .catch(async () => { const d = await offlineGetCategories(); if (d.length) setCategories(d) }),
+    ])
   }, [])
 
-  const loadProducts = async () => {
+  const fetchProducts = async (page: number, search: string, filter: string) => {
     setLoading(true)
     try {
       const storeId = getStoreId()
       if (!storeId) return
-      const res = await fetch(`/api/products?storeId=${storeId}`)
-      const { data } = await res.json()
-      if (data?.length > 0) setProducts(data)
+      const params = new URLSearchParams({ storeId, page: String(page), limit: String(PAGE_SIZE), filter })
+      if (search) params.set("search", search)
+      const res = await fetch(`/api/products?${params}`)
+      const json = await res.json()
+      if (json.data) setProducts(json.data)
+      if (json.totalPages) setTotalPages(json.totalPages)
+      if (json.stats) setStats(json.stats)
     } catch (error) {
       console.error("Error loading products:", error)
       const offline = await offlineGetProducts()
-      if (offline.length > 0) setProducts(offline)
+      if (offline.length) setProducts(offline)
     } finally {
       setLoading(false)
     }
   }
+
+  const loadProducts = () => fetchProducts(currentPage, searchTerm, activeTab === "products" ? "all" : activeTab)
 
   const loadCategories = async () => {
     try {
@@ -280,7 +297,6 @@ export default function InventoryPage() {
       const { data } = await res.json()
       if (data?.length > 0) setCategories(data)
     } catch (error) {
-      console.error("Error loading categories:", error)
       const offline = await offlineGetCategories()
       if (offline.length > 0) setCategories(offline)
     }
@@ -288,36 +304,25 @@ export default function InventoryPage() {
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm("Are you sure you want to delete this product?")) return
-    const prev = products
     setProducts(p => p.filter(x => x.id !== id))
     try {
       const res = await fetch(`/api/products?id=${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed")
       toast({ title: "Product deleted" })
+      // Refresh current page to keep count accurate
+      fetchProducts(currentPage, searchTerm, activeTab === "products" ? "all" : activeTab)
     } catch (error) {
-      setProducts(prev)
+      loadProducts()
       toast({ title: "Error", description: "Failed to delete product", variant: "destructive" })
     }
   }
 
-  // Filter products
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.barcode.includes(searchTerm)
-  )
-
-  // Pagination helper
-  const paginate = (list: typeof filteredProducts) => {
-    const total = Math.ceil(list.length / PAGE_SIZE)
-    const page = Math.min(currentPage, total || 1)
-    return { items: list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total, page }
-  }
-
-  // Calculate Stock Value (Cost * Stock)
-  const totalStockValue = products.reduce((sum, p) => sum + (p.cost * p.stock), 0)
-  const totalItems = products.reduce((sum, p) => sum + p.stock, 0)
-  const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 5).length
-  const outOfStockCount = products.filter(p => p.stock === 0).length
+  // Server handles filtering — products is already the current page
+  const filteredProducts = products
+  const totalStockValue = stats.stockValue
+  const totalItems = stats.totalItems
+  const lowStockCount = stats.lowStock
+  const outOfStockCount = stats.outOfStock
 
   // Barcode Actions
   const getBarcodeUrl = (barcode: string) => 
@@ -529,8 +534,10 @@ export default function InventoryPage() {
     )
   }
 
-  const renderProductList = (list: typeof filteredProducts) => {
-    const { items, total, page } = paginate(list)
+  const renderProductList = () => {
+    const items = filteredProducts
+    const total = totalPages
+    const page = currentPage
     return (
     <>
       <div className="flex items-center justify-between gap-4">
@@ -682,9 +689,9 @@ export default function InventoryPage() {
         </div>
       )}
       <PaginationBar total={total} page={page} onChange={handlePageChange} />
-      {list.length > 0 && (
+      {items.length > 0 && (
         <p className="text-center text-xs text-muted-foreground">
-          Showing {Math.min((page - 1) * PAGE_SIZE + 1, list.length)}–{Math.min(page * PAGE_SIZE, list.length)} of {list.length} products
+          Showing {Math.min((page - 1) * PAGE_SIZE + 1, stats.productCount)}–{Math.min(page * PAGE_SIZE, stats.productCount)} of {stats.productCount} products
         </p>
       )}
     </>
@@ -731,21 +738,30 @@ export default function InventoryPage() {
     }
   }
 
-  const tabProducts = {
-    products: filteredProducts,
-    "low-stock": filteredProducts.filter(p => p.stock > 0 && p.stock <= 5),
-    "out-of-stock": filteredProducts.filter(p => p.stock === 0),
-  } as Record<string, typeof filteredProducts>
+  const tabProducts = { products: filteredProducts, "low-stock": filteredProducts, "out-of-stock": filteredProducts } as Record<string, typeof filteredProducts>
 
-  // Reset page when search or tab changes
-  const handleSearchChange = (val: string) => { setSearchTerm(val); setCurrentPage(1) }
-  const handleTabChange = (val: string) => { setActiveTab(val); setCurrentPage(1) }
+  // Debounced search — fires server fetch 400ms after user stops typing
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val)
+    setCurrentPage(1)
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => {
+      fetchProducts(1, val, activeTab === "products" ? "all" : activeTab)
+    }, 400)
+  }
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val)
+    setCurrentPage(1)
+    if (val !== "categories") fetchProducts(1, searchTerm, val === "products" ? "all" : val)
+  }
 
   const handlePageChange = (p: number) => {
     setPageChanging(true)
     setCurrentPage(p)
     window.scrollTo({ top: 0, behavior: "smooth" })
-    setTimeout(() => setPageChanging(false), 300)
+    fetchProducts(p, searchTerm, activeTab === "products" ? "all" : activeTab)
+      .finally(() => setPageChanging(false))
   }
 
   return (
@@ -855,8 +871,9 @@ export default function InventoryPage() {
         ) : loading ? (
           <MobileGridSkeleton />
         ) : (() => {
-          const mobileList = tabProducts[activeTab] ?? filteredProducts
-          const { items: mobileItems, total: mobileTotal, page: mobilePage } = paginate(mobileList)
+          const mobileItems = filteredProducts
+          const mobileTotal = totalPages
+          const mobilePage = currentPage
           return (
           <div>
             <MobileSectionHeader title={activeTab === "products" ? `All ${cfg.itemLabelPlural}` : activeTab === "low-stock" ? "Low Stock" : "Out of Stock"} />
@@ -918,9 +935,9 @@ export default function InventoryPage() {
                 ))}
             </div>
             <PaginationBar total={mobileTotal} page={mobilePage} onChange={handlePageChange} />
-            {mobileList.length > 0 && (
+            {mobileItems.length > 0 && (
               <p className="text-center text-xs text-muted-foreground pt-1">
-                Showing {Math.min((mobilePage - 1) * PAGE_SIZE + 1, mobileList.length)}–{Math.min(mobilePage * PAGE_SIZE, mobileList.length)} of {mobileList.length}
+                Showing {Math.min((mobilePage - 1) * PAGE_SIZE + 1, stats.productCount)}–{Math.min(mobilePage * PAGE_SIZE, stats.productCount)} of {stats.productCount}
               </p>
             )}
           </div>
@@ -1002,9 +1019,9 @@ export default function InventoryPage() {
             <TabsTrigger value="out-of-stock" className="text-sm font-medium text-red-700">Out of Stock ({outOfStockCount})</TabsTrigger>
             <TabsTrigger value="categories" className="text-sm font-medium">Categories</TabsTrigger>
           </TabsList>
-          <TabsContent value="products" className="space-y-6">{renderProductList(filteredProducts)}</TabsContent>
-          <TabsContent value="low-stock" className="space-y-6">{renderProductList(filteredProducts.filter(p => p.stock > 0 && p.stock <= 5))}</TabsContent>
-          <TabsContent value="out-of-stock" className="space-y-6">{renderProductList(filteredProducts.filter(p => p.stock === 0))}</TabsContent>
+          <TabsContent value="products" className="space-y-6">{renderProductList()}</TabsContent>
+          <TabsContent value="low-stock" className="space-y-6">{renderProductList()}</TabsContent>
+          <TabsContent value="out-of-stock" className="space-y-6">{renderProductList()}</TabsContent>
           <TabsContent value="categories"><CategoryManager categories={categories} onUpdate={loadCategories} /></TabsContent>
         </Tabs>
         )}

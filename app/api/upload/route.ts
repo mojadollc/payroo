@@ -8,7 +8,7 @@ import path from "path"
 // Locally: <project_root>/uploads/products/
 const UPLOAD_DIR =
   process.env.UPLOAD_DIR ||
-  path.join(process.cwd(), "uploads")
+  path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads")
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"

@@ -5,7 +5,7 @@ import path from "path"
 
 const UPLOAD_DIR =
   process.env.UPLOAD_DIR ||
-  path.join(process.cwd(), "uploads")
+  path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads")
 
 export async function GET(
   _req: NextRequest,

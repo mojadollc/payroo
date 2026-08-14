@@ -143,8 +143,11 @@ export async function POST(req: NextRequest) {
       console.log("[eload] buy success, content keys:", Object.keys(result.content || {}), "balance:", balanceAfter)
       return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId, balance: balanceAfter })
     }
-    if (result.errorCode === 105)
-      return NextResponse.json({ status: "pending", txnId, gbitsRef: result.content?.transactionId || txnId })
+    if (result.errorCode === 105) {
+      const gbitsRef = result.content?.transactionId || txnId
+      const balanceAfter = result.content?.balance ?? null
+      return NextResponse.json({ status: "pending", txnId, gbitsRef, balance: balanceAfter })
+    }
     return NextResponse.json(
       { status: "failed", txnId, error: result.content?.description || result.message || `GBits error ${result.errorCode}` },
       { status: 422 }

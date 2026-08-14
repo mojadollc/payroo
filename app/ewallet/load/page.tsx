@@ -137,7 +137,12 @@ export default function ELoadPage() {
         await recordEloadTransaction(data.txnId || "")
         setStep("success")
       } else if (data.status === "pending") {
-        // Use gbitsRef if available, fallback to txnId
+        // Save balance from pending response immediately — GBits returns it in errorCode 105
+        if (data.balance != null) {
+          setWalletBalance(data.balance)
+          localStorage.setItem("gbits_balance", String(data.balance))
+          window.dispatchEvent(new StorageEvent("storage", { key: "gbits_balance", newValue: String(data.balance) }))
+        }
         await pollStatus(data.gbitsRef || data.txnId)
       } else {
         setError(data.error || "Transaction failed.")

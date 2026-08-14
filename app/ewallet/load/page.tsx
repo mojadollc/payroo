@@ -47,11 +47,7 @@ export default function ELoadPage() {
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
   const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
-  const [walletBalance, setWalletBalance] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null
-    const saved = localStorage.getItem("gbits_balance")
-    return saved != null ? parseFloat(saved) : null
-  })
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 

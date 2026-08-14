@@ -98,6 +98,7 @@ export async function GET(req: NextRequest) {
     if (action === "balance") {
       // Read cached balance from DB — synced across all devices
       const settings = await prisma.commissionSettings.findUnique({ where: { storeId } })
+      console.log("[eload] balance from DB for", storeId, ":", settings?.gbitsBalance)
       return NextResponse.json({ balance: settings?.gbitsBalance ?? null })
     }
 

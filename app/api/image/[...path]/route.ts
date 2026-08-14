@@ -3,19 +3,20 @@ import { readFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 
-const UPLOAD_DIR =
-  process.env.UPLOAD_DIR ||
-  path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads")
+function getUploadDir() {
+  return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads")
+}
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const filePath = path.join(UPLOAD_DIR, ...params.path)
+    const filePath = path.join(getUploadDir(), ...params.path)
+    const uploadDir = getUploadDir()
 
     // Prevent path traversal
-    if (!filePath.startsWith(UPLOAD_DIR)) {
+    if (!filePath.startsWith(uploadDir)) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 

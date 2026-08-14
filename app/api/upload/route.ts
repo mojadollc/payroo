@@ -3,12 +3,9 @@ import { writeFile, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 
-// Persistent upload dir OUTSIDE the Next.js build folder so deploys never wipe it.
-// On VPS: /var/www/uploads/payroo/products/
-// Locally: <project_root>/uploads/products/
-const UPLOAD_DIR =
-  process.env.UPLOAD_DIR ||
-  path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads")
+function getUploadDir() {
+  return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads")
+}
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
@@ -26,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Sanitise productId so it can't escape the directory
     const safeId = productId.replace(/[^a-zA-Z0-9_-]/g, "_")
-    const dir = path.join(UPLOAD_DIR, "products", safeId)
+    const dir = path.join(getUploadDir(), "products", safeId)
 
     if (!existsSync(dir)) await mkdir(dir, { recursive: true })
 

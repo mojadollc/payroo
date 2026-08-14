@@ -67,9 +67,11 @@ export async function GET(req: NextRequest) {
 
     if (action === "status" && txnId) {
       const data = await gbitsGet(`/eload/status/${txnId}`)
-      const status = data.content?.status
-      if (status === "success") return NextResponse.json({ status: "completed", txnId })
-      if (status === "failed") return NextResponse.json({ status: "failed", error: data.content?.description || "Failed" })
+      const raw = (data.content?.status || "").toLowerCase()
+      if (["success", "completed", "successful"].includes(raw))
+        return NextResponse.json({ status: "completed", txnId, balance: data.content?.balance ?? null })
+      if (["failed", "failure", "cancelled", "canceled", "rejected"].includes(raw))
+        return NextResponse.json({ status: "failed", error: data.content?.description || data.message || "Transaction failed" })
       return NextResponse.json({ status: "pending", txnId })
     }
 
@@ -142,7 +144,8 @@ export async function POST(req: NextRequest) {
       const balanceAfter = result.content?.balance ?? null
       return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId, balance: balanceAfter })
     }
-    if (result.errorCode === 105) return NextResponse.json({ status: "pending", txnId })
+    if (result.errorCode === 105)
+      return NextResponse.json({ status: "pending", txnId, gbitsRef: result.content?.transactionId || txnId })
     return NextResponse.json(
       { status: "failed", txnId, error: result.content?.description || result.message || `GBits error ${result.errorCode}` },
       { status: 422 }

@@ -144,14 +144,13 @@ export default function ELoadPage() {
         if (data.balance != null) {
           setWalletBalance(data.balance)
           localStorage.setItem("gbits_balance", String(data.balance))
-          // Notify same-tab listeners (storage event only fires cross-tab natively)
           window.dispatchEvent(new StorageEvent("storage", { key: "gbits_balance", newValue: String(data.balance) }))
         }
         await recordEloadTransaction(data.txnId || "")
         setStep("success")
       } else if (data.status === "pending") {
-        // Poll for status
-        await pollStatus(data.txnId)
+        // Use gbitsRef if available, fallback to txnId
+        await pollStatus(data.gbitsRef || data.txnId)
       } else {
         setError(data.error || "Transaction failed.")
         setStep("failed")
@@ -190,17 +189,31 @@ export default function ELoadPage() {
 
   const pollStatus = async (id: string) => {
     const start = Date.now()
-    while (Date.now() - start < 60000) {
-      await new Promise(r => setTimeout(r, 3000))
+    const TIMEOUT = 3 * 60 * 1000 // 3 minutes
+    const storeId = getStoreId()
+    while (Date.now() - start < TIMEOUT) {
+      await new Promise(r => setTimeout(r, 4000))
       try {
-        const res = await fetch(`/api/eload?action=status&txnId=${id}`)
+        const res = await fetch(`/api/eload?action=status&txnId=${id}&storeId=${storeId}`)
         const data = await res.json()
-        if (data.status === "completed") { setTxnId(data.txnId || id); await recordEloadTransaction(data.txnId || id); setStep("success"); return }
-        if (data.status === "failed") { setError(data.error || "Failed"); setStep("failed"); return }
+        if (data.status === "completed") {
+          if (data.balance != null) {
+            setWalletBalance(data.balance)
+            localStorage.setItem("gbits_balance", String(data.balance))
+            window.dispatchEvent(new StorageEvent("storage", { key: "gbits_balance", newValue: String(data.balance) }))
+          }
+          setTxnId(data.txnId || id)
+          await recordEloadTransaction(data.txnId || id)
+          setStep("success")
+          return
+        }
+        if (data.status === "failed") { setError(data.error || "Transaction failed."); setStep("failed"); return }
       } catch {}
     }
-    setError("Still processing. Please check back shortly.")
-    setStep("failed")
+    // Timeout — GBits already accepted the transaction, treat as sent
+    setTxnId(id)
+    await recordEloadTransaction(id)
+    setStep("success")
   }
 
   const reset = () => {

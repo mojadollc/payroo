@@ -1,25 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { 
-  Plus, 
-  Search, 
-  LayoutGrid, 
-  List as ListIcon, 
-  Barcode, 
-  Download, 
-  Printer, 
-  Trash2, 
-  Edit,
-  Package,
-  AlertTriangle,
-  XCircle,
-  DollarSign,
-  RefreshCw,
-  Upload,
-  FileText,
-  CheckCircle2,
-  XCircle as XCircleIcon,
+import { useState, useEffect, useCallback, useRef } from "react"
+import {
+  Plus, Search, LayoutGrid, List as ListIcon, Barcode, Download,
+  Printer, Trash2, Edit, Package, AlertTriangle, XCircle, DollarSign,
+  RefreshCw, Upload, FileText, CheckCircle2, XCircle as XCircleIcon,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,17 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { offlineGetProducts, offlineGetCategories } from "@/lib/offline/services"
-import { isOnline } from "@/lib/offline/sync-engine"
 import { Label } from "@/components/ui/label"
 import type { Product, Category } from "@/lib/firebase/types"
 import { getStoreId } from "@/lib/store-id"
@@ -45,14 +22,60 @@ import { AddProductDialog } from "@/components/inventory/add-product-dialog"
 import { EditProductDialog } from "@/components/inventory/edit-product-dialog"
 import { CategoryManager } from "@/components/inventory/category-manager"
 import { DefaultProductImage } from "@/components/ui/default-product-image"
-import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
-import { BottomSheet } from "@/components/ui/bottom-sheet"
+import { MobileAppShell } from "@/components/mobile-app-shell"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 
-// ── CSV helpers ────────────────────────────────────────────────────────────────
+// ── Shimmer skeleton ──────────────────────────────────────────────────────────
+function Shimmer({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-gray-200 rounded-xl ${className ?? ""}`} />
+}
+
+function StatsSkeleton() {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="shrink-0 bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5 shadow-sm min-w-[120px] space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Shimmer className="w-6 h-6 rounded-md" />
+            <Shimmer className="w-16 h-3" />
+          </div>
+          <Shimmer className="w-20 h-4" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ProductRowSkeleton() {
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm flex items-center gap-3 px-3 py-2.5">
+      <Shimmer className="shrink-0 w-14 h-14 rounded-xl" />
+      <div className="flex-1 space-y-2">
+        <Shimmer className="w-3/4 h-3.5" />
+        <Shimmer className="w-1/2 h-3" />
+      </div>
+      <div className="shrink-0 flex flex-col gap-1">
+        {[1, 2, 3, 4].map(i => <Shimmer key={i} className="w-7 h-7 rounded-lg" />)}
+      </div>
+    </div>
+  )
+}
+
+function DesktopRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell><Shimmer className="h-4 w-40" /></TableCell>
+      <TableCell><Shimmer className="h-4 w-28" /></TableCell>
+      <TableCell><Shimmer className="h-4 w-10" /></TableCell>
+      <TableCell><Shimmer className="h-4 w-14" /></TableCell>
+      <TableCell><Shimmer className="h-4 w-14" /></TableCell>
+      <TableCell><div className="flex justify-end gap-2"><Shimmer className="h-8 w-16" /><Shimmer className="h-8 w-20" /><Shimmer className="h-8 w-20" /></div></TableCell>
+    </TableRow>
+  )
+}
 
 const SAMPLE_CSV_HEADERS = ["name", "barcode", "category", "unit", "cost", "price", "stock", "description"]
 
@@ -162,6 +185,8 @@ export default function InventoryPage() {
   const [bulkUploading, setBulkUploading] = useState(false)
   const [activeTab, setActiveTab] = useState("products")
   const [currentPage, setCurrentPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [pageChanging, setPageChanging] = useState(false)
   const PAGE_SIZE = 20
   const { toast } = useToast()
 
@@ -171,6 +196,7 @@ export default function InventoryPage() {
   }, [])
 
   const loadProducts = async () => {
+    setLoading(true)
     try {
       const storeId = getStoreId()
       if (!storeId) return
@@ -181,6 +207,8 @@ export default function InventoryPage() {
       console.error("Error loading products:", error)
       const offline = await offlineGetProducts()
       if (offline.length > 0) setProducts(offline)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -441,6 +469,13 @@ export default function InventoryPage() {
     )
   }
 
+  const handlePageChange = (p: number) => {
+    setPageChanging(true)
+    setCurrentPage(p)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+    setTimeout(() => setPageChanging(false), 300)
+  }
+
   const renderProductList = (list: typeof filteredProducts) => {
     const { items, total, page } = paginate(list)
     return (
@@ -475,7 +510,21 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {viewMode === "grid" ? (
+      {pageChanging ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+            <div key={i} className="rounded-lg border overflow-hidden bg-card">
+              <Shimmer className="w-full h-28 sm:h-32 rounded-none" />
+              <div className="p-2 space-y-2">
+                <Shimmer className="w-3/4 h-3" />
+                <Shimmer className="w-16 h-4" />
+                <Shimmer className="w-20 h-3" />
+                <div className="flex gap-1 mt-1">{[1,2,3,4].map(j => <Shimmer key={j} className="h-7 w-7" />)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : viewMode === "grid" ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {items.map((product) => (
             <div key={product.id} className="rounded-lg border overflow-hidden bg-card hover:shadow-md transition-shadow">
@@ -530,6 +579,24 @@ export default function InventoryPage() {
               </div>
             </div>
           ))}
+        </div>
+      ) : pageChanging ? (
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Barcode</TableHead>
+                <TableHead>{cfg.stockLabel}</TableHead>
+                <TableHead>{cfg.costLabel}</TableHead>
+                <TableHead>{cfg.priceLabel}</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: PAGE_SIZE }).map((_, i) => <DesktopRowSkeleton key={i} />)}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <div className="border rounded-md">
@@ -589,7 +656,7 @@ export default function InventoryPage() {
           </Table>
         </div>
       )}
-      <PaginationBar total={total} page={page} onChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: "smooth" }) }} />
+      <PaginationBar total={total} page={page} onChange={handlePageChange} />
       {list.length > 0 && (
         <p className="text-center text-xs text-muted-foreground">
           Showing {Math.min((page - 1) * PAGE_SIZE + 1, list.length)}–{Math.min(page * PAGE_SIZE, list.length)} of {list.length} products
@@ -680,23 +747,25 @@ export default function InventoryPage() {
       <div className="md:hidden space-y-3">
 
         {/* Stats — horizontal scroll strip */}
-        <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-          {[
-            { icon: <DollarSign className="h-3.5 w-3.5 text-white" />, bg: "bg-blue-500", label: "Stock Value", value: `₱${totalStockValue.toLocaleString("en-PH")}`, color: "text-blue-700" },
-            { icon: <Package className="h-3.5 w-3.5 text-white" />, bg: "bg-green-500", label: "Total Items", value: totalItems.toLocaleString(), color: "text-green-700" },
-            { icon: <LayoutGrid className="h-3.5 w-3.5 text-white" />, bg: "bg-violet-500", label: "Products", value: products.length.toLocaleString(), color: "text-violet-700" },
-            { icon: <AlertTriangle className="h-3.5 w-3.5 text-white" />, bg: "bg-orange-500", label: "Alerts", value: `${lowStockCount + outOfStockCount}`, sub: `${lowStockCount} low · ${outOfStockCount} out`, color: "text-orange-700" },
-          ].map(s => (
-            <div key={s.label} className="shrink-0 bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5 shadow-sm min-w-[120px]">
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className={`p-1 ${s.bg} rounded-md`}>{s.icon}</div>
-                <span className="text-[10px] text-gray-400 font-medium">{s.label}</span>
+        {loading ? <StatsSkeleton /> : (
+          <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+            {[
+              { icon: <DollarSign className="h-3.5 w-3.5 text-white" />, bg: "bg-blue-500", label: "Stock Value", value: `₱${totalStockValue.toLocaleString("en-PH")}`, color: "text-blue-700" },
+              { icon: <Package className="h-3.5 w-3.5 text-white" />, bg: "bg-green-500", label: "Total Items", value: totalItems.toLocaleString(), color: "text-green-700" },
+              { icon: <LayoutGrid className="h-3.5 w-3.5 text-white" />, bg: "bg-violet-500", label: "Products", value: products.length.toLocaleString(), color: "text-violet-700" },
+              { icon: <AlertTriangle className="h-3.5 w-3.5 text-white" />, bg: "bg-orange-500", label: "Alerts", value: `${lowStockCount + outOfStockCount}`, sub: `${lowStockCount} low · ${outOfStockCount} out`, color: "text-orange-700" },
+            ].map(s => (
+              <div key={s.label} className="shrink-0 bg-white border border-gray-100 rounded-2xl px-3.5 py-2.5 shadow-sm min-w-[120px]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className={`p-1 ${s.bg} rounded-md`}>{s.icon}</div>
+                  <span className="text-[10px] text-gray-400 font-medium">{s.label}</span>
+                </div>
+                <div className={`text-sm font-black ${s.color}`}>{s.value}</div>
+                {s.sub && <div className="text-[10px] text-gray-400 mt-0.5">{s.sub}</div>}
               </div>
-              <div className={`text-sm font-black ${s.color}`}>{s.value}</div>
-              {s.sub && <div className="text-[10px] text-gray-400 mt-0.5">{s.sub}</div>}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Search + Filter row */}
         {activeTab !== "categories" && (
@@ -745,12 +814,20 @@ export default function InventoryPage() {
           <div className="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm">
             <CategoryManager categories={categories} onUpdate={loadCategories} />
           </div>
+        ) : loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <ProductRowSkeleton key={i} />
+            ))}
+          </div>
         ) : (() => {
           const mobileList = tabProducts[activeTab] ?? filteredProducts
           const { items: mobileItems, total: mobileTotal, page: mobilePage } = paginate(mobileList)
           return (
             <div className="space-y-2">
-              {mobileItems.length === 0 ? (
+              {pageChanging ? (
+                Array.from({ length: 6 }).map((_, i) => <ProductRowSkeleton key={i} />)
+              ) : mobileItems.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-2xl py-12 flex flex-col items-center gap-2 shadow-sm">
                   <Package className="h-8 w-8 text-gray-300" />
                   <p className="text-sm text-gray-400">No products found</p>
@@ -815,7 +892,7 @@ export default function InventoryPage() {
                   </div>
                 ))
               )}
-              <PaginationBar total={mobileTotal} page={mobilePage} onChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: "smooth" }) }} />
+              <PaginationBar total={mobileTotal} page={mobilePage} onChange={handlePageChange} />
               {mobileList.length > 0 && (
                 <p className="text-center text-[11px] text-gray-400">
                   {Math.min((mobilePage - 1) * PAGE_SIZE + 1, mobileList.length)}–{Math.min(mobilePage * PAGE_SIZE, mobileList.length)} of {mobileList.length} products
@@ -829,6 +906,22 @@ export default function InventoryPage() {
       {/* ── Desktop View ── */}
       <div className="hidden md:block space-y-6">
         {/* Stats */}
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between mb-2">
+                  <Shimmer className="h-8 w-8" />
+                  <div className="text-right space-y-1">
+                    <Shimmer className="h-6 w-20" />
+                    <Shimmer className="h-3 w-16" />
+                  </div>
+                </div>
+                <Shimmer className="h-3 w-32" />
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardContent className="p-4">
@@ -882,7 +975,35 @@ export default function InventoryPage() {
             </CardContent>
           </Card>
         </div>
+        )}
 
+        {loading ? (
+          <div className="space-y-6">
+            <div className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg gap-1">
+              {[1,2,3,4].map(i => <Shimmer key={i} className="h-9 rounded-md" />)}
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <Shimmer className="h-9 flex-1 max-w-sm" />
+              <div className="flex gap-1">
+                <Shimmer className="h-9 w-9" />
+                <Shimmer className="h-9 w-9" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                <div key={i} className="rounded-lg border overflow-hidden bg-card">
+                  <Shimmer className="w-full h-28 sm:h-32 rounded-none" />
+                  <div className="p-2 space-y-2">
+                    <Shimmer className="w-3/4 h-3" />
+                    <Shimmer className="w-16 h-4" />
+                    <Shimmer className="w-20 h-3" />
+                    <div className="flex gap-1 mt-1">{[1,2,3,4].map(j => <Shimmer key={j} className="h-7 w-7" />)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
         <Tabs defaultValue="products" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
             <TabsTrigger value="products" className="text-sm font-medium">All {cfg.itemLabelPlural}</TabsTrigger>
@@ -895,6 +1016,7 @@ export default function InventoryPage() {
           <TabsContent value="out-of-stock" className="space-y-6">{renderProductList(filteredProducts.filter(p => p.stock === 0))}</TabsContent>
           <TabsContent value="categories"><CategoryManager categories={categories} onUpdate={loadCategories} /></TabsContent>
         </Tabs>
+        )}
       </div>
 
       {/* Floating Add Button (Mobile) */}

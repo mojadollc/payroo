@@ -103,13 +103,25 @@ export default function EWalletPage() {
   }, [period])
 
   useEffect(() => {
-    // Balance only comes from GBits buy responses — read from localStorage
+    // Read cached balance from localStorage immediately (no flicker)
     const saved = localStorage.getItem("gbits_balance")
-    if (saved != null) {
-      setGbitsBalance(parseFloat(saved))
-      setGbitsBalanceError(false)
-    } else {
-      setGbitsBalanceError(false) // don\'t show error, just show nothing until first load
+    if (saved != null) setGbitsBalance(parseFloat(saved))
+
+    // Fetch from DB — synced across all devices
+    const storeId = getStoreId()
+    if (storeId) {
+      setGbitsBalanceLoading(true)
+      fetch(`/api/eload?storeId=${storeId}&action=balance`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.balance != null) {
+            setGbitsBalance(data.balance)
+            setGbitsBalanceError(false)
+            localStorage.setItem("gbits_balance", String(data.balance))
+          }
+        })
+        .catch(() => {})
+        .finally(() => setGbitsBalanceLoading(false))
     }
 
     // Listen for updates dispatched by the E-Load page after each successful buy

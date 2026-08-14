@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/db/client"
 
 const GBITS_API_URL = process.env.GBITS_API_URL || "https://api.gbits.ph"
 const GBITS_BUSINESS_ID = process.env.GBITS_BUSINESS_ID!
@@ -44,6 +45,18 @@ function generateTxnId(): string {
   return `${GBITS_BUSINESS_CODE}${date}${rand}`
 }
 
+async function saveBalanceToDB(storeId: string, balance: number) {
+  try {
+    await prisma.commissionSettings.upsert({
+      where: { storeId },
+      update: { gbitsBalance: balance, gbitsBalanceAt: new Date() },
+      create: { storeId, gbitsBalance: balance, gbitsBalanceAt: new Date() },
+    })
+  } catch (e) {
+    console.error("[eload] failed to save balance to DB:", e)
+  }
+}
+
 async function fetchGbitsBalance(): Promise<number | null> {
   // GBits has no dedicated balance endpoint (all return errorCode 4).
   // Balance is only available in the buy transaction response (content.balance).
@@ -83,9 +96,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === "balance") {
-      // GBits has no balance endpoint. Balance only comes from buy responses.
-      // Return null so the UI falls back to localStorage cached value.
-      return NextResponse.json({ balance: null })
+      // Read cached balance from DB — synced across all devices
+      const settings = await prisma.commissionSettings.findUnique({ where: { storeId } })
+      return NextResponse.json({ balance: settings?.gbitsBalance ?? null })
     }
 
     // Fetch SKUs only (no balance endpoint exists on GBits)
@@ -141,11 +154,13 @@ export async function POST(req: NextRequest) {
       const gbitsRef = result.content?.transactionId || txnId
       const balanceAfter = result.content?.balance ?? result.content?.remainingBalance ?? result.content?.walletBalance ?? null
       console.log("[eload] buy success, content keys:", Object.keys(result.content || {}), "balance:", balanceAfter)
+      if (balanceAfter != null) await saveBalanceToDB(storeId, balanceAfter)
       return NextResponse.json({ status: "completed", txnId: gbitsRef, localTxnId: txnId, balance: balanceAfter })
     }
     if (result.errorCode === 105) {
       const gbitsRef = result.content?.transactionId || txnId
       const balanceAfter = result.content?.balance ?? null
+      if (balanceAfter != null) await saveBalanceToDB(storeId, balanceAfter)
       return NextResponse.json({ status: "pending", txnId, gbitsRef, balance: balanceAfter })
     }
     return NextResponse.json(

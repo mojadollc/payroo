@@ -261,6 +261,8 @@ model CommissionSettings {
   mayaCashoutRate   Float        @default(0.02)
   eloadFeeType      EloadFeeType @default(flat)
   eloadFeeValue     Float        @default(5)
+  gbitsBalance      Float?       // cached from last GBits buy response
+  gbitsBalanceAt    DateTime?    // when it was last updated
   updatedAt         DateTime     @updatedAt
 
   @@index([storeId])

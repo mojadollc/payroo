@@ -71,13 +71,20 @@ export default function ELoadPage() {
         const nets = [...new Set(prods.map(p => p.network))]
         setNetworks(nets)
         if (nets.length > 0) setSelectedNetwork(nets[0])
+      })
+      .catch((err) => { setError(err.message || "Failed to load products") })
+      .finally(() => setLoading(false))
+
+    // Fetch balance from DB — synced across all devices
+    fetch(`/api/eload?storeId=${storeId}&action=balance`)
+      .then(r => r.json())
+      .then(data => {
         if (data.balance != null) {
           setWalletBalance(data.balance)
           localStorage.setItem("gbits_balance", String(data.balance))
         }
       })
-      .catch((err) => { setError(err.message || "Failed to load products") })
-      .finally(() => setLoading(false))
+      .catch(() => {})
 
     fetch(`/api/commission-settings?storeId=${storeId}`)
       .then(r => r.json())

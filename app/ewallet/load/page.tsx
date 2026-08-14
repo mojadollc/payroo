@@ -47,7 +47,11 @@ export default function ELoadPage() {
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
   const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
-  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null
+    const saved = localStorage.getItem("gbits_balance")
+    return saved != null ? parseFloat(saved) : null
+  })
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -118,7 +122,12 @@ export default function ELoadPage() {
 
       if (data.status === "completed") {
         setTxnId(data.txnId || "")
-        if (data.balance != null) setWalletBalance(data.balance)
+        if (data.balance != null) {
+          setWalletBalance(data.balance)
+          localStorage.setItem("gbits_balance", String(data.balance))
+          // Notify same-tab listeners (storage event only fires cross-tab natively)
+          window.dispatchEvent(new StorageEvent("storage", { key: "gbits_balance", newValue: String(data.balance) }))
+        }
         await recordEloadTransaction(data.txnId || "")
         setStep("success")
       } else if (data.status === "pending") {
@@ -204,7 +213,7 @@ export default function ELoadPage() {
           <div className="text-right">
             {walletBalance != null ? (
               <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1">
-                <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide">GBits Wallet</p>
+                <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide">E-Load Balance</p>
                 <p className="text-sm font-black text-indigo-700">₱{walletBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
             ) : <div className="w-14" />}
@@ -549,8 +558,14 @@ export default function ELoadPage() {
         </div>
         {txnId && (
           <div className="bg-white rounded-2xl px-5 py-3 shadow-sm border border-gray-100 w-full max-w-xs">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Gbits Reference No.</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">GBits Reference No.</p>
             <p className="text-sm font-black text-gray-800 font-mono tracking-wider break-all">{txnId}</p>
+          </div>
+        )}
+        {walletBalance != null && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl px-5 py-3 w-full max-w-xs">
+            <p className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider mb-0.5">Remaining E-Load Balance</p>
+            <p className="text-xl font-black text-indigo-700">₱{walletBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         )}
         <button

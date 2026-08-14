@@ -54,9 +54,13 @@ export default function EWalletPage() {
   const settingsLoadedRef = useRef(false)
   const [period, setPeriod] = useState<Period>("month")
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>("none")
-  const [gbitsBalance, setGbitsBalance] = useState<number | null>(null)
+  const [gbitsBalance, setGbitsBalance] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null
+    const saved = localStorage.getItem("gbits_balance")
+    return saved != null ? parseFloat(saved) : null
+  })
   const [gbitsBalanceError, setGbitsBalanceError] = useState(false)
-  const [gbitsBalanceLoading, setGbitsBalanceLoading] = useState(true)
+  const [gbitsBalanceLoading, setGbitsBalanceLoading] = useState(false)
   const allLimitRef = useRef(50)
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
@@ -103,11 +107,24 @@ export default function EWalletPage() {
   }, [period])
 
   useEffect(() => {
-    const storeId = getStoreId()
-    if (!storeId) { setGbitsBalanceLoading(false); setGbitsBalanceError(true); return }
-    // GBits has no balance endpoint — balance is only available after a buy transaction
-    setGbitsBalanceLoading(false)
-    setGbitsBalanceError(true)
+    // Read balance from localStorage (written by E-Load page after each successful buy)
+    const saved = localStorage.getItem("gbits_balance")
+    if (saved != null) {
+      setGbitsBalance(parseFloat(saved))
+      setGbitsBalanceError(false)
+    } else {
+      setGbitsBalanceError(true)
+    }
+
+    // Listen for updates from the E-Load page (same tab or other tabs)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "gbits_balance" && e.newValue != null) {
+        setGbitsBalance(parseFloat(e.newValue))
+        setGbitsBalanceError(false)
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
   }, [])
 
   const handleLoadMore = () => {
@@ -247,7 +264,7 @@ export default function EWalletPage() {
                     <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
                   </div>
                 ) : gbitsBalanceError ? (
-                  <p className="text-white/60 text-sm font-medium">Updated after each transaction</p>
+                  <p className="text-white/60 text-sm font-medium">Send a load to see balance</p>
                 ) : (
                   <p className="text-white text-3xl font-black tracking-tight">
                     ₱{gbitsBalance!.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -46,6 +46,7 @@ export default function ELoadPage() {
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
   const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -69,18 +70,15 @@ export default function ELoadPage() {
         const nets = [...new Set(prods.map(p => p.network))]
         setNetworks(nets)
         if (nets.length > 0) setSelectedNetwork(nets[0])
+        if (data.balance != null) setWalletBalance(data.balance)
       })
       .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
 
-    // Load commission settings for e-load fee
-    const storeId = getStoreId()
-    if (storeId) {
-      fetch(`/api/commission-settings?storeId=${storeId}`)
-        .then(r => r.json())
-        .then(({ data }) => { if (data) setCommSettings(data) })
-        .catch(() => {})
-    }
+    fetch(`/api/commission-settings?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setCommSettings(data) })
+      .catch(() => {})
   }, [])
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
@@ -147,14 +145,16 @@ export default function ELoadPage() {
       const feeType = commSettings?.eloadFeeType || "flat"
       const feeValue = commSettings?.eloadFeeValue ?? 5
       const fee = feeType === "flat" ? feeValue : selectedProduct.amount * feeValue
-      const rate = feeType === "percentage" ? feeValue : feeValue / selectedProduct.amount
+      const rate = feeType === "percentage" ? feeValue : (selectedProduct.amount > 0 ? feeValue / selectedProduct.amount : 0)
       await fetch("/api/ewallet-transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          storeId, type: "load", provider: "gcash", amount: selectedProduct.amount,
+          storeId, type: "load", provider: "gcash",
+          amount: selectedProduct.amount,
           commission: fee, commissionRate: rate, profit: fee,
-          customerName: phone, customerNumber: phone, referenceNumber: refId, status: "completed",
+          customerName: `${selectedProduct.network} · ${selectedProduct.name}`,
+          customerNumber: phone, referenceNumber: refId, status: "completed",
         }),
       })
     } catch (e) {
@@ -202,7 +202,16 @@ export default function ELoadPage() {
             <p className="font-bold text-gray-800 text-lg">E-Load</p>
             <p className="text-[10px] text-gray-400">{storeName}</p>
           </div>
-          <div className="w-14" />
+          <div className="text-right">
+            {walletBalance != null ? (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1">
+                <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide">GBits Wallet</p>
+                <p className="text-sm font-black text-indigo-700">₱{walletBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+            ) : (
+              <div className="w-14" />
+            )}
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
@@ -447,6 +456,27 @@ export default function ELoadPage() {
                 <span className="text-sm text-gray-400">Product</span>
                 <span className="font-bold text-gray-800 text-right max-w-[60%] text-sm">{selectedProduct?.name}</span>
               </div>
+              {commSettings && selectedProduct && (() => {
+                const feeType = commSettings.eloadFeeType || "flat"
+                const feeValue = commSettings.eloadFeeValue ?? 5
+                const fee = feeType === "flat" ? feeValue : selectedProduct.amount * feeValue
+                return (
+                  <>
+                    <div className="border-t border-gray-100 pt-2 flex justify-between items-center">
+                      <span className="text-sm text-gray-400">Load Amount</span>
+                      <span className="font-bold text-gray-800">₱{selectedProduct.amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">Service Fee</span>
+                      <span className="font-bold text-green-600">+₱{fee.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-gray-100 pt-2">
+                      <span className="text-sm font-semibold text-gray-700">Total to Collect</span>
+                      <span className="font-black text-gray-900 text-base">₱{(selectedProduct.amount + fee).toFixed(2)}</span>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
 

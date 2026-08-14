@@ -81,9 +81,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ balance })
     }
 
-    const data = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`)
-    const products = mapSkus(data.content || [])
-    return NextResponse.json({ products })
+    const [skuData, balData] = await Promise.allSettled([
+      gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`),
+      gbitsGet(`/account/balance/${GBITS_BUSINESS_ID}`),
+    ])
+    const products = mapSkus(skuData.status === "fulfilled" ? skuData.value.content || [] : [])
+    const balance = balData.status === "fulfilled"
+      ? (balData.value.content?.balance ?? balData.value.content?.availableBalance ?? null)
+      : null
+    return NextResponse.json({ products, balance })
   } catch (error: any) {
     console.error("eload GET error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })

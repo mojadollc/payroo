@@ -120,10 +120,10 @@ export function TransactionHistory({
                       <Badge variant={t.type === "cashin" ? "default" : "outline"} className="capitalize">
                         {t.type}
                       </Badge>
-                      {t.type !== "load" && (
-                        <Badge variant="outline" className="uppercase">
-                          {t.provider}
-                        </Badge>
+                      {t.type === "load" ? (
+                        <Badge variant="outline" className="text-purple-600 border-purple-300">E-Load</Badge>
+                      ) : (
+                        <Badge variant="outline" className="uppercase">{t.provider}</Badge>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">{fmtDate(t.createdAt)}</p>
@@ -132,8 +132,8 @@ export function TransactionHistory({
                 <div className="flex items-start gap-2">
                   <div className="text-right">
                     <div className="font-bold text-lg">₱{t.amount.toFixed(2)}</div>
-                    <div className="text-xs text-secondary font-semibold">
-                      +₱{Math.abs(t.profit).toFixed(2)} commission
+                    <div className="text-xs text-green-600 font-semibold">
+                      +₱{Math.abs(t.profit).toFixed(2)} {t.type === "load" ? "service fee" : "commission"}
                     </div>
                   </div>
                   <Button
@@ -162,7 +162,9 @@ export function TransactionHistory({
               )}
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Ref: {t.referenceNumber}</span>
-                <span className="text-muted-foreground">Rate: {(t.commissionRate * 100).toFixed(2)}%</span>
+                {t.type !== "load" && (
+                  <span className="text-muted-foreground">Rate: {(t.commissionRate * 100).toFixed(2)}%</span>
+                )}
               </div>
             </div>
           )

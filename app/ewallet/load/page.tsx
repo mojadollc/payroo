@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
-  ChevronLeft, CheckCircle, XCircle, AlertTriangle,
+  ChevronLeft, ChevronRight, CheckCircle, XCircle, AlertTriangle,
   Loader2, Delete, RotateCcw,
 } from "lucide-react"
 import type { CommissionSettings } from "@/lib/types"
@@ -290,25 +290,30 @@ export default function ELoadPage() {
                   <p className="text-gray-400 text-sm">No products available</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="flex flex-col gap-3">
                   {filtered.map(p => (
                     <button
                       key={p.promoId}
                       onClick={() => handleBuy(p)}
-                      className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 active:scale-[0.97] transition-all text-left flex flex-col"
+                      className="bg-white rounded-2xl px-4 py-3.5 border border-gray-100 shadow-sm active:scale-[0.98] transition-all text-left flex items-center gap-3"
                     >
-                      <p className="text-xs font-bold text-gray-800 leading-tight flex-1">{p.name}</p>
-                      {p.description && (
-                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{p.description}</p>
-                      )}
-                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-50">
-                        <span className="text-base font-black" style={{ color: netColor }}>₱{p.amount}</span>
+                      {/* Amount badge */}
+                      <div className="shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: netColor + "18" }}>
+                        <span className="text-base font-black leading-none text-center" style={{ color: netColor }}>₱{p.amount}</span>
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-extrabold text-gray-900 leading-snug">{p.name}</p>
+                        {p.description && (
+                          <p className="text-xs text-gray-500 mt-0.5 leading-snug">{p.description}</p>
+                        )}
                         {p.validity && (
-                          <span className="text-[9px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-full">
+                          <span className="inline-block mt-1.5 text-[11px] font-semibold text-white px-2 py-0.5 rounded-full" style={{ backgroundColor: netColor }}>
                             {p.validity.replace("Valid for ", "")}
                           </span>
                         )}
                       </div>
+                      <ChevronRight className="shrink-0 h-5 w-5 text-gray-300" />
                     </button>
                   ))}
                 </div>

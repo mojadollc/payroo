@@ -30,7 +30,7 @@ const PRIMARY_TABS: NavItem[] = [
   { href: "/pos", label: "POS", icon: Store, feature: "pos" },
   { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
   { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
-  { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
+  { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
 ]
 
 // Grouped items (in "More" sheet)
@@ -38,6 +38,7 @@ const MORE_GROUPS: NavGroup[] = [
   {
     label: "Finance",
     items: [
+      { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
       { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
     ],

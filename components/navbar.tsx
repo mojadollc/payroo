@@ -49,7 +49,7 @@ interface NavGroup {
 const PRIMARY_NAV: NavItem[] = [
   { href: "/pos", label: "POS", icon: Store, feature: "pos" },
   { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
-  { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
+  { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
 ]
 
 // Grouped nav items (in dropdown menus)
@@ -60,6 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
       { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
+      { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
     ],
   },
   {

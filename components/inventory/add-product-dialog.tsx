@@ -29,7 +29,7 @@ function looksLikeFilePath(val: string) {
     val.includes("fakepath") ||
     val.includes("\\") ||
     /[A-Za-z]:\//.test(val) ||
-    (val.includes("/") && val.length > 40)
+    (val.startsWith("/") && !val.startsWith("/api/") && val.length > 40)
   )
 }
 
@@ -243,15 +243,17 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
         }),
       }
 
-      // Upload image as base64 if present
+      // Upload image to DO Spaces if present
       if (imageFile) {
-        const reader = new FileReader()
-        const base64 = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string)
-          reader.onerror = reject
-          reader.readAsDataURL(imageFile)
-        })
-        productData.imageUrl = base64
+        const productId = `prod_${Date.now()}`
+        const formData2 = new FormData()
+        formData2.append("file", imageFile)
+        formData2.append("productId", productId)
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData2 })
+        if (!uploadRes.ok) throw new Error("Image upload failed")
+        const { url } = await uploadRes.json()
+        productData.imageUrl = url
+        productData.id = productId
       }
 
       const res = await fetch("/api/products", {

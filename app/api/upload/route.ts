@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     if (!buffer.length) return NextResponse.json({ error: "Empty buffer" }, { status: 400 })
 
-    // Clean productId for filename
+    // Clean productId for filename — add timestamp so re-uploads bust the cache
     const safeId = productId.replace(/[^a-zA-Z0-9_-]/g, "_")
-    const filename = `${safeId}.jpg`
+    const filename = `${safeId}_${Date.now()}.jpg`
     const filePath = path.join(UPLOAD_DIR, filename)
 
     // Ensure directory exists

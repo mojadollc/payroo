@@ -262,18 +262,19 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
               <Label>Product Image</Label>
               <div className="flex gap-4">
                 <div
-                  className={`flex h-32 w-32 cursor-pointer items-center justify-center rounded-lg overflow-hidden transition-colors ${
+                  className={`flex h-32 w-32 cursor-pointer items-center justify-center rounded-lg overflow-hidden transition-colors bg-muted focus:outline-none ${
                     imagePreview
-                      ? "border-0"
+                      ? ""
                       : "border-2 border-dashed border-border hover:border-primary"
                   }`}
                   onClick={() => openFilePicker(fileInputRef)}
+                  tabIndex={-1}
                 >
                   {imagePreview ? (
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="h-full w-full object-cover rounded-lg outline-none"
+                      className="h-full w-full object-cover"
                     />
                   ) : (
                     <Camera className="h-8 w-8 text-muted-foreground" />

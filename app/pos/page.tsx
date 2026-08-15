@@ -10,7 +10,6 @@ import { Separator } from "@/components/ui/separator"
 import { BarcodeScanner } from "@/components/inventory/barcode-scanner"
 import { CheckoutDialog } from "@/components/pos/checkout-dialog"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
-import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { cacheProducts, getCachedProducts, isOnline } from "@/lib/offline-sync"
 import { localPutMany, localGetByStoreId } from "@/lib/offline/store"
@@ -901,11 +900,53 @@ export default function POSPage() {
       </div>
 
       {/* Floating Cart Button (Mobile) */}
-      <FloatingActionButton
-        icon={<ShoppingCart className="h-7 w-7" />}
-        onClick={() => setShowCartDrawer(true)}
-        badge={cart.reduce((s, i) => s + i.quantity, 0)}
-      />
+      <div className="fixed z-40 md:hidden bottom-20 right-4 flex flex-col items-center gap-1">
+        {/* Floating label */}
+        <div className="animate-bounce bg-yellow-400 text-gray-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap">
+          More Sales Today! 🎉
+        </div>
+        {/* Smiley cart button */}
+        <button
+          onClick={() => setShowCartDrawer(true)}
+          className="relative w-16 h-16 rounded-full bg-yellow-400 shadow-2xl shadow-yellow-400/50 active:scale-95 transition-transform flex items-center justify-center"
+          style={{ animation: "fabFloat 2.5s ease-in-out infinite" }}
+        >
+          {/* Ping ring */}
+          <span className="absolute inset-0 rounded-full bg-yellow-400 opacity-40 animate-ping" />
+          {/* Smiley cart SVG */}
+          <svg viewBox="0 0 64 64" className="w-10 h-10" fill="none">
+            {/* Cart body */}
+            <path d="M8 12h6l6 28h24l4-18H18" stroke="#1a1a1a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="#fff" />
+            <path d="M14 18h32l-4 18H20L14 18z" fill="#fde68a" stroke="#1a1a1a" strokeWidth="2" strokeLinejoin="round" />
+            {/* Wheels */}
+            <circle cx="24" cy="44" r="3.5" fill="#1a1a1a" />
+            <circle cx="38" cy="44" r="3.5" fill="#1a1a1a" />
+            {/* Smiley face on cart */}
+            {/* Left eye - blinking */}
+            <ellipse cx="27" cy="28" rx="2" ry="2" fill="#1a1a1a" style={{ animation: "blink 3s ease-in-out infinite" }} />
+            {/* Right eye - blinking */}
+            <ellipse cx="35" cy="28" rx="2" ry="2" fill="#1a1a1a" style={{ animation: "blink 3s ease-in-out infinite 0.15s" }} />
+            {/* Smile */}
+            <path d="M26 33 Q31 37 36 33" stroke="#1a1a1a" strokeWidth="2" strokeLinecap="round" fill="none" />
+          </svg>
+          {/* Badge */}
+          {cart.reduce((s, i) => s + i.quantity, 0) > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center border-2 border-background shadow">
+              {cart.reduce((s, i) => s + i.quantity, 0) > 99 ? "99+" : cart.reduce((s, i) => s + i.quantity, 0)}
+            </span>
+          )}
+        </button>
+        <style>{`
+          @keyframes fabFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+          }
+          @keyframes blink {
+            0%, 90%, 100% { transform: scaleY(1); }
+            95% { transform: scaleY(0.1); }
+          }
+        `}</style>
+      </div>
 
       {/* Cart Bottom Sheet (Mobile) */}
       <BottomSheet

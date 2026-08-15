@@ -30,7 +30,7 @@ function looksLikeFilePath(val: string) {
     val.includes("fakepath") ||
     val.includes("\\") ||
     /[A-Za-z]:\//.test(val) ||
-    (val.includes("/") && val.length > 40)
+    (val.startsWith("/") && !val.startsWith("/api/") && val.length > 40)
   )
 }
 
@@ -207,7 +207,7 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
       if (imageFile) {
         const formData2 = new FormData()
         formData2.append("file", imageFile)
-        formData2.append("productId", product.id)
+        formData2.append("productId", product.id || "")
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData2 })
         if (!uploadRes.ok) throw new Error("Image upload failed")
         const { url } = await uploadRes.json()

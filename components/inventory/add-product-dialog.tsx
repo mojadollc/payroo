@@ -137,7 +137,13 @@ export function AddProductDialog({ open, onOpenChange, categories, onSuccess }: 
 
     setImageUploading(true)
     try {
-      const cropped = await cropImageToSquare(file)
+      let cropped: File
+      try {
+        cropped = await cropImageToSquare(file)
+      } catch {
+        // cropImageToSquare failed — use raw file
+        cropped = file
+      }
       setImageFile(cropped)
       const reader = new FileReader()
       reader.onloadend = () => setImagePreview(reader.result as string)

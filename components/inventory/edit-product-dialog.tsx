@@ -116,7 +116,13 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
 
     setImageProcessing(true)
     try {
-      const cropped = await cropImageToSquare(file)
+      let cropped: File
+      try {
+        cropped = await cropImageToSquare(file)
+      } catch {
+        // cropImageToSquare failed (e.g. HEIC on some WebViews) — use raw file
+        cropped = file
+      }
       setImageFile(cropped)
       setRemoveImage(false)
       const reader = new FileReader()

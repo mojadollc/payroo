@@ -15,24 +15,33 @@ export async function POST(req: NextRequest) {
     let productId = (form.get("productId") as string | null)?.trim()
 
     if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 })
+    if (!file.size) return NextResponse.json({ error: "Empty file" }, { status: 400 })
 
-    // Guard against undefined/empty productId — generate a stable one
+    // Guard against undefined/empty productId
     if (!productId || productId === "undefined" || productId === "null") {
       productId = `prod_${randomUUID()}`
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
+    if (!buffer.length) return NextResponse.json({ error: "Empty buffer" }, { status: 400 })
+
     const safeId = productId.replace(/[^a-zA-Z0-9_-]/g, "_")
-    const dir = path.join(getUploadDir(), "products", safeId)
+    const uploadDir = getUploadDir()
+    const dir = path.join(uploadDir, "products", safeId)
 
-    if (!existsSync(dir)) await mkdir(dir, { recursive: true })
+    await mkdir(dir, { recursive: true })
 
-    // Timestamp in filename busts browser cache on re-upload
     const filename = `main_${Date.now()}.jpg`
-    await writeFile(path.join(dir, filename), buffer)
+    const filePath = path.join(dir, filename)
+    await writeFile(filePath, buffer)
 
-    // Relative URL — works on any host/port/domain
+    // Verify file was actually written
+    if (!existsSync(filePath)) {
+      return NextResponse.json({ error: "File write failed" }, { status: 500 })
+    }
+
     const url = `/api/image/products/${safeId}/${filename}`
+    console.log(`[upload] saved ${buffer.length} bytes → ${filePath} → ${url}`)
     return NextResponse.json({ url, productId: safeId })
   } catch (err: any) {
     console.error("[upload] error:", err.message)

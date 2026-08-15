@@ -139,50 +139,50 @@ export default function POSPage() {
     return shuffled
   }
 
-  // Load products on mount — fetch from Postgres API
+  // Load products on mount — always fetch fresh from DB first, cache is display-only
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
 
-    // Show cached products immediately
+    // Show cached products for instant display ONLY — never use for stock decisions
     const cached = getCachedProducts()
     if (cached.length > 0) {
-      setProducts(cached as Product[])
       setShuffledProducts(shuffleArray(cached as Product[]))
-      productsRef.current = cached as Product[]
-    } else {
-      localGetByStoreId<Product>("products").then(idbProducts => {
-        if (idbProducts.length > 0) {
-          setProducts(idbProducts)
-          setShuffledProducts(shuffleArray(idbProducts))
-          productsRef.current = idbProducts
-        }
-      }).catch(() => {})
+      // Do NOT set products state from cache — search and stock must use fresh DB data
     }
 
+    // Always fetch fresh from DB immediately
     fetch(`/api/products?storeId=${storeId}`)
       .then(r => r.json())
       .then(({ data }) => {
         if (!data?.length) return
         setProducts(data)
-        setShuffledProducts(prev => {
-          if (prev.length === 0) return shuffleArray(data)
-          const map = new Map(data.map((p: Product) => [p.id, p]))
-          const kept = prev.map(p => map.get(p.id)).filter((p): p is Product => !!p)
-          const existingIds = new Set(kept.map(p => p.id))
-          const added = data.filter((p: Product) => !existingIds.has(p.id))
-          return [...kept, ...added]
-        })
+        setShuffledProducts(shuffleArray(data))
         productsRef.current = data
+        freshLoadedRef.current = true
         cacheProducts(data)
         localPutMany("products", data.map((d: Product) => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
       })
-      .catch(() => {})
+      .catch(() => {
+        // Only fall back to cache if API completely fails
+        if (cached.length > 0) {
+          setProducts(cached as Product[])
+          productsRef.current = cached as Product[]
+        } else {
+          localGetByStoreId<Product>("products").then(idbProducts => {
+            if (idbProducts.length > 0) {
+              setProducts(idbProducts)
+              productsRef.current = idbProducts
+            }
+          }).catch(() => {})
+        }
+      })
   }, [])
 
-  // Auto-sync cart stock when products update in real-time
+  // Sync cart stock ONLY after fresh DB data loads (productsRef is set)
+  const freshLoadedRef = useRef(false)
   useEffect(() => {
-    if (products.length === 0 || cart.length === 0) return
+    if (!freshLoadedRef.current || products.length === 0 || cart.length === 0) return
     let changed = false
     const updated = cart.reduce<CartItem[]>((acc, item) => {
       const liveProduct = products.find(p => p.id === item.id)
@@ -266,84 +266,39 @@ export default function POSPage() {
 
   const handleInputChange = (value: string) => {
     setBarcodeInput(value)
-    if (value.trim().length >= 2) {
-      const q = value.toLowerCase()
-      
-      // Enhanced search with related products and fuzzy matching
-      const matches = products.filter(p => {
-        const name = p.name.toLowerCase()
-        const barcode = p.barcode.toLowerCase()
-        const category = p.category.toLowerCase()
-        const description = (p.description || '').toLowerCase()
-        
-        return name.includes(q) || barcode.includes(q) || category.includes(q) || description.includes(q)
+    const q = value.trim().toLowerCase()
+    if (!q) { setSearchSuggestions([]); return }
+
+    // Always use fresh DB data — products state is only set from API, never from stale cache
+    const pool = products.length > 0 ? products : productsRef.current
+    if (pool.length === 0) { setSearchSuggestions([]); return }
+
+    const words = q.split(/\s+/).filter(Boolean)
+
+    const results = pool
+      .map(p => {
+        const name = (p.name || "").toLowerCase()
+        const barcode = (p.barcode || "").toLowerCase()
+        const category = (p.category || "").toLowerCase()
+        const desc = (p.description || "").toLowerCase()
+        const unit = (p.unit || "").toLowerCase()
+        const haystack = `${name} ${barcode} ${category} ${desc} ${unit}`
+
+        if (barcode === q)                                    return { p, score: 100 }
+        if (name === q)                                       return { p, score: 90 }
+        if (name.startsWith(q))                              return { p, score: 80 }
+        if (barcode.startsWith(q))                           return { p, score: 75 }
+        if (category === q)                                   return { p, score: 70 }
+        if (haystack.includes(q))                            return { p, score: 60 }
+        if (words.every(w => haystack.includes(w)))          return { p, score: 50 }
+        const hits = words.filter(w => haystack.includes(w)).length
+        if (hits > 0)                                        return { p, score: hits * 10 }
+        return null
       })
-      
-      // Find related products by keywords
-      const relatedMatches = products.filter(p => {
-        const name = p.name.toLowerCase()
-        const category = p.category.toLowerCase()
-        
-        // Skip if already in main matches
-        if (matches.some(m => m.id === p.id)) return false
-        
-        // Related product logic based on search term
-        const searchWords = q.split(' ').filter(word => word.length > 2)
-        
-        return searchWords.some(word => {
-          // Find products with similar keywords
-          if (word === 'ice' && (name.includes('cold') || name.includes('frozen') || name.includes('drink') || category.includes('beverage'))) return true
-          if (word === 'juice' && (name.includes('drink') || name.includes('beverage') || category.includes('drink'))) return true
-          if (word === 'water' && (name.includes('drink') || name.includes('beverage') || name.includes('liquid'))) return true
-          if (word === 'milk' && (name.includes('dairy') || category.includes('dairy') || name.includes('cream'))) return true
-          if (word === 'bread' && (name.includes('loaf') || category.includes('bakery') || name.includes('bun'))) return true
-          if (word === 'rice' && (name.includes('grain') || category.includes('grain') || name.includes('bigas'))) return true
-          if (word === 'soap' && (name.includes('detergent') || category.includes('cleaning') || name.includes('wash'))) return true
-          if (word === 'candy' && (name.includes('sweet') || category.includes('snack') || name.includes('chocolate'))) return true
-          if (word === 'noodle' && (name.includes('pasta') || name.includes('instant') || category.includes('noodle'))) return true
-          if (word === 'coffee' && (name.includes('caffeine') || name.includes('instant') || category.includes('beverage'))) return true
-          
-          return false
-        })
-      })
-      
-      // Combine main matches with related matches
-      const allMatches = [...matches, ...relatedMatches]
-      
-      // Sort by relevance: exact matches first, then starts-with, then contains, then related
-      const sortedMatches = allMatches.sort((a, b) => {
-        const aName = a.name.toLowerCase()
-        const bName = b.name.toLowerCase()
-        const aIsMainMatch = matches.some(m => m.id === a.id)
-        const bIsMainMatch = matches.some(m => m.id === b.id)
-        
-        // Main matches always come before related matches
-        if (aIsMainMatch && !bIsMainMatch) return -1
-        if (bIsMainMatch && !aIsMainMatch) return 1
-        
-        // Within main matches, prioritize by relevance
-        if (aIsMainMatch && bIsMainMatch) {
-          // Exact name match gets highest priority
-          if (aName === q) return -1
-          if (bName === q) return 1
-          
-          // Name starts with query gets second priority
-          if (aName.startsWith(q) && !bName.startsWith(q)) return -1
-          if (bName.startsWith(q) && !aName.startsWith(q)) return 1
-          
-          // Barcode exact match gets third priority
-          if (a.barcode === q) return -1
-          if (b.barcode === q) return 1
-        }
-        
-        // Alphabetical order for remaining matches
-        return aName.localeCompare(bName)
-      })
-      
-      setSearchSuggestions(sortedMatches.slice(0, 12)) // Increased to 12 to show more related products
-    } else {
-      setSearchSuggestions([])
-    }
+      .filter((x): x is { p: Product; score: number } => x !== null)
+      .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+
+    setSearchSuggestions(results.slice(0, 20).map(x => x.p))
   }
 
   const handleBarcodeSubmit = async (barcode: string) => {

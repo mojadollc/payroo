@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Camera, Barcode, Tag, Plus, X } from "lucide-react"
+import { Camera, Barcode, Tag, Plus, X, Shuffle } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -149,6 +149,13 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
     setShowScanner(false)
   }
 
+  const generateBarcode = () => {
+    const code = Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join("")
+    const digits = code.split("").map(Number)
+    const check = (10 - (digits.reduce((s, d, i) => s + d * (i % 2 === 0 ? 1 : 3), 0) % 10)) % 10
+    setFormData(prev => ({ ...prev, barcode: code + check }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (looksLikeFilePath(formData.barcode)) {
@@ -196,14 +203,15 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
         }),
       }
 
-      // Image: store as base64 or remove
+      // Image: upload to DO Spaces or remove
       if (imageFile) {
-        const reader = new FileReader()
-        updates.imageUrl = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string)
-          reader.onerror = reject
-          reader.readAsDataURL(imageFile)
-        })
+        const formData2 = new FormData()
+        formData2.append("file", imageFile)
+        formData2.append("productId", product.id)
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData2 })
+        if (!uploadRes.ok) throw new Error("Image upload failed")
+        const { url } = await uploadRes.json()
+        updates.imageUrl = url
       } else if (removeImage) {
         updates.imageUrl = null
       }
@@ -339,6 +347,9 @@ export function EditProductDialog({ product, categories, open, onOpenChange, onS
                     required
                     autoComplete="off"
                   />
+                  <Button type="button" variant="outline" size="icon" title="Generate random barcode" onClick={generateBarcode}>
+                    <Shuffle className="h-4 w-4 text-violet-500" />
+                  </Button>
                   <Button type="button" variant="outline" size="icon" onClick={() => setShowScanner(true)}>
                     <Barcode className="h-4 w-4" />
                   </Button>

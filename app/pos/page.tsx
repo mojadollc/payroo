@@ -266,38 +266,84 @@ export default function POSPage() {
 
   const handleInputChange = (value: string) => {
     setBarcodeInput(value)
-    const q = value.trim().toLowerCase()
-    if (q.length === 0) { setSearchSuggestions([]); return }
-
-    // Use products state (always current) with productsRef as fallback
-    const pool = products.length > 0 ? products : productsRef.current
-    const words = q.split(/\s+/).filter(Boolean)
-
-    const scored = pool
-      .map(p => {
+    if (value.trim().length >= 2) {
+      const q = value.toLowerCase()
+      
+      // Enhanced search with related products and fuzzy matching
+      const matches = products.filter(p => {
         const name = p.name.toLowerCase()
-        const barcode = (p.barcode || "").toLowerCase()
-        const category = (p.category || "").toLowerCase()
-        const desc = (p.description || "").toLowerCase()
-        const unit = (p.unit || "").toLowerCase()
-        const sku = (p.sku || "").toLowerCase()
-        const haystack = `${name} ${barcode} ${category} ${desc} ${unit} ${sku}`
-
-        if (barcode === q)           return { p, score: 100 }
-        if (name === q)              return { p, score: 90 }
-        if (name.startsWith(q))     return { p, score: 80 }
-        if (barcode.startsWith(q))  return { p, score: 75 }
-        if (category === q)         return { p, score: 70 }
-        if (haystack.includes(q))   return { p, score: 60 }
-        if (words.every(w => haystack.includes(w))) return { p, score: 50 }
-        const hits = words.filter(w => haystack.includes(w)).length
-        if (hits > 0)               return { p, score: hits * 10 }
-        return null
+        const barcode = p.barcode.toLowerCase()
+        const category = p.category.toLowerCase()
+        const description = (p.description || '').toLowerCase()
+        
+        return name.includes(q) || barcode.includes(q) || category.includes(q) || description.includes(q)
       })
-      .filter((x): x is { p: Product; score: number } => x !== null)
-      .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
-
-    setSearchSuggestions(scored.slice(0, 20).map(x => x.p))
+      
+      // Find related products by keywords
+      const relatedMatches = products.filter(p => {
+        const name = p.name.toLowerCase()
+        const category = p.category.toLowerCase()
+        
+        // Skip if already in main matches
+        if (matches.some(m => m.id === p.id)) return false
+        
+        // Related product logic based on search term
+        const searchWords = q.split(' ').filter(word => word.length > 2)
+        
+        return searchWords.some(word => {
+          // Find products with similar keywords
+          if (word === 'ice' && (name.includes('cold') || name.includes('frozen') || name.includes('drink') || category.includes('beverage'))) return true
+          if (word === 'juice' && (name.includes('drink') || name.includes('beverage') || category.includes('drink'))) return true
+          if (word === 'water' && (name.includes('drink') || name.includes('beverage') || name.includes('liquid'))) return true
+          if (word === 'milk' && (name.includes('dairy') || category.includes('dairy') || name.includes('cream'))) return true
+          if (word === 'bread' && (name.includes('loaf') || category.includes('bakery') || name.includes('bun'))) return true
+          if (word === 'rice' && (name.includes('grain') || category.includes('grain') || name.includes('bigas'))) return true
+          if (word === 'soap' && (name.includes('detergent') || category.includes('cleaning') || name.includes('wash'))) return true
+          if (word === 'candy' && (name.includes('sweet') || category.includes('snack') || name.includes('chocolate'))) return true
+          if (word === 'noodle' && (name.includes('pasta') || name.includes('instant') || category.includes('noodle'))) return true
+          if (word === 'coffee' && (name.includes('caffeine') || name.includes('instant') || category.includes('beverage'))) return true
+          
+          return false
+        })
+      })
+      
+      // Combine main matches with related matches
+      const allMatches = [...matches, ...relatedMatches]
+      
+      // Sort by relevance: exact matches first, then starts-with, then contains, then related
+      const sortedMatches = allMatches.sort((a, b) => {
+        const aName = a.name.toLowerCase()
+        const bName = b.name.toLowerCase()
+        const aIsMainMatch = matches.some(m => m.id === a.id)
+        const bIsMainMatch = matches.some(m => m.id === b.id)
+        
+        // Main matches always come before related matches
+        if (aIsMainMatch && !bIsMainMatch) return -1
+        if (bIsMainMatch && !aIsMainMatch) return 1
+        
+        // Within main matches, prioritize by relevance
+        if (aIsMainMatch && bIsMainMatch) {
+          // Exact name match gets highest priority
+          if (aName === q) return -1
+          if (bName === q) return 1
+          
+          // Name starts with query gets second priority
+          if (aName.startsWith(q) && !bName.startsWith(q)) return -1
+          if (bName.startsWith(q) && !aName.startsWith(q)) return 1
+          
+          // Barcode exact match gets third priority
+          if (a.barcode === q) return -1
+          if (b.barcode === q) return 1
+        }
+        
+        // Alphabetical order for remaining matches
+        return aName.localeCompare(bName)
+      })
+      
+      setSearchSuggestions(sortedMatches.slice(0, 12)) // Increased to 12 to show more related products
+    } else {
+      setSearchSuggestions([])
+    }
   }
 
   const handleBarcodeSubmit = async (barcode: string) => {
@@ -514,7 +560,7 @@ export default function POSPage() {
               onChange={(e) => handleInputChange(e.target.value)}
               className="pl-10 h-11 text-base rounded-xl border-2 border-yellow-300 bg-white focus:border-yellow-400"
               autoFocus
-              onBlur={() => setTimeout(() => setSearchSuggestions([]), 300)}
+              onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
             />
             {searchSuggestions.length > 0 && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border-2 border-yellow-400 rounded-2xl shadow-2xl max-h-[68vh] overflow-y-auto">
@@ -691,7 +737,7 @@ export default function POSPage() {
                           onChange={(e) => handleInputChange(e.target.value)}
                           className="w-full"
                           autoFocus
-                          onBlur={() => setTimeout(() => setSearchSuggestions([]), 300)}
+                          onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
                         />
                         {searchSuggestions.length > 0 && (
                           <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-64 overflow-y-auto">

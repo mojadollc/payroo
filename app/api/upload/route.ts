@@ -7,9 +7,6 @@ function getUploadDir() {
   return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads")
 }
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData()
@@ -21,17 +18,17 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    // Sanitise productId so it can't escape the directory
     const safeId = productId.replace(/[^a-zA-Z0-9_-]/g, "_")
     const dir = path.join(getUploadDir(), "products", safeId)
 
     if (!existsSync(dir)) await mkdir(dir, { recursive: true })
 
-    const filename = "main.jpg"
+    // Add timestamp to bust cache on re-upload
+    const filename = `main_${Date.now()}.jpg`
     await writeFile(path.join(dir, filename), buffer)
 
-    // Return the URL that the /api/image route will serve
-    const url = `${BASE_URL}/api/image/products/${safeId}/${filename}`
+    // Store relative URL — works on any host/port/domain
+    const url = `/api/image/products/${safeId}/${filename}`
     return NextResponse.json({ url })
   } catch (err: any) {
     console.error("[upload] error:", err.message)

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
+import { normaliseImageUrl } from "@/lib/image-url"
+
+// Strip absolute origin from stored imageUrls so they work on any host
+function fixProduct(p: any) {
+  if (p?.imageUrl) p.imageUrl = normaliseImageUrl(p.imageUrl)
+  return p
+}
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams
@@ -9,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   if (barcode) {
     const item = await prisma.product.findFirst({ where: { storeId, barcode } })
-    return NextResponse.json({ data: item })
+    return NextResponse.json({ data: fixProduct(item) })
   }
 
   const search = p.get("search")?.trim() || ""
@@ -29,7 +36,7 @@ export async function GET(req: NextRequest) {
   // No pagination param = return ALL products (POS, offline cache, etc.)
   if (!hasPagination) {
     const items = await prisma.product.findMany({ where, orderBy: { name: "asc" } })
-    return NextResponse.json({ data: items })
+    return NextResponse.json({ data: items.map(fixProduct) })
   }
 
   // Run page items + stats in one round-trip
@@ -73,7 +80,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    data: items,
+    data: items.map(fixProduct),
     total,
     page,
     totalPages: Math.ceil(total / limit),
@@ -90,7 +97,7 @@ export async function POST(req: NextRequest) {
       update: { name, price, cost, stock, category, barcode, imageUrl, description, unit, onSale, salePrice, sku, weight, dimensions, shippingClass, variants },
       create: { id, storeId, name, price, cost: cost ?? 0, stock: stock ?? 0, category: category ?? "", barcode: barcode ?? "", imageUrl, description, unit, onSale: onSale ?? false, salePrice, sku, weight, dimensions, shippingClass, variants },
     })
-    return NextResponse.json({ data: item })
+    return NextResponse.json({ data: fixProduct(item) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
@@ -101,7 +108,7 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const { id, ...data } = body
     const item = await prisma.product.update({ where: { id }, data })
-    return NextResponse.json({ data: item })
+    return NextResponse.json({ data: fixProduct(item) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

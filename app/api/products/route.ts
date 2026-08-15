@@ -14,8 +14,9 @@ export async function GET(req: NextRequest) {
 
   const search = p.get("search")?.trim() || ""
   const filter = p.get("filter") || "all"
+  const hasPagination = p.has("page")
   const page = Math.max(1, parseInt(p.get("page") || "1"))
-  const limit = Math.min(100, Math.max(1, parseInt(p.get("limit") || "20")))
+  const limit = Math.min(500, Math.max(1, parseInt(p.get("limit") || "20")))
 
   const where: any = { storeId }
   if (search) where.OR = [
@@ -24,6 +25,12 @@ export async function GET(req: NextRequest) {
   ]
   if (filter === "low-stock") where.stock = { gt: 0, lte: 5 }
   else if (filter === "out-of-stock") where.stock = 0
+
+  // No pagination param = return ALL products (POS, offline cache, etc.)
+  if (!hasPagination) {
+    const items = await prisma.product.findMany({ where, orderBy: { name: "asc" } })
+    return NextResponse.json({ data: items })
+  }
 
   // Run page items + stats in one round-trip
   const [total, items, stats] = await Promise.all([

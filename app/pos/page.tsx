@@ -160,7 +160,7 @@ export default function POSPage() {
       }).catch(() => {})
     }
 
-    fetch(`/api/products?storeId=${storeId}&limit=1000`)
+    fetch(`/api/products?storeId=${storeId}`)
       .then(r => r.json())
       .then(({ data }) => {
         if (!data?.length) return
@@ -246,7 +246,7 @@ export default function POSPage() {
     try {
       const storeId = getStoreId()
       if (!storeId) return
-      const res = await fetch(`/api/products?storeId=${storeId}&limit=1000`)
+      const res = await fetch(`/api/products?storeId=${storeId}`)
       const { data } = await res.json()
       if (data?.length > 0) {
         setProducts(data)

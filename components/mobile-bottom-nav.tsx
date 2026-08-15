@@ -31,6 +31,7 @@ const PRIMARY_TABS: NavItem[] = [
   { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
   { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
   { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
+  { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
 ]
 
 // Grouped items (in "More" sheet)
@@ -38,7 +39,6 @@ const MORE_GROUPS: NavGroup[] = [
   {
     label: "Finance",
     items: [
-      { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
     ],
   },
@@ -114,7 +114,7 @@ export function MobileBottomNav() {
                 }`}
               >
                 <Icon className="h-5 w-5" />
-                <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+                <span className="text-[9px] font-medium leading-tight">{item.label}</span>
               </Link>
             )
           })}
@@ -126,7 +126,7 @@ export function MobileBottomNav() {
               }`}
             >
               <MoreHorizontal className="h-5 w-5" />
-              <span className="text-[10px] font-medium leading-tight">More</span>
+              <span className="text-[9px] font-medium leading-tight">More</span>
             </button>
           )}
         </div>

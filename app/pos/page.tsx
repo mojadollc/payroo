@@ -269,39 +269,35 @@ export default function POSPage() {
     const q = value.trim().toLowerCase()
     if (q.length === 0) { setSearchSuggestions([]); return }
 
+    // Use products state (always current) with productsRef as fallback
+    const pool = products.length > 0 ? products : productsRef.current
     const words = q.split(/\s+/).filter(Boolean)
 
-    const scored = productsRef.current
+    const scored = pool
       .map(p => {
         const name = p.name.toLowerCase()
-        const barcode = p.barcode.toLowerCase()
+        const barcode = (p.barcode || "").toLowerCase()
         const category = (p.category || "").toLowerCase()
         const desc = (p.description || "").toLowerCase()
         const unit = (p.unit || "").toLowerCase()
-        const haystack = `${name} ${barcode} ${category} ${desc} ${unit}`
+        const sku = (p.sku || "").toLowerCase()
+        const haystack = `${name} ${barcode} ${category} ${desc} ${unit} ${sku}`
 
-        // Exact barcode match — highest priority
-        if (barcode === q) return { p, score: 100 }
-        // Exact name match
-        if (name === q) return { p, score: 90 }
-        // Name starts with query
-        if (name.startsWith(q)) return { p, score: 80 }
-        // Barcode starts with query
-        if (barcode.startsWith(q)) return { p, score: 75 }
-        // Full query contained anywhere
-        if (haystack.includes(q)) return { p, score: 60 }
-        // All words present somewhere in haystack
+        if (barcode === q)           return { p, score: 100 }
+        if (name === q)              return { p, score: 90 }
+        if (name.startsWith(q))     return { p, score: 80 }
+        if (barcode.startsWith(q))  return { p, score: 75 }
+        if (category === q)         return { p, score: 70 }
+        if (haystack.includes(q))   return { p, score: 60 }
         if (words.every(w => haystack.includes(w))) return { p, score: 50 }
-        // At least one word matches
-        const matchCount = words.filter(w => haystack.includes(w)).length
-        if (matchCount > 0) return { p, score: 10 * matchCount }
-
+        const hits = words.filter(w => haystack.includes(w)).length
+        if (hits > 0)               return { p, score: hits * 10 }
         return null
       })
       .filter((x): x is { p: Product; score: number } => x !== null)
       .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
 
-    setSearchSuggestions(scored.slice(0, 15).map(x => x.p))
+    setSearchSuggestions(scored.slice(0, 20).map(x => x.p))
   }
 
   const handleBarcodeSubmit = async (barcode: string) => {
@@ -518,7 +514,7 @@ export default function POSPage() {
               onChange={(e) => handleInputChange(e.target.value)}
               className="pl-10 h-11 text-base rounded-xl border-2 border-yellow-300 bg-white focus:border-yellow-400"
               autoFocus
-              onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
+              onBlur={() => setTimeout(() => setSearchSuggestions([]), 300)}
             />
             {searchSuggestions.length > 0 && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border-2 border-yellow-400 rounded-2xl shadow-2xl max-h-[68vh] overflow-y-auto">
@@ -695,7 +691,7 @@ export default function POSPage() {
                           onChange={(e) => handleInputChange(e.target.value)}
                           className="w-full"
                           autoFocus
-                          onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
+                          onBlur={() => setTimeout(() => setSearchSuggestions([]), 300)}
                         />
                         {searchSuggestions.length > 0 && (
                           <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-64 overflow-y-auto">

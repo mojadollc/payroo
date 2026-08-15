@@ -40,7 +40,6 @@ const MORE_GROUPS: NavGroup[] = [
     items: [
       { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
-      { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
     ],
   },
   {

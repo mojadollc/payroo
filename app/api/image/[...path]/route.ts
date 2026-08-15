@@ -5,7 +5,6 @@ import path from "path"
 
 const UPLOAD_DIR = "/var/www/pntos.payroo.xyz/inventory/products/images"
 
-// 1x1 transparent PNG — shown instead of broken image icon when file missing
 const PLACEHOLDER = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
   "base64"
@@ -13,16 +12,18 @@ const PLACEHOLDER = Buffer.from(
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const filePath = path.join(UPLOAD_DIR, ...params.path)
+    const { path: segments } = await params
+    const filePath = path.join(UPLOAD_DIR, ...segments)
 
     if (!filePath.startsWith(UPLOAD_DIR)) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 
     if (!existsSync(filePath)) {
+      console.log(`[image] file not found: ${filePath}`)
       return new NextResponse(PLACEHOLDER, {
         headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
       })
@@ -42,7 +43,8 @@ export async function GET(
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     })
-  } catch {
+  } catch (err: any) {
+    console.error(`[image] error:`, err.message)
     return new NextResponse(PLACEHOLDER, {
       headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
     })

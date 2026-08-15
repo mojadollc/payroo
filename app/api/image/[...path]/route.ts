@@ -7,6 +7,12 @@ function getUploadDir() {
   return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads")
 }
 
+// 1x1 transparent PNG — shown instead of broken image icon when file missing
+const PLACEHOLDER = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64"
+)
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { path: string[] } }
@@ -15,13 +21,15 @@ export async function GET(
     const filePath = path.join(getUploadDir(), ...params.path)
     const uploadDir = getUploadDir()
 
-    // Prevent path traversal
     if (!filePath.startsWith(uploadDir)) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 
     if (!existsSync(filePath)) {
-      return new NextResponse("Not found", { status: 404 })
+      // Return transparent placeholder instead of broken image icon
+      return new NextResponse(PLACEHOLDER, {
+        headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
+      })
     }
 
     const buffer = await readFile(filePath)
@@ -38,7 +46,9 @@ export async function GET(
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     })
-  } catch (err: any) {
-    return new NextResponse("Error", { status: 500 })
+  } catch {
+    return new NextResponse(PLACEHOLDER, {
+      headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
+    })
   }
 }

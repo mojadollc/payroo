@@ -117,6 +117,14 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 })
-  await prisma.product.delete({ where: { id } })
-  return NextResponse.json({ success: true })
+  try {
+    // Delete related records first to avoid foreign key constraint errors
+    await prisma.inventoryTransaction.deleteMany({ where: { productId: id } }).catch(() => {})
+    await prisma.saleItem.deleteMany({ where: { productId: id } }).catch(() => {})
+    await prisma.product.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    console.error("[delete product] error:", err.message)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
 }

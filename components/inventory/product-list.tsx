@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import { Edit, Trash2, AlertTriangle, PackagePlus, History } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,6 +28,19 @@ interface ProductListProps {
   categories: Category[]
   onUpdate: () => void
   isLoading: boolean
+}
+
+function ProductImage({ url, name }: { url?: string | null; name: string }) {
+  const [errored, setErrored] = useState(false)
+  if (!url || errored) return <DefaultProductImage />
+  return (
+    <img
+      src={url}
+      alt={name}
+      className="h-full w-full object-cover"
+      onError={() => setErrored(true)}
+    />
+  )
 }
 
 export function ProductList({ products, categories, onUpdate, isLoading }: ProductListProps) {
@@ -87,17 +99,7 @@ export function ProductList({ products, categories, onUpdate, isLoading }: Produ
         {products.map((product) => (
           <Card key={product.id} className="overflow-hidden">
             <div className="relative h-48 bg-muted">
-              {product.imageUrl ? (
-                <Image
-                  src={product.imageUrl || "/placeholder.svg"}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                />
-              ) : (
-                <DefaultProductImage />
-              )}
+<ProductImage url={product.imageUrl} name={product.name} />
               {product.stock <= 10 && (
                 <Badge variant="destructive" className="absolute top-2 right-2">
                   Low Stock

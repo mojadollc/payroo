@@ -534,8 +534,12 @@ export default function POSPage() {
                       {/* Name + stock badge */}
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <p className="text-[16px] font-bold text-gray-900 leading-snug flex-1">{p.name}</p>
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${
-                          outOfStock ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"
+                        <span className={`text-[12px] font-extrabold px-2.5 py-1 rounded-full shrink-0 mt-0.5 ${
+                          outOfStock
+                            ? "bg-red-500 text-white"
+                            : p.stock <= 5
+                            ? "bg-orange-500 text-white"
+                            : "bg-emerald-500 text-white"
                         }`}>
                           {outOfStock ? "Out of stock" : `${p.stock} left`}
                         </span>
@@ -702,7 +706,13 @@ export default function POSPage() {
                                 <div key={p.id} className="flex items-center gap-2 px-3 py-2 border-b last:border-b-0 hover:bg-muted">
                                   <div className="flex-1 min-w-0">
                                     <div className="font-medium text-sm truncate">{p.name}</div>
-                                    <div className="text-xs text-muted-foreground">₱{effectivePrice(p).toFixed(2)} • Stock: {p.stock}{p.onSale && p.salePrice && <span className="ml-1 text-orange-500 font-medium">SALE</span>}</div>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="text-xs text-muted-foreground">₱{effectivePrice(p).toFixed(2)}</span>
+                                      <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                                        p.stock <= 0 ? "bg-red-500 text-white" : p.stock <= 5 ? "bg-orange-500 text-white" : "bg-emerald-500 text-white"
+                                      }`}>{p.stock <= 0 ? "Out of stock" : `${p.stock} left`}</span>
+                                      {p.onSale && p.salePrice && <span className="text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded-full">SALE</span>}
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-1 flex-shrink-0">
                                     <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>

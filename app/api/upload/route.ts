@@ -4,9 +4,7 @@ import { existsSync } from "fs"
 import path from "path"
 import { randomUUID } from "crypto"
 
-function getUploadDir() {
-  return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads")
-}
+const UPLOAD_DIR = "/var/www/pntos.payroo.xyz/inventory/products/images"
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +15,6 @@ export async function POST(req: NextRequest) {
     if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 })
     if (!file.size) return NextResponse.json({ error: "Empty file" }, { status: 400 })
 
-    // Guard against undefined/empty productId
     if (!productId || productId === "undefined" || productId === "null") {
       productId = `prod_${randomUUID()}`
     }
@@ -25,23 +22,27 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     if (!buffer.length) return NextResponse.json({ error: "Empty buffer" }, { status: 400 })
 
+    // Clean productId for filename
     const safeId = productId.replace(/[^a-zA-Z0-9_-]/g, "_")
-    const uploadDir = getUploadDir()
-    const dir = path.join(uploadDir, "products", safeId)
+    const filename = `${safeId}.jpg`
+    const filePath = path.join(UPLOAD_DIR, filename)
 
-    await mkdir(dir, { recursive: true })
+    // Ensure directory exists
+    await mkdir(UPLOAD_DIR, { recursive: true })
 
-    const filename = `main_${Date.now()}.jpg`
-    const filePath = path.join(dir, filename)
+    // Write file
     await writeFile(filePath, buffer)
 
-    // Verify file was actually written
+    // Verify file was written
     if (!existsSync(filePath)) {
       return NextResponse.json({ error: "File write failed" }, { status: 500 })
     }
 
-    const url = `/api/image/products/${safeId}/${filename}`
-    console.log(`[upload] saved ${buffer.length} bytes → ${filePath} → ${url}`)
+    // Public URL path (served by /api/image/...)
+    const url = `/api/image/${filename}`
+
+    console.log(`[upload] saved ${buffer.length} bytes → ${filePath}`)
+
     return NextResponse.json({ url, productId: safeId })
   } catch (err: any) {
     console.error("[upload] error:", err.message)

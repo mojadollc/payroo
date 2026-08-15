@@ -1,6 +1,6 @@
 /**
  * Crop an image file to a centered square and compress as JPEG.
- * Uses FileReader instead of createObjectURL for better mobile WebView compatibility.
+ * Like Shopee - clean square thumbnail with white background.
  */
 export function cropImageToSquare(file: File, size = 600): Promise<File> {
   return new Promise((resolve, reject) => {
@@ -27,11 +27,15 @@ export function cropImageToSquare(file: File, size = 600): Promise<File> {
           const ctx = canvas.getContext("2d")
           if (!ctx) return reject(new Error("Canvas not supported"))
 
+          // White background like Shopee
+          ctx.fillStyle = "#ffffff"
+          ctx.fillRect(0, 0, size, size)
+
+          // Center crop
           const sx = (img.width - min) / 2
           const sy = (img.height - min) / 2
 
-          ctx.fillStyle = "#ffffff"
-          ctx.fillRect(0, 0, size, size)
+          // Draw image centered and scaled
           ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
 
           canvas.toBlob(
@@ -40,7 +44,7 @@ export function cropImageToSquare(file: File, size = 600): Promise<File> {
               resolve(new File([blob], `product-${Date.now()}.jpg`, { type: "image/jpeg" }))
             },
             "image/jpeg",
-            0.85
+            0.9 // Better quality like Shopee
           )
         } catch (e) {
           reject(e)

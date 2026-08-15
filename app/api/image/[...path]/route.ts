@@ -3,9 +3,7 @@ import { readFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 
-function getUploadDir() {
-  return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads")
-}
+const UPLOAD_DIR = "/var/www/pntos.payroo.xyz/inventory/products/images"
 
 // 1x1 transparent PNG — shown instead of broken image icon when file missing
 const PLACEHOLDER = Buffer.from(
@@ -18,15 +16,13 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const filePath = path.join(getUploadDir(), ...params.path)
-    const uploadDir = getUploadDir()
+    const filePath = path.join(UPLOAD_DIR, ...params.path)
 
-    if (!filePath.startsWith(uploadDir)) {
+    if (!filePath.startsWith(UPLOAD_DIR)) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 
     if (!existsSync(filePath)) {
-      // Return transparent placeholder instead of broken image icon
       return new NextResponse(PLACEHOLDER, {
         headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
       })

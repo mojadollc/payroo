@@ -200,6 +200,7 @@ export default function ReportsPage() {
   const canExport = features.exportData && tier !== "basic"
   const [sales, setSales] = useState<Sale[]>([])
   const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>([])
+  const [billPayments, setBillPayments] = useState<any[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(false)
@@ -232,18 +233,21 @@ export default function ReportsPage() {
         params.set("to", to.toISOString())
       }
 
-      const [salesRes, ewalletRes] = await Promise.all([
+      const [salesRes, ewalletRes, billRes] = await Promise.all([
         fetch(`/api/sales?${params}`),
         fetch(`/api/ewallet-transactions?${params}`),
+        fetch(`/api/bill-payments?${params}`),
       ])
 
-      const [{ data: salesData }, { data: ewalletData }] = await Promise.all([
+      const [{ data: salesData }, { data: ewalletData }, { data: billData }] = await Promise.all([
         salesRes.json(),
         ewalletRes.json(),
+        billRes.json(),
       ])
 
       setSales(salesData ?? [])
       setEWalletTransactions(ewalletData ?? [])
+      setBillPayments(billData ?? [])
 
       if (!productsLoadedRef.current) {
         const prodRes = await fetch(`/api/products?storeId=${storeId}`)
@@ -274,13 +278,17 @@ export default function ReportsPage() {
       sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
     const ewalletGross = ewalletTransactions.reduce((sum, t) => sum + t.amount, 0)
     const ewalletProfit = ewalletTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
+    const billsRevenue = billPayments.reduce((sum, t) => sum + t.totalAmount, 0)
+    const billsServiceFee = billPayments.reduce((sum, t) => sum + t.serviceFee, 0)
     return {
-      totalRevenue: salesGross + ewalletGross,
-      totalProfit: salesProfit + ewalletProfit,
+      totalRevenue: salesGross + ewalletGross + billsRevenue,
+      totalProfit: salesProfit + ewalletProfit + billsServiceFee,
       salesRevenue: salesGross, salesProfit,
       ewalletRevenue: ewalletGross, ewalletProfit,
+      billsRevenue, billsServiceFee,
       totalSales: activeSales.length,
       totalEWalletTransactions: ewalletTransactions.length,
+      totalBillPayments: billPayments.length,
     }
   }
 
@@ -534,6 +542,17 @@ export default function ReportsPage() {
             </div>
             <div className="text-[15px] font-bold text-purple-600 truncate">₱{stats.ewalletRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="text-[11px] text-green-600 font-medium mt-0.5 truncate">Comm: ₱{stats.ewalletProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </MobileCard>
+
+          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-sky-50 border-blue-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="p-1.5 bg-blue-600 rounded-md">
+                <Receipt className="h-3.5 w-3.5 text-white" />
+              </div>
+              <span className="text-[11px] text-muted-foreground">Bills ({stats.totalBillPayments})</span>
+            </div>
+            <div className="text-[15px] font-bold text-blue-700 truncate">₱{stats.billsRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-[11px] text-green-600 font-medium mt-0.5 truncate">Fee: ₱{stats.billsServiceFee.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </MobileCard>
         </div>
 

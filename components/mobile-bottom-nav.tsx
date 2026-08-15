@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import {
   Store, Package, TrendingUp, HandCoins, Star,
-  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks,
+  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks, Receipt,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
@@ -39,6 +39,7 @@ const MORE_GROUPS: NavGroup[] = [
     label: "Finance",
     items: [
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
+      { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
     ],
   },
   {

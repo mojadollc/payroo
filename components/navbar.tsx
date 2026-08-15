@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
   Store, Package, Smartphone, TrendingUp, Menu, Settings, Download,
   HandCoins, Star, Brain, Users, LogOut, BarChart2, RefreshCw, Truck, FileText,
-  ChevronDown, ListChecks,
+  ChevronDown, ListChecks, Receipt,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -59,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
+      { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
     ],
   },
   {

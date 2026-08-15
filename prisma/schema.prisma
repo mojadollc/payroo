@@ -782,3 +782,23 @@ model PinReset {
   @@index([email, used])
   @@map("pin_resets")
 }
+
+// ─── Bill Payments ────────────────────────────────────────────────────────────
+
+model BillPayment {
+  id            String   @id @default(uuid())
+  storeId       String
+  txnRef        String   @unique
+  billerName    String
+  accountNumber String
+  amount        Float
+  serviceFee    Float    @default(0)
+  totalAmount   Float
+  status        String   @default("completed")
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  @@index([storeId])
+  @@index([storeId, createdAt])
+  @@map("bill_payments")
+}

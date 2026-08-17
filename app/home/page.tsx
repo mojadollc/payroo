@@ -14,12 +14,14 @@ import { useSubscription } from "@/hooks/use-subscription"
 import { getSession } from "@/lib/pos-session"
 import { getStoreId } from "@/lib/store-id"
 
-interface QuickStat {
-  label: string
-  value: string
-  sub: string
-  color: string
-  bg: string
+interface TodayData {
+  gross: number
+  profit: number
+  txCount: number
+  itemsSold: number
+  eGross: number
+  eProfit: number
+  topItems: { name: string; qty: number }[]
 }
 
 interface NavTile {
@@ -63,7 +65,7 @@ export default function HomePage() {
   const { user, loading } = useAuth()
   const { tier, isActive, features } = useSubscription()
   const [session, setSession] = useState<ReturnType<typeof getSession>>(null)
-  const [todaySales, setTodaySales] = useState<{ gross: number; txCount: number } | null>(null)
+  const [today, setToday] = useState<TodayData | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push("/login")
@@ -76,16 +78,31 @@ export default function HomePage() {
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    fetch(`/api/sales?storeId=${storeId}&from=${today.toISOString()}`)
-      .then(r => r.json())
-      .then(({ data }) => {
-        if (!data) return
-        const gross = data.filter((s: any) => s.status !== "voided").reduce((sum: number, s: any) => sum + s.total, 0)
-        setTodaySales({ gross, txCount: data.filter((s: any) => s.status !== "voided").length })
-      })
-      .catch(() => {})
+    const from = new Date()
+    from.setHours(0, 0, 0, 0)
+    const params = `storeId=${storeId}&from=${from.toISOString()}`
+    Promise.all([
+      fetch(`/api/sales?${params}`).then(r => r.json()),
+      fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
+    ]).then(([{ data: salesData }, { data: eData }]) => {
+      const active = (salesData ?? []).filter((s: any) => s.status !== "voided")
+      const gross = active.reduce((sum: number, s: any) => sum + s.total, 0)
+      const profit = active.reduce((sum: number, s: any) =>
+        sum + s.items.reduce((p: number, i: any) => p + (i.price - i.cost) * i.quantity, 0), 0)
+      const itemsSold = active.reduce((sum: number, s: any) =>
+        sum + s.items.reduce((n: number, i: any) => n + i.quantity, 0), 0)
+      const topItems = Object.values(
+        active.flatMap((s: any) => s.items).reduce((acc: any, i: any) => {
+          if (!acc[i.productId]) acc[i.productId] = { name: i.productName, qty: 0 }
+          acc[i.productId].qty += i.quantity
+          return acc
+        }, {})
+      ).sort((a: any, b: any) => b.qty - a.qty).slice(0, 3) as { name: string; qty: number }[]
+      const ewallet = eData ?? []
+      const eGross = ewallet.reduce((sum: number, t: any) => sum + t.amount, 0)
+      const eProfit = ewallet.reduce((sum: number, t: any) => sum + Math.abs(t.profit), 0)
+      setToday({ gross, profit, txCount: active.length, itemsSold, eGross, eProfit, topItems })
+    }).catch(() => {})
   }, [])
 
   if (loading || !user) return null
@@ -94,23 +111,7 @@ export default function HomePage() {
   const ownerName = session?.ownerName || user?.name || "there"
   const isOwner = user?.role === "owner"
   const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : "Basic"
-
-  const stats: QuickStat[] = [
-    {
-      label: "Today's Sales",
-      value: todaySales ? `₱${todaySales.gross.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—",
-      sub: todaySales ? `${todaySales.txCount} transaction${todaySales.txCount !== 1 ? "s" : ""}` : "Loading...",
-      color: "text-primary",
-      bg: "bg-primary/10",
-    },
-    {
-      label: "Plan",
-      value: tierLabel,
-      sub: isActive ? "Active" : "Expired",
-      color: "text-white",
-      bg: "bg-white/10",
-    },
-  ]
+  const fmt = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
   const visibleMore = MORE_TILES.filter(t => {
     if (!isOwner) return false
@@ -128,50 +129,74 @@ export default function HomePage() {
 
       {/* ── Hero Header ── */}
       <div className="relative overflow-hidden">
-        {/* Golden yellow gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-primary/80" />
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: "radial-gradient(circle at 2px 2px, white 1px, transparent 0)", backgroundSize: "24px 24px" }}
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500" />
+        <div className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: "radial-gradient(circle at 2px 2px, #000 1px, transparent 0)", backgroundSize: "24px 24px" }}
         />
 
         <div className="relative px-5 pt-14 pb-8">
           {/* Top row */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+              <div className="h-11 w-11 rounded-2xl bg-black/10 backdrop-blur-sm flex items-center justify-center border border-black/10">
                 <img src="/logo.svg" alt="Payroo" className="h-7 w-7 rounded-xl" />
               </div>
               <div>
-                <p className="text-white/70 text-[11px] font-medium tracking-wide uppercase">{getGreeting()}</p>
-                <p className="text-white font-bold text-[15px] leading-tight">{ownerName.split(" ")[0]} 👋</p>
+                <p className="text-amber-900/70 text-[11px] font-semibold tracking-wide uppercase">{getGreeting()}</p>
+                <p className="text-amber-950 font-bold text-[15px] leading-tight">{ownerName.split(" ")[0]} 👋</p>
               </div>
             </div>
             <Link href="/settings">
-              <div className="h-10 w-10 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 active:scale-90 transition-transform">
-                <Bell className="h-4.5 w-4.5 text-white" />
+              <div className="h-10 w-10 rounded-2xl bg-black/10 backdrop-blur-sm flex items-center justify-center border border-black/10 active:scale-90 transition-transform">
+                <Bell className="h-4.5 w-4.5 text-amber-950" />
               </div>
             </Link>
           </div>
 
           {/* Store name */}
           <div className="mb-5">
-            <h1 className="text-white text-2xl font-black tracking-tight leading-tight">{storeName}</h1>
-            <p className="text-white/60 text-[12px] mt-0.5">
+            <h1 className="text-amber-950 text-2xl font-black tracking-tight leading-tight">{storeName}</h1>
+            <p className="text-amber-900/60 text-[12px] mt-0.5">
               {session?.externalId ? `ID: ${session.externalId}` : "Payroo POS"}
               {session?.branchName ? ` · ${session.branchName}` : ""}
             </p>
           </div>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-2 gap-3">
-            {stats.map((s, i) => (
-              <div key={i} className="bg-white/15 backdrop-blur-sm rounded-2xl p-3.5 border border-white/20">
-                <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest mb-1">{s.label}</p>
-                <p className="text-white text-[20px] font-black leading-none">{s.value}</p>
-                <p className="text-white/60 text-[11px] mt-1">{s.sub}</p>
-              </div>
-            ))}
+          {/* Stats grid — 2×2 */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-3.5 border border-black/10">
+              <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-1">Gross Sales</p>
+              <p className="text-amber-950 text-[20px] font-black leading-none">{today ? fmt(today.gross) : "—"}</p>
+              <p className="text-amber-900/60 text-[11px] mt-1">{today ? `${today.txCount} txn${today.txCount !== 1 ? "s" : ""}` : "Loading..."}</p>
+            </div>
+            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-3.5 border border-black/10">
+              <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-1">Net Profit</p>
+              <p className="text-amber-950 text-[20px] font-black leading-none">{today ? fmt(today.profit) : "—"}</p>
+              <p className="text-amber-900/60 text-[11px] mt-1">{today ? `${today.itemsSold} items sold` : "Loading..."}</p>
+            </div>
+            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-3.5 border border-black/10">
+              <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-1">E-Wallet</p>
+              <p className="text-amber-950 text-[20px] font-black leading-none">{today ? fmt(today.eGross) : "—"}</p>
+              <p className="text-amber-900/60 text-[11px] mt-1">{today ? `₱${today.eProfit.toFixed(0)} comm.` : "Loading..."}</p>
+            </div>
+            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-3.5 border border-black/10">
+              <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-1">Plan</p>
+              <p className="text-amber-950 text-[20px] font-black leading-none">{tierLabel}</p>
+              <p className="text-amber-900/60 text-[11px] mt-1">{isActive ? "✓ Active" : "⚠ Expired"}</p>
+            </div>
           </div>
+
+          {/* Top sellers strip */}
+          {today && today.topItems.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="text-amber-900/60 text-[10px] font-bold uppercase tracking-widest">Top:</span>
+              {today.topItems.map((item, i) => (
+                <span key={i} className="bg-black/10 text-amber-950 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-black/10">
+                  {item.name} ×{item.qty}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bottom curve */}

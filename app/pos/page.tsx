@@ -954,6 +954,7 @@ export default function POSPage() {
         onClose={() => setShowCartDrawer(false)}
         title="Shopping Cart"
         description={cart.length > 0 ? `${cart.length} items` : "Your cart is empty"}
+        maxHeight="82vh"
       >
         {cart.length === 0 ? (
           <div className="py-16 text-center">
@@ -962,7 +963,7 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="flex flex-col" style={{ maxHeight: "calc(80vh - 120px)" }}>
+          <div className="flex flex-col h-full" style={{ maxHeight: "calc(80vh - 120px)" }}>
             {/* Scrollable items + summary */}
             <div className="flex-1 overflow-y-auto overscroll-contain">
               <div className="divide-y divide-border/50">
@@ -1028,7 +1029,7 @@ export default function POSPage() {
             </div>
 
             {/* Sticky action buttons — always visible at bottom */}
-            <div className="flex-shrink-0 pt-3 pb-2 space-y-2 border-t bg-background">
+            <div className="flex-shrink-0 pt-3 pb-safe space-y-2 border-t bg-background" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
               <Button
                 size="lg"
                 className="w-full h-12 text-[15px] rounded-xl shadow-md"

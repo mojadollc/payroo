@@ -56,6 +56,17 @@ function getGreeting() {
   return "Good evening"
 }
 
+const THEMES = [
+  { id: "amber",   from: "#f59e0b", via: "#fbbf24", to: "#f97316", orb1: "#fde68a", orb2: "#fed7aa", dark: "#78350f", mid: "#92400e" },
+  { id: "violet",  from: "#7c3aed", via: "#8b5cf6", to: "#6366f1", orb1: "#ddd6fe", orb2: "#c7d2fe", dark: "#1e1b4b", mid: "#2e1065" },
+  { id: "rose",    from: "#e11d48", via: "#f43f5e", to: "#ec4899", orb1: "#fecdd3", orb2: "#fbcfe8", dark: "#4c0519", mid: "#500724" },
+  { id: "emerald", from: "#059669", via: "#10b981", to: "#0d9488", orb1: "#a7f3d0", orb2: "#99f6e4", dark: "#022c22", mid: "#064e3b" },
+  { id: "sky",     from: "#0284c7", via: "#0ea5e9", to: "#6366f1", orb1: "#bae6fd", orb2: "#c7d2fe", dark: "#0c1a2e", mid: "#0c4a6e" },
+  { id: "fuchsia", from: "#a21caf", via: "#c026d3", to: "#7c3aed", orb1: "#f5d0fe", orb2: "#ddd6fe", dark: "#2e1065", mid: "#4a044e" },
+  { id: "orange",  from: "#ea580c", via: "#f97316", to: "#eab308", orb1: "#fed7aa", orb2: "#fef08a", dark: "#431407", mid: "#7c2d12" },
+  { id: "teal",    from: "#0f766e", via: "#14b8a6", to: "#0284c7", orb1: "#99f6e4", orb2: "#bae6fd", dark: "#042f2e", mid: "#134e4a" },
+]
+
 // Shimmer block
 function Shimmer({ className }: { className?: string }) {
   return (
@@ -75,6 +86,14 @@ export default function HomePage() {
   const [today, setToday] = useState<TodayData | null>(null)
   const [showLogout, setShowLogout] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [themeIdx, setThemeIdx] = useState(() => Math.floor(Date.now() / 86400000) % THEMES.length)
+  const theme = THEMES[themeIdx]
+
+  // Auto-rotate theme every 8 seconds
+  useEffect(() => {
+    const t = setInterval(() => setThemeIdx(i => (i + 1) % THEMES.length), 8000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     if (!loading && !user) router.push("/login")
@@ -143,15 +162,44 @@ export default function HomePage() {
           0%   { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
+        @keyframes orbFloat {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          33%       { transform: translateY(-18px) scale(1.08); }
+          66%       { transform: translateY(10px) scale(0.95); }
+        }
       `}</style>
 
       <div className="min-h-screen bg-[oklch(0.97_0.008_90)] pb-28">
 
         {/* ── Hero Header ── */}
         <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500" />
-          <div className="absolute inset-0 opacity-[0.07]"
-            style={{ backgroundImage: "radial-gradient(circle at 2px 2px, #000 1px, transparent 0)", backgroundSize: "24px 24px" }}
+          {/* Animated gradient */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(135deg, ${theme.from}, ${theme.via}, ${theme.to})`,
+              transition: "background 1.2s ease",
+            }}
+          />
+          {/* Floating orbs */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div
+              className="absolute -top-10 -right-10 w-52 h-52 rounded-full opacity-30 blur-2xl animate-[orbFloat_6s_ease-in-out_infinite]"
+              style={{ background: theme.orb1, transition: "background 1.2s ease" }}
+            />
+            <div
+              className="absolute -bottom-8 -left-8 w-44 h-44 rounded-full opacity-25 blur-2xl animate-[orbFloat_8s_ease-in-out_infinite_2s]"
+              style={{ background: theme.orb2, transition: "background 1.2s ease" }}
+            />
+            <div
+              className="absolute top-1/2 left-1/3 w-36 h-36 rounded-full opacity-20 blur-3xl animate-[orbFloat_10s_ease-in-out_infinite_1s]"
+              style={{ background: theme.orb1, transition: "background 1.2s ease" }}
+            />
+          </div>
+          {/* Dot grid overlay */}
+          <div
+            className="absolute inset-0 opacity-[0.06]"
+            style={{ backgroundImage: "radial-gradient(circle at 2px 2px, #fff 1px, transparent 0)", backgroundSize: "24px 24px" }}
           />
 
           <div className="relative px-5 pt-14 pb-8">
@@ -166,25 +214,25 @@ export default function HomePage() {
                   <img src="/logo.svg" alt="Payroo" className="h-7 w-7 rounded-xl" />
                 </button>
                 <div>
-                  <p className="text-amber-900/70 text-[11px] font-semibold tracking-wide uppercase">{getGreeting()}</p>
-                  <p className="text-amber-950 font-bold text-[15px] leading-tight">{ownerName.split(" ")[0]} 👋</p>
+                  <p className="text-[11px] font-semibold tracking-wide uppercase" style={{ color: theme.dark + "cc" }}>{getGreeting()}</p>
+                  <p className="font-bold text-[15px] leading-tight" style={{ color: theme.dark }}>{ownerName.split(" ")[0]} 👋</p>
                 </div>
               </div>
               <Link href="/settings">
                 <div className="h-10 w-10 rounded-2xl bg-black/10 backdrop-blur-sm flex items-center justify-center border border-black/10 active:scale-90 transition-transform">
-                  <Bell className="h-4.5 w-4.5 text-amber-950" />
+                  <Bell className="h-4.5 w-4.5" style={{ color: theme.dark }} />
                 </div>
               </Link>
             </div>
 
             {/* Store name */}
             <div className="mb-5">
-              <h1 className="text-amber-950 text-2xl font-black tracking-tight leading-tight">{storeName}</h1>
-              <p className="text-amber-900/60 text-[12px] mt-0.5">
+              <h1 className="text-2xl font-black tracking-tight leading-tight" style={{ color: theme.dark }}>{storeName}</h1>
+              <p className="text-[12px] mt-0.5" style={{ color: theme.mid + "99" }}>
                 {session?.externalId ? `ID: ${session.externalId}` : "Payroo POS"}
                 {session?.branchName ? ` · ${session.branchName}` : ""}
                 {" · "}
-                <span className={isActive ? "text-green-700 font-semibold" : "text-red-600 font-semibold"}>
+                <span className={isActive ? "font-semibold" : "font-semibold text-red-300"} style={isActive ? { color: theme.dark } : {}}>
                   {tierLabel} {isActive ? "✓" : "⚠"}
                 </span>
               </p>
@@ -192,13 +240,13 @@ export default function HomePage() {
 
             {/* Today's Sales — single clean number */}
             <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4 border border-black/10">
-              <p className="text-amber-900/70 text-[11px] font-bold uppercase tracking-widest mb-1">Benta ngayong araw</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: theme.dark + "cc" }}>Benta ngayong araw</p>
               {dataLoaded ? (
                 <>
-                  <p className="text-amber-950 text-[36px] font-black leading-none">{fmt(today!.gross)}</p>
-                  <p className="text-amber-900/60 text-[12px] mt-1.5">
+                  <p className="text-[36px] font-black leading-none" style={{ color: theme.dark }}>{fmt(today!.gross)}</p>
+                  <p className="text-[12px] mt-1.5" style={{ color: theme.mid + "99" }}>
                     {today!.pctChange !== null && (
-                      <span className={`font-bold mr-1 ${today!.pctChange >= 0 ? "text-green-700" : "text-red-600"}`}>
+                      <span className="font-bold mr-1" style={{ color: theme.dark }}>
                         {today!.pctChange >= 0 ? "+" : ""}{today!.pctChange}% vs. kahapon ·
                       </span>
                     )}
@@ -214,6 +262,21 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* Theme picker dots */}
+          <div className="relative flex justify-center gap-1.5 pb-3 pt-1">
+            {THEMES.map((t, i) => (
+              <button
+                key={t.id}
+                onClick={() => setThemeIdx(i)}
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: i === themeIdx ? 20 : 6,
+                  height: 6,
+                  background: i === themeIdx ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)",
+                }}
+              />
+            ))}
+          </div>
           {/* Bottom curve */}
           <div className="h-6 bg-[oklch(0.97_0.008_90)] rounded-t-[28px] -mt-1" />
         </div>

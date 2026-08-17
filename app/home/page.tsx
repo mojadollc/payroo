@@ -86,12 +86,15 @@ export default function HomePage() {
   const [today, setToday] = useState<TodayData | null>(null)
   const [showLogout, setShowLogout] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [themeIdx, setThemeIdx] = useState(() => Math.floor(Date.now() / 86400000) % THEMES.length)
+  const [themeIdx, setThemeIdx] = useState(() => Math.floor(Math.random() * THEMES.length))
   const theme = THEMES[themeIdx]
 
-  // Auto-rotate theme every 8 seconds
   useEffect(() => {
-    const t = setInterval(() => setThemeIdx(i => (i + 1) % THEMES.length), 8000)
+    const t = setInterval(() => setThemeIdx(i => {
+      let next = i
+      while (next === i) next = Math.floor(Math.random() * THEMES.length)
+      return next
+    }), 8000)
     return () => clearInterval(t)
   }, [])
 
@@ -262,21 +265,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Theme picker dots */}
-          <div className="relative flex justify-center gap-1.5 pb-3 pt-1">
-            {THEMES.map((t, i) => (
-              <button
-                key={t.id}
-                onClick={() => setThemeIdx(i)}
-                className="rounded-full transition-all duration-300"
-                style={{
-                  width: i === themeIdx ? 20 : 6,
-                  height: 6,
-                  background: i === themeIdx ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)",
-                }}
-              />
-            ))}
-          </div>
           {/* Bottom curve */}
           <div className="h-6 bg-[oklch(0.97_0.008_90)] rounded-t-[28px] -mt-1" />
         </div>

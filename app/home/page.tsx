@@ -21,6 +21,8 @@ interface TodayData {
   itemsSold: number
   eGross: number
   eProfit: number
+  tobaccoGross: number
+  tobaccoProfit: number
   topItems: { name: string; qty: number }[]
 }
 
@@ -112,7 +114,8 @@ export default function HomePage() {
     Promise.all([
       fetch(`/api/sales?${params}`).then(r => r.json()),
       fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
-    ]).then(([{ data: salesData }, { data: eData }]) => {
+      fetch(`/api/products?storeId=${storeId}`).then(r => r.json()),
+    ]).then(([{ data: salesData }, { data: eData }, { data: productsData }]) => {
       const active = (salesData ?? []).filter((s: any) => s.status !== "voided")
       const gross = active.reduce((sum: number, s: any) => sum + s.total, 0)
       const profit = active.reduce((sum: number, s: any) =>
@@ -129,7 +132,17 @@ export default function HomePage() {
       const ewallet = eData ?? []
       const eGross = ewallet.reduce((sum: number, t: any) => sum + t.amount, 0)
       const eProfit = ewallet.reduce((sum: number, t: any) => sum + Math.abs(t.profit), 0)
-      setToday({ gross, profit, txCount: active.length, itemsSold, eGross, eProfit, topItems })
+      const tobaccoIds = new Set<string>(
+        (productsData ?? []).filter((p: any) => {
+          const c = (p.category || "").trim().toLowerCase()
+          return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+        }).map((p: any) => p.id)
+      )
+      const tobaccoGross = active.reduce((sum: number, s: any) =>
+        sum + s.items.filter((i: any) => tobaccoIds.has(i.productId)).reduce((p: number, i: any) => p + i.subtotal, 0), 0)
+      const tobaccoProfit = active.reduce((sum: number, s: any) =>
+        sum + s.items.filter((i: any) => tobaccoIds.has(i.productId)).reduce((p: number, i: any) => p + (i.price - i.cost) * i.quantity, 0), 0)
+      setToday({ gross, profit, txCount: active.length, itemsSold, eGross, eProfit, tobaccoGross, tobaccoProfit, topItems })
     }).catch(() => {})
   }, [])
 
@@ -161,26 +174,30 @@ export default function HomePage() {
     return true
   })
 
-  const stats = [
+  const todayStats = [
     {
       label: "Gross Sales",
       value: dataLoaded ? fmt(today!.gross) : null,
       sub: dataLoaded ? `${today!.txCount} txn${today!.txCount !== 1 ? "s" : ""}` : null,
+      color: "text-amber-950",
     },
     {
       label: "Net Profit",
       value: dataLoaded ? fmt(today!.profit) : null,
       sub: dataLoaded ? `${today!.itemsSold} items sold` : null,
+      color: "text-green-700",
     },
     {
       label: "E-Wallet",
       value: dataLoaded ? fmt(today!.eGross) : null,
       sub: dataLoaded ? `₱${today!.eProfit.toFixed(0)} comm.` : null,
+      color: "text-blue-700",
     },
     {
-      label: "Plan",
-      value: tierLabel,
-      sub: isActive ? "✓ Active" : "⚠ Expired",
+      label: "Total Net Profit",
+      value: dataLoaded ? fmt(today!.profit + today!.eProfit) : null,
+      sub: "Sales + E-Wallet",
+      color: "text-orange-700",
     },
   ]
 
@@ -232,27 +249,56 @@ export default function HomePage() {
               <p className="text-amber-900/60 text-[12px] mt-0.5">
                 {session?.externalId ? `ID: ${session.externalId}` : "Payroo POS"}
                 {session?.branchName ? ` · ${session.branchName}` : ""}
+                {" · "}
+                <span className={isActive ? "text-green-700 font-semibold" : "text-red-600 font-semibold"}>
+                  {tierLabel} {isActive ? "✓" : "⚠"}
+                </span>
               </p>
             </div>
 
-            {/* Stats grid — 2×2 with shimmer */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {stats.map((stat, i) => (
-                <div key={i} className="bg-black/10 backdrop-blur-sm rounded-2xl p-3.5 border border-black/10">
-                  <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-1">{stat.label}</p>
-                  {stat.value !== null ? (
-                    <>
-                      <p className="text-amber-950 text-[20px] font-black leading-none">{stat.value}</p>
-                      <p className="text-amber-900/60 text-[11px] mt-1">{stat.sub}</p>
-                    </>
+            {/* Today's Sales — matches reports page layout */}
+            <div className="mb-2">
+              <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-2">Today's Sales</p>
+              <div className="grid grid-cols-2 gap-2">
+                {todayStats.map((stat, i) => (
+                  <div key={i} className="bg-black/10 backdrop-blur-sm rounded-2xl p-3 border border-black/10">
+                    <p className="text-amber-900/70 text-[10px] font-semibold mb-1">{stat.label}</p>
+                    {stat.value !== null ? (
+                      <>
+                        <p className={`text-[18px] font-black leading-none ${stat.color}`}>{stat.value}</p>
+                        <p className="text-amber-900/60 text-[10px] mt-1">{stat.sub}</p>
+                      </>
+                    ) : (
+                      <>
+                        <Shimmer className="h-5 w-20 mb-1.5" />
+                        <Shimmer className="h-3 w-14" />
+                      </>
+                    )}
+                  </div>
+                ))}
+                {/* Tobacco row — full width */}
+                <div className="col-span-2 bg-black/10 backdrop-blur-sm rounded-2xl p-3 border border-black/10">
+                  <p className="text-amber-900/70 text-[10px] font-semibold mb-1">🚬 Tobacco Sales Today</p>
+                  {dataLoaded ? (
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-[15px] font-black text-amber-700">{fmt(today!.tobaccoGross)}</p>
+                        <p className="text-amber-900/60 text-[10px]">Gross</p>
+                      </div>
+                      <div className="text-amber-900/30">|</div>
+                      <div>
+                        <p className="text-[15px] font-black text-green-700">{fmt(today!.tobaccoProfit)}</p>
+                        <p className="text-amber-900/60 text-[10px]">Net profit</p>
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      <Shimmer className="h-6 w-24 mb-1.5" />
-                      <Shimmer className="h-3 w-16" />
-                    </>
+                    <div className="flex gap-4">
+                      <Shimmer className="h-5 w-16" />
+                      <Shimmer className="h-5 w-16" />
+                    </div>
                   )}
                 </div>
-              ))}
+              </div>
             </div>
 
             {/* Top sellers strip */}

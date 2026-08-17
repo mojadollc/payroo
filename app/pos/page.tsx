@@ -637,6 +637,7 @@ export default function POSPage() {
               ))}
             </div>
           ) : (
+            <div className="grid grid-cols-2 gap-3">
             {shuffledProducts.slice(0, 20).map((product) => (
               <MobileCard
                 key={product.id}
@@ -685,7 +686,7 @@ export default function POSPage() {
                 </div>
               </MobileCard>
             ))}
-          </div>
+            </div>
           )}
         </div>
       </div>

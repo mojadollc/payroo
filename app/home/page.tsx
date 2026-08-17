@@ -16,14 +16,7 @@ import { getStoreId } from "@/lib/store-id"
 
 interface TodayData {
   gross: number
-  profit: number
   txCount: number
-  itemsSold: number
-  eGross: number
-  eProfit: number
-  tobaccoGross: number
-  tobaccoProfit: number
-  topItems: { name: string; qty: number }[]
 }
 
 interface NavTile {
@@ -111,39 +104,13 @@ export default function HomePage() {
     const from = new Date()
     from.setHours(0, 0, 0, 0)
     const params = `storeId=${storeId}&from=${from.toISOString()}`
-    Promise.all([
-      fetch(`/api/sales?${params}`).then(r => r.json()),
-      fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
-      fetch(`/api/products?storeId=${storeId}`).then(r => r.json()),
-    ]).then(([{ data: salesData }, { data: eData }, { data: productsData }]) => {
-      const active = (salesData ?? []).filter((s: any) => s.status !== "voided")
-      const gross = active.reduce((sum: number, s: any) => sum + s.total, 0)
-      const profit = active.reduce((sum: number, s: any) =>
-        sum + s.items.reduce((p: number, i: any) => p + (i.price - i.cost) * i.quantity, 0), 0)
-      const itemsSold = active.reduce((sum: number, s: any) =>
-        sum + s.items.reduce((n: number, i: any) => n + i.quantity, 0), 0)
-      const topItems = Object.values(
-        active.flatMap((s: any) => s.items).reduce((acc: any, i: any) => {
-          if (!acc[i.productId]) acc[i.productId] = { name: i.productName, qty: 0 }
-          acc[i.productId].qty += i.quantity
-          return acc
-        }, {})
-      ).sort((a: any, b: any) => b.qty - a.qty).slice(0, 3) as { name: string; qty: number }[]
-      const ewallet = eData ?? []
-      const eGross = ewallet.reduce((sum: number, t: any) => sum + t.amount, 0)
-      const eProfit = ewallet.reduce((sum: number, t: any) => sum + Math.abs(t.profit), 0)
-      const tobaccoIds = new Set<string>(
-        (productsData ?? []).filter((p: any) => {
-          const c = (p.category || "").trim().toLowerCase()
-          return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
-        }).map((p: any) => p.id)
-      )
-      const tobaccoGross = active.reduce((sum: number, s: any) =>
-        sum + s.items.filter((i: any) => tobaccoIds.has(i.productId)).reduce((p: number, i: any) => p + i.subtotal, 0), 0)
-      const tobaccoProfit = active.reduce((sum: number, s: any) =>
-        sum + s.items.filter((i: any) => tobaccoIds.has(i.productId)).reduce((p: number, i: any) => p + (i.price - i.cost) * i.quantity, 0), 0)
-      setToday({ gross, profit, txCount: active.length, itemsSold, eGross, eProfit, tobaccoGross, tobaccoProfit, topItems })
-    }).catch(() => {})
+    fetch(`/api/sales?${params}`)
+      .then(r => r.json())
+      .then(({ data: salesData }) => {
+        const active = (salesData ?? []).filter((s: any) => s.status !== "voided")
+        const gross = active.reduce((sum: number, s: any) => sum + s.total, 0)
+        setToday({ gross, txCount: active.length })
+      }).catch(() => {})
   }, [])
 
   const handleLogout = async () => {
@@ -174,32 +141,7 @@ export default function HomePage() {
     return true
   })
 
-  const todayStats = [
-    {
-      label: "Gross Sales",
-      value: dataLoaded ? fmt(today!.gross) : null,
-      sub: dataLoaded ? `${today!.txCount} txn${today!.txCount !== 1 ? "s" : ""}` : null,
-      color: "text-amber-950",
-    },
-    {
-      label: "Net Profit",
-      value: dataLoaded ? fmt(today!.profit) : null,
-      sub: dataLoaded ? `${today!.itemsSold} items sold` : null,
-      color: "text-green-700",
-    },
-    {
-      label: "E-Wallet",
-      value: dataLoaded ? fmt(today!.eGross) : null,
-      sub: dataLoaded ? `₱${today!.eProfit.toFixed(0)} comm.` : null,
-      color: "text-blue-700",
-    },
-    {
-      label: "Total Net Profit",
-      value: dataLoaded ? fmt(today!.profit + today!.eProfit) : null,
-      sub: "Sales + E-Wallet",
-      color: "text-orange-700",
-    },
-  ]
+
 
   return (
     <>
@@ -256,62 +198,21 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Today's Sales — matches reports page layout */}
-            <div className="mb-2">
-              <p className="text-amber-900/70 text-[10px] font-bold uppercase tracking-widest mb-2">Today's Sales</p>
-              <div className="grid grid-cols-2 gap-2">
-                {todayStats.map((stat, i) => (
-                  <div key={i} className="bg-black/10 backdrop-blur-sm rounded-2xl p-3 border border-black/10">
-                    <p className="text-amber-900/70 text-[10px] font-semibold mb-1">{stat.label}</p>
-                    {stat.value !== null ? (
-                      <>
-                        <p className={`text-[18px] font-black leading-none ${stat.color}`}>{stat.value}</p>
-                        <p className="text-amber-900/60 text-[10px] mt-1">{stat.sub}</p>
-                      </>
-                    ) : (
-                      <>
-                        <Shimmer className="h-5 w-20 mb-1.5" />
-                        <Shimmer className="h-3 w-14" />
-                      </>
-                    )}
-                  </div>
-                ))}
-                {/* Tobacco row — full width */}
-                <div className="col-span-2 bg-black/10 backdrop-blur-sm rounded-2xl p-3 border border-black/10">
-                  <p className="text-amber-900/70 text-[10px] font-semibold mb-1">🚬 Tobacco Sales Today</p>
-                  {dataLoaded ? (
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-[15px] font-black text-amber-700">{fmt(today!.tobaccoGross)}</p>
-                        <p className="text-amber-900/60 text-[10px]">Gross</p>
-                      </div>
-                      <div className="text-amber-900/30">|</div>
-                      <div>
-                        <p className="text-[15px] font-black text-green-700">{fmt(today!.tobaccoProfit)}</p>
-                        <p className="text-amber-900/60 text-[10px]">Net profit</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-4">
-                      <Shimmer className="h-5 w-16" />
-                      <Shimmer className="h-5 w-16" />
-                    </div>
-                  )}
-                </div>
-              </div>
+            {/* Today's Sales — single clean number */}
+            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4 border border-black/10">
+              <p className="text-amber-900/70 text-[11px] font-bold uppercase tracking-widest mb-1">Today's Sales</p>
+              {dataLoaded ? (
+                <>
+                  <p className="text-amber-950 text-[36px] font-black leading-none">{fmt(today!.gross)}</p>
+                  <p className="text-amber-900/60 text-[12px] mt-1.5">{today!.txCount} transaction{today!.txCount !== 1 ? "s" : ""} today</p>
+                </>
+              ) : (
+                <>
+                  <Shimmer className="h-9 w-36 mb-2" />
+                  <Shimmer className="h-3 w-24" />
+                </>
+              )}
             </div>
-
-            {/* Top sellers strip */}
-            {dataLoaded && today!.topItems.length > 0 && (
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="text-amber-900/60 text-[10px] font-bold uppercase tracking-widest">Top:</span>
-                {today!.topItems.map((item, i) => (
-                  <span key={i} className="bg-black/10 text-amber-950 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-black/10">
-                    {item.name} ×{item.qty}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Bottom curve */}

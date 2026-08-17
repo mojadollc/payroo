@@ -627,11 +627,20 @@ export default function POSPage() {
           {shuffledProducts.length === 0 ? (
             <div className="grid grid-cols-2 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="rounded-2xl overflow-hidden border border-border/40 bg-muted/30 animate-pulse">
-                  <div className="aspect-square bg-muted/50" />
+                <div key={i} className="rounded-2xl overflow-hidden border border-border/40 bg-white">
+                  <div className="aspect-square relative overflow-hidden bg-gray-100">
+                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                  </div>
                   <div className="p-3 space-y-2">
-                    <div className="h-3 bg-muted rounded w-3/4" />
-                    <div className="h-3 bg-muted rounded w-1/2" />
+                    <div className="h-3 rounded w-3/4 relative overflow-hidden bg-gray-100">
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                    </div>
+                    <div className="h-3 rounded w-1/2 relative overflow-hidden bg-gray-100">
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite_0.2s] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                    </div>
+                    <div className="h-4 rounded w-2/3 relative overflow-hidden bg-gray-100">
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite_0.1s] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                    </div>
                   </div>
                 </div>
               ))}

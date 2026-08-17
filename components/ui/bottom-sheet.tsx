@@ -87,7 +87,7 @@ export function BottomSheet({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden px-6 pb-6">
+        <div className="flex-1 overflow-hidden flex flex-col px-6 pb-0">
           {children}
         </div>
       </div>

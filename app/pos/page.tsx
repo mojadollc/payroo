@@ -963,7 +963,7 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="flex flex-col h-full" style={{ maxHeight: "calc(80vh - 120px)" }}>
+          <div className="flex flex-col h-full">
             {/* Scrollable items + summary */}
             <div className="flex-1 overflow-y-auto overscroll-contain">
               <div className="divide-y divide-border/50">
@@ -1028,11 +1028,11 @@ export default function POSPage() {
               </div>
             </div>
 
-            {/* Sticky action buttons — always visible at bottom */}
-            <div className="flex-shrink-0 pt-3 pb-safe space-y-2 border-t bg-background" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+            {/* Inline action buttons — always pinned at bottom */}
+            <div className="flex-shrink-0 flex gap-2 pt-3 border-t bg-background" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
               <Button
                 size="lg"
-                className="w-full h-12 text-[15px] rounded-xl shadow-md"
+                className="flex-1 h-12 text-[14px] font-bold rounded-xl shadow-md"
                 onClick={() => {
                   setShowCartDrawer(false)
                   setShowCheckout(true)
@@ -1041,12 +1041,11 @@ export default function POSPage() {
                 Checkout · ₱{calculateTotal().toFixed(2)}
               </Button>
               <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-9 rounded-xl text-[13px] text-destructive border-destructive/20"
+                size="lg"
+                className="h-12 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white border-0 shadow-md flex-shrink-0"
                 onClick={clearCart}
               >
-                Clear Cart
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>

@@ -37,38 +37,33 @@ export function MobileAppShell({
   const branchName = session?.branchName
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Native-style header */}
+    <div className="min-h-screen bg-[oklch(0.97_0.008_90)]">
+      {/* Glass header */}
       {(title || headerAction) && (
-        <div className="sticky top-0 z-40 bg-background border-b border-border/50 shadow-sm">
-          <div className="container mx-auto px-4 py-2.5">
+        <div className="sticky top-0 z-40 glass-header">
+          <div className="px-4 py-3">
             <div className="flex items-center justify-between gap-2">
-              {/* Left: page title + store identity */}
               <div className="flex-1 min-w-0">
                 {title && (
-                  <h1 className="text-[15px] font-bold text-foreground truncate leading-tight">
+                  <h1 className="text-[16px] font-bold text-foreground truncate leading-tight tracking-tight">
                     {title}
                   </h1>
                 )}
-                {/* Store identity row */}
                 {storeName && (
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <span className="text-[11px] font-semibold text-primary truncate max-w-[140px]">
                       {storeName}
                     </span>
                     {storeId && (
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        · ID {storeId}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground font-mono">· {storeId}</span>
                     )}
                     {branchName && (
-                      <span className="text-[9px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded-full">
+                      <span className="text-[9px] bg-primary/15 text-primary font-semibold px-2 py-0.5 rounded-full">
                         {branchName}
                       </span>
                     )}
                   </div>
                 )}
-                {/* Fallback subtitle if no session yet */}
                 {!storeName && subtitle && (
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>
                 )}
@@ -79,7 +74,7 @@ export function MobileAppShell({
             </div>
           </div>
           {stickyBar && (
-            <div className="border-t border-border/40 bg-background px-4 py-2">
+            <div className="border-t border-border/30 px-4 py-2.5">
               {stickyBar}
             </div>
           )}
@@ -89,7 +84,7 @@ export function MobileAppShell({
       {/* Content area */}
       <div
         className={cn(
-          "container mx-auto pb-24",
+          "mx-auto pb-28",
           !noPadding && "px-4 py-4",
           className
         )}
@@ -100,7 +95,7 @@ export function MobileAppShell({
   )
 }
 
-// Native-style card component
+// Modern glass card
 export function MobileCard({
   children,
   className,
@@ -113,8 +108,8 @@ export function MobileCard({
   return (
     <div
       className={cn(
-        "bg-card rounded-2xl shadow-sm border border-border/50 overflow-hidden",
-        onClick && "active:scale-[0.98] transition-transform cursor-pointer",
+        "bg-white/80 backdrop-blur-sm rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] border border-white/60 overflow-hidden",
+        onClick && "active:scale-[0.97] transition-all duration-150 cursor-pointer",
         className
       )}
       onClick={onClick}
@@ -124,7 +119,7 @@ export function MobileCard({
   )
 }
 
-// Native-style section header
+// Section header
 export function MobileSectionHeader({
   title,
   action,
@@ -134,7 +129,7 @@ export function MobileSectionHeader({
 }) {
   return (
     <div className="flex items-center justify-between mb-3">
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+      <h2 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
         {title}
       </h2>
       {action}

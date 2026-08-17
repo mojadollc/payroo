@@ -846,19 +846,15 @@ export default function InventoryPage() {
 
         {/* Search */}
         {activeTab !== "categories" && (
-          <MobileCard className="bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200">
-            <div className="p-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10 h-12 text-base rounded-xl border-2 border-yellow-300 bg-white"
-                />
-              </div>
-            </div>
-          </MobileCard>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9 h-11 text-base rounded-xl border border-border/60 bg-white/80 focus:border-primary/50 shadow-sm"
+            />
+          </div>
         )}
 
         {/* Product List / Categories */}

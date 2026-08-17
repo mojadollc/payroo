@@ -190,15 +190,15 @@ export default function SettingsPage() {
   const cfg = getBusinessConfig(businessType)
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-background border-b shadow-sm">
+    <div className="min-h-screen bg-[oklch(0.97_0.008_90)]">
+      {/* Glass header */}
+      <div className="sticky top-0 z-40 glass-header">
         <div className="max-w-lg mx-auto px-4 py-3">
-          <h1 className="text-[17px] font-bold">Settings</h1>
+          <h1 className="text-[17px] font-bold tracking-tight">Settings</h1>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-4 pb-24 space-y-6">
+      <div className="max-w-lg mx-auto px-4 py-4 pb-28 space-y-6">
 
         {/* Subscription Card */}
         <div className="rounded-2xl border overflow-hidden">

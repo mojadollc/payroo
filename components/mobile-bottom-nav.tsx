@@ -99,55 +99,69 @@ export function MobileBottomNav() {
 
   return (
     <>
-      {/* Bottom nav bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-card border-t safe-area-bottom">
-        <div className="flex items-stretch justify-around">
-          {visiblePrimary.map(item => {
-            const Icon = item.icon
-            const active = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 min-h-[56px] active:scale-95 transition-transform ${
-                  active ? "text-primary" : "text-muted-foreground"
+      {/* Floating pill bottom nav */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden safe-area-bottom">
+        <div className="mx-3 mb-3 rounded-[22px] bg-white/90 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/70 overflow-hidden">
+          <div className="flex items-stretch justify-around">
+            {visiblePrimary.map(item => {
+              const Icon = item.icon
+              const active = pathname === item.href
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] active:scale-90 transition-all duration-150 ${
+                    active ? "text-primary" : "text-muted-foreground/70"
+                  }`}
+                >
+                  <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                    active ? "bg-primary/15" : ""
+                  }`}>
+                    <Icon className={`h-[18px] w-[18px] ${ active ? "stroke-[2.5]" : "stroke-[1.8]" }`} />
+                  </div>
+                  <span className={`text-[9px] font-semibold leading-none ${ active ? "text-primary" : "" }`}>{item.label}</span>
+                </Link>
+              )
+            })}
+            {hasMoreItems && (
+              <button
+                onClick={() => setMoreOpen(true)}
+                className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] active:scale-90 transition-all duration-150 ${
+                  visibleGroups.some(g => g.items.some(i => pathname === i.href)) ? "text-primary" : "text-muted-foreground/70"
                 }`}
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[9px] font-medium leading-tight">{item.label}</span>
-              </Link>
-            )
-          })}
-          {hasMoreItems && (
-            <button
-              onClick={() => setMoreOpen(true)}
-              className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 min-h-[56px] active:scale-95 transition-transform ${
-                visibleGroups.some(g => g.items.some(i => pathname === i.href)) ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              <MoreHorizontal className="h-5 w-5" />
-              <span className="text-[9px] font-medium leading-tight">More</span>
-            </button>
-          )}
+                <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                  visibleGroups.some(g => g.items.some(i => pathname === i.href)) ? "bg-primary/15" : ""
+                }`}>
+                  <MoreHorizontal className="h-[18px] w-[18px] stroke-[1.8]" />
+                </div>
+                <span className="text-[9px] font-semibold leading-none">More</span>
+              </button>
+            )}
+          </div>
         </div>
       </nav>
 
       {/* "More" bottom sheet */}
       {moreOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl safe-area-bottom animate-in slide-in-from-bottom duration-200 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 sticky top-0 bg-background border-b">
-              <span className="font-semibold text-sm">More Features</span>
-              <button onClick={() => setMoreOpen(false)} className="p-1 rounded-full hover:bg-muted">
-                <X className="h-5 w-5" />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl rounded-t-3xl safe-area-bottom animate-in slide-in-from-bottom duration-200 max-h-[80vh] overflow-y-auto border-t border-white/60 shadow-[0_-8px_40px_rgba(0,0,0,0.12)]">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-border/60" />
+            </div>
+            <div className="flex items-center justify-between px-5 pt-2 pb-3">
+              <span className="font-bold text-[15px] tracking-tight">More Features</span>
+              <button onClick={() => setMoreOpen(false)} className="p-1.5 rounded-full bg-muted/60 hover:bg-muted">
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="px-3 pb-4">
+            <div className="px-4 pb-6">
               {visibleGroups.map((group, idx) => (
-                <div key={group.label} className={idx > 0 ? "mt-4" : "mt-2"}>
-                  <p className="text-xs font-semibold text-muted-foreground px-2 mb-2">{group.label}</p>
-                  <div className="grid grid-cols-3 gap-2">
+                <div key={group.label} className={idx > 0 ? "mt-5" : "mt-1"}>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 mb-3">{group.label}</p>
+                  <div className="grid grid-cols-4 gap-2">
                     {group.items.map(item => {
                       const Icon = item.icon
                       const active = pathname === item.href
@@ -156,12 +170,14 @@ export function MobileBottomNav() {
                           key={item.href}
                           href={item.href}
                           onClick={() => setMoreOpen(false)}
-                          className={`flex flex-col items-center justify-center py-3 rounded-xl active:scale-95 transition-transform ${
-                            active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+                          className={`flex flex-col items-center justify-center py-3.5 rounded-2xl active:scale-90 transition-all duration-150 gap-1.5 ${
+                            active
+                              ? "bg-primary/15 text-primary"
+                              : "bg-muted/40 text-muted-foreground hover:bg-muted/70"
                           }`}
                         >
-                          <Icon className="h-6 w-6 mb-1" />
-                          <span className="text-[11px] font-medium text-center">{item.label}</span>
+                          <Icon className={`h-5 w-5 ${ active ? "stroke-[2.5]" : "stroke-[1.8]" }`} />
+                          <span className="text-[10px] font-semibold text-center leading-tight">{item.label}</span>
                         </Link>
                       )
                     })}

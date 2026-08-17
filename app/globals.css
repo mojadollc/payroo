@@ -135,6 +135,20 @@
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
 }
 
+/* Glass header */
+.glass-header {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 20px rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-header {
+  background: rgba(18, 18, 28, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* Larger touch targets on mobile */
 @media (max-width: 767px) {
   /* Smooth momentum scrolling */

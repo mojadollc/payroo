@@ -168,7 +168,7 @@ export default function EWalletPage() {
 
   const PeriodSelect = (
     <Select value={period} onValueChange={v => setPeriod(v as Period)}>
-      <SelectTrigger className="w-full md:w-[200px] h-11 md:h-9 rounded-xl border-2 md:rounded-md md:border">
+      <SelectTrigger className="w-full md:w-[200px] h-11 md:h-9 rounded-xl border border-border/60 bg-white/80 md:rounded-md md:border">
         <Calendar className="h-4 w-4 mr-2 shrink-0" />
         <SelectValue placeholder="Period" />
       </SelectTrigger>

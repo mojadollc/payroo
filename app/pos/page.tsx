@@ -506,13 +506,13 @@ export default function POSPage() {
       stickyBar={
         <div className="md:hidden flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               ref={scannerInputRef}
               placeholder={cfg.posPlaceholder}
               value={barcodeInput}
               onChange={(e) => handleInputChange(e.target.value)}
-              className="pl-10 h-11 text-base rounded-xl border-2 border-yellow-300 bg-white focus:border-yellow-400"
+              className="pl-9 h-10 text-base rounded-xl border border-border/60 bg-white/80 focus:border-primary/50 focus:bg-white shadow-sm"
               autoFocus
               onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
             />
@@ -594,7 +594,7 @@ export default function POSPage() {
           </div>
           <Button
             size="lg"
-            className="h-11 w-11 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white border-0 shadow-md flex-shrink-0"
+            className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-sm flex-shrink-0"
             onClick={() => setShowScanner(true)}
           >
             <Barcode className="h-5 w-5" />
@@ -617,7 +617,7 @@ export default function POSPage() {
                 onClick={() => product.stock > 0 && addToCart(product)}
                 className={product.stock <= 0 ? "opacity-50" : ""}
               >
-                <div className="relative aspect-square bg-muted">
+                <div className="relative aspect-square bg-muted/40">
                   {product.imageUrl ? (
                     <img
                       src={product.imageUrl}
@@ -631,31 +631,31 @@ export default function POSPage() {
                   )}
                   {product.stock <= 0 && (
                     <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
-                      <span className="text-sm font-bold text-destructive">Out of Stock</span>
+                      <span className="text-xs font-bold text-destructive">Out of Stock</span>
                     </div>
                   )}
                   {product.onSale && product.salePrice && product.stock > 0 && (
-                    <div className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">
+                    <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
                       SALE
                     </div>
                   )}
                 </div>
                 <div className="p-3">
-                  <div className="font-semibold text-sm truncate mb-0.5" title={product.name}>
+                  <div className="font-semibold text-[13px] truncate mb-0.5 tracking-tight" title={product.name}>
                     {product.name}
                   </div>
                   {product.variants && product.variants.length > 0 && (
                     <p className="text-[10px] text-primary font-medium mb-0.5">{product.variants.map(v => v.name).join(", ")}</p>
                   )}
                   {product.onSale && product.salePrice ? (
-                    <div className="flex items-center gap-2">
-                      <div className="text-base font-bold text-orange-600">₱{product.salePrice.toFixed(2)}</div>
-                      <div className="text-xs line-through text-muted-foreground">₱{product.price.toFixed(2)}</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-[15px] font-bold text-orange-500">₱{product.salePrice.toFixed(2)}</div>
+                      <div className="text-[11px] line-through text-muted-foreground">₱{product.price.toFixed(2)}</div>
                     </div>
                   ) : (
-                    <div className="text-base font-bold text-emerald-700">₱{product.price.toFixed(2)}</div>
+                    <div className="text-[15px] font-bold text-primary">₱{product.price.toFixed(2)}</div>
                   )}
-                  <div className="text-xs text-muted-foreground mt-1">Stock: {product.stock}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1 font-medium">{product.stock} in stock</div>
                 </div>
               </MobileCard>
             ))}
@@ -900,15 +900,15 @@ export default function POSPage() {
       </div>
 
       {/* Floating Cart Button (Mobile) */}
-      <div className="fixed z-40 md:hidden bottom-20 right-4 flex flex-col items-center gap-1">
+      <div className="fixed z-40 md:hidden bottom-24 right-4 flex flex-col items-center gap-1">
         {/* Floating label */}
-        <div className="animate-bounce bg-yellow-400 text-gray-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-lg whitespace-nowrap">
+        <div className="animate-bounce bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1 rounded-full shadow-lg whitespace-nowrap">
           More Sales Today! 🎉
         </div>
-        {/* Smiley cart button */}
+        {/* Cart button */}
         <button
           onClick={() => setShowCartDrawer(true)}
-          className="relative w-16 h-16 rounded-full bg-yellow-400 shadow-2xl shadow-yellow-400/50 active:scale-95 transition-transform flex items-center justify-center"
+          className="relative w-14 h-14 rounded-2xl bg-primary shadow-[0_8px_24px_rgba(0,0,0,0.18)] active:scale-90 transition-all duration-150 flex items-center justify-center"
           style={{ animation: "fabFloat 2.5s ease-in-out infinite" }}
         >
           {/* Ping ring */}

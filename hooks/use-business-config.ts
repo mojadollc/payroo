@@ -3,12 +3,13 @@ import { getBusinessConfig, type BusinessConfig, type BusinessType } from "@/lib
 import { getStoreId } from "@/lib/store-id"
 
 export function useBusinessConfig(): BusinessConfig {
-  const [config, setConfig] = useState<BusinessConfig>(() => getBusinessConfig("retail"))
+  const [config, setConfig] = useState<BusinessConfig>(() => {
+    if (typeof window === "undefined") return getBusinessConfig("retail")
+    const cached = localStorage.getItem("businessType")
+    return getBusinessConfig(cached ?? "retail")
+  })
 
   useEffect(() => {
-    const cached = localStorage.getItem("businessType")
-    if (cached) setConfig(getBusinessConfig(cached))
-
     const fetchConfig = async () => {
       try {
         const storeId = getStoreId()

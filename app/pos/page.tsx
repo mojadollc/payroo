@@ -170,15 +170,8 @@ export default function POSPage() {
     const storeId = getStoreId()
     if (!storeId) return
 
-    // Show cached products for instant display ONLY — never use for stock decisions
-    const cached = getCachedProducts()
-    if (cached.length > 0) {
-      setShuffledProducts(shuffleArray(cached as Product[]))
-      // Do NOT set products state from cache — search and stock must use fresh DB data
-    }
-
     // Always fetch fresh from DB immediately
-    fetch(`/api/products?storeId=${storeId}`)
+    fetch(`/api/products?storeId=${storeId}&pos=1`)
       .then(r => r.json())
       .then(({ data }) => {
         if (!data?.length) return
@@ -187,10 +180,13 @@ export default function POSPage() {
         productsRef.current = data
         freshLoadedRef.current = true
         cacheProducts(data)
-        localPutMany("products", data.map((d: Product) => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
+        // Defer IndexedDB write — don't compete with render
+        setTimeout(() => {
+          localPutMany("products", data.map((d: Product) => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
+        }, 2000)
       })
       .catch(() => {
-        // Only fall back to cache if API completely fails
+        const cached = getCachedProducts()
         if (cached.length > 0) {
           setProducts(cached as Product[])
           productsRef.current = cached as Product[]
@@ -272,7 +268,7 @@ export default function POSPage() {
     try {
       const storeId = getStoreId()
       if (!storeId) return
-      const res = await fetch(`/api/products?storeId=${storeId}`)
+      const res = await fetch(`/api/products?storeId=${storeId}&pos=1`)
       const { data } = await res.json()
       if (data?.length > 0) {
         setProducts(data)

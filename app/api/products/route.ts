@@ -35,7 +35,19 @@ export async function GET(req: NextRequest) {
 
   // No pagination param = return ALL products (POS, offline cache, etc.)
   if (!hasPagination) {
-    const items = await prisma.product.findMany({ where, orderBy: { name: "asc" } })
+    // pos=1: slim select — only fields POS needs, much smaller payload
+    const posMode = p.get("pos") === "1"
+    const items = posMode
+      ? await prisma.product.findMany({
+          where,
+          orderBy: { name: "asc" },
+          select: {
+            id: true, name: true, barcode: true, category: true,
+            price: true, cost: true, stock: true, imageUrl: true,
+            unit: true, onSale: true, salePrice: true, variants: true,
+          },
+        })
+      : await prisma.product.findMany({ where, orderBy: { name: "asc" } })
     return NextResponse.json(
       { data: items.map(fixProduct) },
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }

@@ -1029,7 +1029,7 @@ export default function POSPage() {
             </div>
 
             {/* Inline action buttons — always pinned at bottom */}
-            <div className="flex-shrink-0 flex gap-2 pt-3 border-t bg-background" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+            <div className="flex-shrink-0 flex gap-2 pt-3 pb-5 border-t bg-background">
               <Button
                 size="lg"
                 className="flex-1 h-12 text-[14px] font-bold rounded-xl shadow-md"

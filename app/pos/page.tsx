@@ -89,7 +89,21 @@ export default function POSPage() {
   const { isActive, loading: subLoading, endDate } = useSubscription()
   const CART_KEY = "pos_cart"
   const [products, setProducts] = useState<Product[]>([])
-  const [shuffledProducts, setShuffledProducts] = useState<Product[]>([])
+  const [shuffledProducts, setShuffledProducts] = useState<Product[]>(() => {
+    // Seed grid instantly from cache on first render — no blank screen
+    if (typeof window === "undefined") return []
+    try {
+      const cached = getCachedProducts()
+      if (cached.length > 0) {
+        const arr = [...cached] as Product[]
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]
+        }
+        return arr
+      }
+    } catch {}
+    return []
+  })
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return []
     try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") } catch { return [] }
@@ -610,7 +624,19 @@ export default function POSPage() {
         {/* Product Grid */}
         <div className="pt-1">
           <MobileSectionHeader title="Products" />
-          <div className="grid grid-cols-2 gap-3">
+          {shuffledProducts.length === 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="rounded-2xl overflow-hidden border border-border/40 bg-muted/30 animate-pulse">
+                  <div className="aspect-square bg-muted/50" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 bg-muted rounded w-3/4" />
+                    <div className="h-3 bg-muted rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
             {shuffledProducts.slice(0, 20).map((product) => (
               <MobileCard
                 key={product.id}
@@ -660,6 +686,7 @@ export default function POSPage() {
               </MobileCard>
             ))}
           </div>
+          )}
         </div>
       </div>
 

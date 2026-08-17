@@ -92,7 +92,7 @@ export default function DashboardPage() {
 
       login(ownerUser)
       toast({ title: `Welcome, ${subscription.ownerName}!`, description: `${subscription.storeName} — ${subscription.tier} plan` })
-      router.push("/pos")
+      router.push("/home")
     } catch (err: any) {
       setError(err.message || "Login failed. Please try again.")
     } finally {

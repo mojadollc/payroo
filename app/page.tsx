@@ -33,7 +33,7 @@ export default function HomePage() {
   const [plansLoading, setPlansLoading] = useState(true)
 
   useEffect(() => {
-    if (!loading && user) router.push("/pos")
+    if (!loading && user) router.push("/home")
   }, [user, loading, router])
 
   useEffect(() => {

@@ -87,7 +87,7 @@ export function BottomSheet({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-8" style={{ maxHeight: 'calc(90vh - 100px)' }}>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 pb-4">
           {children}
         </div>
       </div>

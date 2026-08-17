@@ -68,7 +68,7 @@ export default function LoginPage() {
 
       login(user)
       toast({ title: `Welcome back, ${user.name}!`, description: `Signed in as ${user.role}` })
-      router.push("/pos")
+      router.push("/home")
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" })
     } finally {

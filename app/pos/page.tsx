@@ -962,80 +962,82 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="space-y-3 pb-6">
-            {/* Cart Items */}
-            <div className="divide-y divide-border/50">
-              {cart.map((item, idx) => (
-                <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-2.5 first:pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium truncate">{item.name}</p>
-                      {item.selectedVariants && (
-                        <p className="text-[11px] text-primary font-medium">{Object.values(item.selectedVariants).join(" · ")}</p>
-                      )}
-                      <p className="text-[12px] text-muted-foreground">₱{item.price.toFixed(2)} × {item.quantity}</p>
+          <div className="flex flex-col" style={{ maxHeight: "calc(80vh - 120px)" }}>
+            {/* Scrollable items + summary */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+              <div className="divide-y divide-border/50">
+                {cart.map((item, idx) => (
+                  <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-2.5 first:pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium truncate">{item.name}</p>
+                        {item.selectedVariants && (
+                          <p className="text-[11px] text-primary font-medium">{Object.values(item.selectedVariants).join(" · ")}</p>
+                        )}
+                        <p className="text-[12px] text-muted-foreground">₱{item.price.toFixed(2)} × {item.quantity}</p>
+                      </div>
+                      <div className="text-[14px] font-semibold text-emerald-700 ml-2">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 text-destructive/60" onClick={() => removeFromCart(item.cartLineId || item.id!)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <div className="text-[14px] font-semibold text-emerald-700 ml-2">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 text-destructive/60" onClick={() => removeFromCart(item.cartLineId || item.id!)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-md border-red-200 text-red-500"
+                        onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </Button>
+                      <CartQuantityInput
+                        item={item}
+                        onUpdate={updateQuantity}
+                        onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.cartLineId || item.id!]: q }))}
+                        className="h-8 w-12 text-center p-0 text-[14px] font-semibold rounded-md border"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 rounded-md border-green-200 text-green-600"
+                        onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-md border-red-200 text-red-500"
-                      onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <CartQuantityInput
-                      item={item}
-                      onUpdate={updateQuantity}
-                      onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.cartLineId || item.id!]: q }))}
-                      className="h-8 w-12 text-center p-0 text-[14px] font-semibold rounded-md border"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 rounded-md border-green-200 text-green-600"
-                      onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                ))}
+              </div>
+
+              {/* Summary */}
+              <div className="border-t pt-3 space-y-1.5 mt-2">
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">₱{calculateTotal().toFixed(2)}</span>
                 </div>
-              ))}
-            </div>
-
-            {/* Summary */}
-            <div className="border-t pt-3 space-y-1.5">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">₱{calculateTotal().toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-muted-foreground">Est. Profit</span>
-                <span className="font-medium text-teal-600">₱{calculateProfit().toFixed(2)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-[16px] font-bold">
-                <span>Total</span>
-                <span className="text-emerald-700">₱{calculateTotal().toFixed(2)}</span>
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-muted-foreground">Est. Profit</span>
+                  <span className="font-medium text-teal-600">₱{calculateProfit().toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-[16px] font-bold">
+                  <span>Total</span>
+                  <span className="text-emerald-700">₱{calculateTotal().toFixed(2)}</span>
+                </div>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="space-y-2 pt-2">
+            {/* Sticky action buttons — always visible at bottom */}
+            <div className="flex-shrink-0 pt-3 pb-2 space-y-2 border-t bg-background">
               <Button
                 size="lg"
-                className="w-full h-11 text-[14px] rounded-xl shadow-md"
+                className="w-full h-12 text-[15px] rounded-xl shadow-md"
                 onClick={() => {
                   setShowCartDrawer(false)
                   setShowCheckout(true)
                 }}
               >
-                Checkout
+                Checkout · ₱{calculateTotal().toFixed(2)}
               </Button>
               <Button
                 variant="outline"

@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import {
   Store, Package, TrendingUp, HandCoins, Star,
-  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks, Receipt,
+  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks, Receipt, Home,
 } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
@@ -27,10 +27,10 @@ interface NavGroup {
 
 // Primary tabs (always in bottom bar)
 const PRIMARY_TABS: NavItem[] = [
+  { href: "/home", label: "Home", icon: Home },
   { href: "/pos", label: "POS", icon: Store, feature: "pos" },
   { href: "/ewallet", label: "E-Wallet", icon: Smartphone, feature: "ewallet", ownerOnly: true },
   { href: "/inventory", label: "Inventory", icon: Package, feature: "inventory", ownerOnly: true },
-  { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
   { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
 ]
 
@@ -40,6 +40,7 @@ const MORE_GROUPS: NavGroup[] = [
     label: "Finance",
     items: [
       { href: "/utang", label: "Utang", icon: HandCoins, feature: "utang", ownerOnly: true },
+      { href: "/bills", label: "Pay Bills", icon: Receipt, ownerOnly: true },
     ],
   },
   {

@@ -28,16 +28,16 @@ const AuthContext = createContext<AuthState>({
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<StoreUser | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
+  const [user, setUser] = useState<StoreUser | null>(() => {
+    if (typeof window === "undefined") return null
     try {
       const stored = localStorage.getItem(AUTH_KEY)
-      if (stored) setUser(JSON.parse(stored))
-    } catch {}
-    setLoading(false)
-  }, [])
+      return stored ? JSON.parse(stored) : null
+    } catch { return null }
+  })
+  const [loading] = useState(false)
+
+  useEffect(() => {}, [])
 
   const login = useCallback((u: StoreUser) => {
     setUser(u)

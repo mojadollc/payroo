@@ -7,9 +7,18 @@ export async function GET(req: NextRequest) {
   if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
   const from = req.nextUrl.searchParams.get("from")
   const to = req.nextUrl.searchParams.get("to")
+  const summary = req.nextUrl.searchParams.get("summary") === "1"
   const where: any = { storeId }
   if (from && to) {
     where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+  }
+  // summary=1: skip items join, return only totals — much faster for dashboard
+  if (summary) {
+    const rows = await prisma.sale.findMany({
+      where,
+      select: { total: true, status: true },
+    })
+    return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
   }
   const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } })
   return NextResponse.json({ data: items })

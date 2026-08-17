@@ -65,28 +65,13 @@ function Shimmer({ className }: { className?: string }) {
   )
 }
 
-// Card shimmer for feature tiles
-function CardShimmer() {
-  return (
-    <div className="bg-white/80 rounded-2xl p-4 border border-white/60 shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
-      <div className="relative overflow-hidden h-10 w-10 rounded-xl bg-muted/40 mb-3">
-        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-      </div>
-      <div className="relative overflow-hidden h-3.5 w-20 rounded-lg bg-muted/40 mb-2">
-        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-      </div>
-      <div className="relative overflow-hidden h-3 w-14 rounded-lg bg-muted/30">
-        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-      </div>
-    </div>
-  )
-}
-
 export default function HomePage() {
   const router = useRouter()
   const { user, loading, logout } = useAuth()
   const { tier, isActive, features } = useSubscription()
-  const [session, setSession] = useState<ReturnType<typeof getSession>>(null)
+  const [session] = useState<ReturnType<typeof getSession>>(() =>
+    typeof window !== "undefined" ? getSession() : null
+  )
   const [today, setToday] = useState<TodayData | null>(null)
   const [showLogout, setShowLogout] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -94,10 +79,6 @@ export default function HomePage() {
   useEffect(() => {
     if (!loading && !user) router.push("/login")
   }, [user, loading, router])
-
-  useEffect(() => {
-    setSession(getSession())
-  }, [])
 
   useEffect(() => {
     const storeId = getStoreId()
@@ -112,8 +93,8 @@ export default function HomePage() {
     yesterdayEnd.setMilliseconds(yesterdayEnd.getMilliseconds() - 1)
 
     Promise.all([
-      fetch(`/api/sales?storeId=${storeId}&from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}`).then(r => r.json()),
-      fetch(`/api/sales?storeId=${storeId}&from=${yesterdayStart.toISOString()}&to=${yesterdayEnd.toISOString()}`).then(r => r.json()),
+      fetch(`/api/sales?storeId=${storeId}&from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}&summary=1`).then(r => r.json()),
+      fetch(`/api/sales?storeId=${storeId}&from=${yesterdayStart.toISOString()}&to=${yesterdayEnd.toISOString()}&summary=1`).then(r => r.json()),
     ]).then(([todayRes, yestRes]) => {
       const todayActive = (todayRes.data ?? []).filter((s: any) => s.status !== "voided")
       const yestActive = (yestRes.data ?? []).filter((s: any) => s.status !== "voided")
@@ -132,7 +113,7 @@ export default function HomePage() {
     router.push("/login")
   }
 
-  if (loading || !user) return null
+  if (!user) return null
 
   const storeName = session?.storeName || "My Store"
   const ownerName = session?.ownerName || user?.name || "there"
@@ -258,35 +239,29 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* ── Primary Features — shimmer while loading, real tiles after ── */}
+          {/* ── Primary Features — always visible ── */}
           <div>
             <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-1">Main Features</p>
-            {!dataLoaded ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[0, 1, 2, 3].map(i => <CardShimmer key={i} />)}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {PRIMARY_TILES.map((tile) => {
-                  const Icon = tile.icon
-                  return (
-                    <Link key={tile.href} href={tile.href}>
-                      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-[0_2px_16px_rgba(0,0,0,0.06)] border border-white/60 active:scale-[0.97] transition-all duration-150">
-                        <div className={`h-10 w-10 rounded-xl ${tile.bg} flex items-center justify-center mb-3`}>
-                          <Icon className={`h-5 w-5 ${tile.color}`} />
-                        </div>
-                        <p className="font-bold text-[14px] text-foreground leading-tight">{tile.label}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">{tile.desc}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {PRIMARY_TILES.map((tile) => {
+                const Icon = tile.icon
+                return (
+                  <Link key={tile.href} href={tile.href}>
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-[0_2px_16px_rgba(0,0,0,0.06)] border border-white/60 active:scale-[0.97] transition-all duration-150">
+                      <div className={`h-10 w-10 rounded-xl ${tile.bg} flex items-center justify-center mb-3`}>
+                        <Icon className={`h-5 w-5 ${tile.color}`} />
                       </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
+                      <p className="font-bold text-[14px] text-foreground leading-tight">{tile.label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{tile.desc}</p>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
 
-          {/* ── More Features ── */}
-          {dataLoaded && visibleMore.length > 0 && (
+          {/* ── More Features — always visible ── */}
+          {isOwner && visibleMore.length > 0 && (
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-1">More Tools</p>
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] border border-white/60 overflow-hidden divide-y divide-border/30">
@@ -307,32 +282,6 @@ export default function HomePage() {
                     </Link>
                   )
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* ── More Tools shimmer while loading ── */}
-          {!dataLoaded && isOwner && (
-            <div>
-              <div className="relative overflow-hidden h-3 w-20 rounded-full bg-muted/30 mb-3 mx-1">
-                <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-              </div>
-              <div className="bg-white/80 rounded-2xl border border-white/60 overflow-hidden divide-y divide-border/30">
-                {[0, 1, 2, 3].map(i => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                    <div className="relative overflow-hidden h-9 w-9 rounded-xl bg-muted/30 flex-shrink-0">
-                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                    </div>
-                    <div className="flex-1 space-y-1.5">
-                      <div className="relative overflow-hidden h-3 w-24 rounded-lg bg-muted/30">
-                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                      </div>
-                      <div className="relative overflow-hidden h-2.5 w-16 rounded-lg bg-muted/20">
-                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           )}

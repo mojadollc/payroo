@@ -17,6 +17,7 @@ import { getStoreId } from "@/lib/store-id"
 interface TodayData {
   gross: number
   txCount: number
+  pctChange: number | null
 }
 
 interface NavTile {
@@ -101,16 +102,26 @@ export default function HomePage() {
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
-    const from = new Date()
-    from.setHours(0, 0, 0, 0)
-    const params = `storeId=${storeId}&from=${from.toISOString()}`
-    fetch(`/api/sales?${params}`)
-      .then(r => r.json())
-      .then(({ data: salesData }) => {
-        const active = (salesData ?? []).filter((s: any) => s.status !== "voided")
-        const gross = active.reduce((sum: number, s: any) => sum + s.total, 0)
-        setToday({ gross, txCount: active.length })
-      }).catch(() => {})
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+    const yesterdayStart = new Date(todayStart)
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+    const yesterdayEnd = new Date(todayStart)
+    yesterdayEnd.setMilliseconds(yesterdayEnd.getMilliseconds() - 1)
+
+    Promise.all([
+      fetch(`/api/sales?storeId=${storeId}&from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}`).then(r => r.json()),
+      fetch(`/api/sales?storeId=${storeId}&from=${yesterdayStart.toISOString()}&to=${yesterdayEnd.toISOString()}`).then(r => r.json()),
+    ]).then(([todayRes, yestRes]) => {
+      const todayActive = (todayRes.data ?? []).filter((s: any) => s.status !== "voided")
+      const yestActive = (yestRes.data ?? []).filter((s: any) => s.status !== "voided")
+      const gross = todayActive.reduce((sum: number, s: any) => sum + s.total, 0)
+      const yestGross = yestActive.reduce((sum: number, s: any) => sum + s.total, 0)
+      const pctChange = yestGross > 0 ? Math.round(((gross - yestGross) / yestGross) * 100) : null
+      setToday({ gross, txCount: todayActive.length, pctChange })
+    }).catch(() => {})
   }, [])
 
   const handleLogout = async () => {
@@ -200,16 +211,23 @@ export default function HomePage() {
 
             {/* Today's Sales — single clean number */}
             <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4 border border-black/10">
-              <p className="text-amber-900/70 text-[11px] font-bold uppercase tracking-widest mb-1">Today's Sales</p>
+              <p className="text-amber-900/70 text-[11px] font-bold uppercase tracking-widest mb-1">Benta ngayong araw</p>
               {dataLoaded ? (
                 <>
                   <p className="text-amber-950 text-[36px] font-black leading-none">{fmt(today!.gross)}</p>
-                  <p className="text-amber-900/60 text-[12px] mt-1.5">{today!.txCount} transaction{today!.txCount !== 1 ? "s" : ""} today</p>
+                  <p className="text-amber-900/60 text-[12px] mt-1.5">
+                    {today!.pctChange !== null && (
+                      <span className={`font-bold mr-1 ${today!.pctChange >= 0 ? "text-green-700" : "text-red-600"}`}>
+                        {today!.pctChange >= 0 ? "+" : ""}{today!.pctChange}% vs. kahapon ·
+                      </span>
+                    )}
+                    {today!.txCount} transactions
+                  </p>
                 </>
               ) : (
                 <>
                   <Shimmer className="h-9 w-36 mb-2" />
-                  <Shimmer className="h-3 w-24" />
+                  <Shimmer className="h-3 w-40" />
                 </>
               )}
             </div>

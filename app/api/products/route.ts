@@ -36,7 +36,10 @@ export async function GET(req: NextRequest) {
   // No pagination param = return ALL products (POS, offline cache, etc.)
   if (!hasPagination) {
     const items = await prisma.product.findMany({ where, orderBy: { name: "asc" } })
-    return NextResponse.json({ data: items.map(fixProduct) })
+    return NextResponse.json(
+      { data: items.map(fixProduct) },
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
+    )
   }
 
   // Run page items + stats in one round-trip

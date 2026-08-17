@@ -152,6 +152,19 @@ export default function POSPage() {
     return shuffled
   }
 
+  // Preload first 4 product images for instant display
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    shuffledProducts.slice(0, 4).forEach(p => {
+      if (!p.imageUrl) return
+      const link = document.createElement("link")
+      link.rel = "preload"
+      link.as = "image"
+      link.href = p.imageUrl
+      document.head.appendChild(link)
+    })
+  }, [shuffledProducts.length > 0])
+
   // Load products on mount — always fetch fresh from DB first, cache is display-only
   useEffect(() => {
     const storeId = getStoreId()
@@ -647,7 +660,7 @@ export default function POSPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
-            {shuffledProducts.slice(0, 20).map((product) => (
+            {shuffledProducts.slice(0, 20).map((product, idx) => (
               <MobileCard
                 key={product.id}
                 onClick={() => product.stock > 0 && addToCart(product)}
@@ -659,8 +672,11 @@ export default function POSPage() {
                       src={product.imageUrl}
                       alt={product.name}
                       className="w-full h-full object-cover"
-                      loading="lazy"
-                      decoding="async"
+                      loading={idx < 8 ? "eager" : "lazy"}
+                      decoding={idx < 8 ? "sync" : "async"}
+                      fetchPriority={idx < 4 ? "high" : "auto"}
+                      width={200}
+                      height={200}
                     />
                   ) : (
                     <DefaultProductImage />

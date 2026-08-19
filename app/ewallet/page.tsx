@@ -88,6 +88,8 @@ export default function EWalletPage() {
   const [payoutPurpose, setPayoutPurpose] = useState("")
   const [payoutLoading, setPayoutLoading] = useState(false)
   const [payoutResult, setPayoutResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [payoutChannels, setPayoutChannels] = useState<{ id: string; label: string; type: string; logo: string | null; color: string }[]>([])
+  const [payoutChannelsLoading, setPayoutChannelsLoading] = useState(false)
   const allLimitRef = useRef(50)
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
@@ -148,6 +150,16 @@ export default function EWalletPage() {
       })
       .catch(() => setHitpayBalanceError(true))
       .finally(() => setHitpayBalanceLoading(false))
+  }
+
+  const fetchPayoutChannels = () => {
+    if (payoutChannels.length > 0) return // already loaded
+    setPayoutChannelsLoading(true)
+    fetch("/api/hitpay/channels")
+      .then(r => r.json())
+      .then(d => { if (d.channels) setPayoutChannels(d.channels) })
+      .catch(() => {})
+      .finally(() => setPayoutChannelsLoading(false))
   }
 
   useEffect(() => {
@@ -378,7 +390,7 @@ export default function EWalletPage() {
 
           {/* HitPay Cash-In wallet card */}
           <button
-            onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
+            onClick={() => { setPayoutResult(null); fetchPayoutChannels(); setActiveSheet("hitpay") }}
             className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
             style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 6px 20px rgba(190,18,60,0.30)" }}
           >
@@ -421,7 +433,7 @@ export default function EWalletPage() {
               <span className="text-[10px] font-semibold text-foreground text-center">Cash In/Out</span>
             </button>
 
-            <button onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+            <button onClick={() => { setPayoutResult(null); fetchPayoutChannels(); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
               <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shadow-md shadow-rose-500/30">
                 <Send className="h-5 w-5 text-white" />
               </div>
@@ -681,98 +693,124 @@ export default function EWalletPage() {
         open={activeSheet === "hitpay"}
         onClose={() => { setActiveSheet("none"); setPayoutResult(null) }}
         title="Send Payout"
-        description="Send money via HitPay to GCash, Maya, ShopeePay, or any bank"
+        description="Select a channel and fill in the details"
       >
-        <div className="pb-24 space-y-4 px-1">
-          {/* Balance display */}
-          <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3">
-            <div>
-              <p className="text-[11px] text-rose-600 font-semibold uppercase tracking-widest">HitPay Balance</p>
-              <p className="text-xl font-black text-rose-700">
-                {hitpayBalanceLoading ? "..." : hitpayBalance != null ? `₱${hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}` : "N/A"}
-              </p>
-            </div>
-            <button onClick={fetchHitpayBalance} className="p-2 rounded-xl bg-rose-100 active:scale-90 transition-transform">
-              <RefreshCw className={`h-4 w-4 text-rose-600 ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
-            </button>
-          </div>
+        <div className="space-y-5 pt-2">
 
           {/* Channel picker */}
           <div>
-            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Channel</label>
-            <div className="grid grid-cols-3 gap-2">
-              {HITPAY_CHANNELS.map(ch => (
-                <button
-                  key={ch.value}
-                  onClick={() => setPayoutChannel(ch.value)}
-                  className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border text-[11px] font-semibold transition-all ${
-                    payoutChannel === ch.value
-                      ? "bg-rose-500 border-rose-500 text-white shadow-md"
-                      : "bg-white border-border text-foreground active:scale-95"
-                  }`}
-                >
-                  <span className="text-base">{ch.emoji}</span>
-                  {ch.label}
-                </button>
-              ))}
-            </div>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Select Channel</p>
+            {payoutChannelsLoading ? (
+              <div className="grid grid-cols-4 gap-2">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="h-16 rounded-2xl bg-muted animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {payoutChannels.map(ch => (
+                  <button
+                    key={ch.id}
+                    onClick={() => setPayoutChannel(ch.id)}
+                    className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all active:scale-95 ${
+                      payoutChannel === ch.id
+                        ? "border-rose-500 bg-rose-50 shadow-md"
+                        : "border-transparent bg-muted/40"
+                    }`}
+                  >
+                    {ch.logo ? (
+                      <img
+                        src={ch.logo}
+                        alt={ch.label}
+                        className="w-8 h-8 rounded-xl object-contain"
+                        onError={e => { (e.target as HTMLImageElement).style.display = "none" }}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-black" style={{ background: ch.color }}>
+                        {ch.label.slice(0, 2)}
+                      </div>
+                    )}
+                    <span className={`text-[10px] font-semibold text-center leading-tight ${
+                      payoutChannel === ch.id ? "text-rose-600" : "text-foreground"
+                    }`}>{ch.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Bank channel — InstaPay or PESONet */}
+          {payoutChannels.find(c => c.id === payoutChannel)?.type === "bank" && (
+            <div>
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Payment Rail</p>
+              <div className="grid grid-cols-2 gap-2">
+                {["instapay", "pesonet"].map(rail => (
+                  <button
+                    key={rail}
+                    onClick={() => setPayoutPurpose(rail)}
+                    className={`py-3 rounded-2xl border-2 text-[13px] font-bold transition-all active:scale-95 ${
+                      payoutPurpose === rail
+                        ? "border-rose-500 bg-rose-50 text-rose-600"
+                        : "border-transparent bg-muted/40 text-foreground"
+                    }`}
+                  >
+                    {rail === "instapay" ? "⚡ InstaPay" : "🏦 PESONet"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Account number */}
           <div>
-            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Account / Phone Number</label>
+            <label className="text-[12px] font-bold text-foreground mb-1.5 block">
+              {payoutChannels.find(c => c.id === payoutChannel)?.type === "wallet" ? "Mobile Number" : "Account Number"}
+            </label>
             <input
               type="tel"
               value={payoutAccount}
               onChange={e => setPayoutAccount(e.target.value)}
-              placeholder="e.g. 09171234567"
-              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
+              placeholder={payoutChannels.find(c => c.id === payoutChannel)?.type === "wallet" ? "09171234567" : "Account number"}
+              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
             />
           </div>
 
           {/* Account name */}
           <div>
-            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Account Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <label className="text-[12px] font-bold text-foreground mb-1.5 block">Account Name</label>
             <input
               type="text"
               value={payoutName}
               onChange={e => setPayoutName(e.target.value)}
               placeholder="Customer name"
-              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
+              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
             />
           </div>
 
           {/* Amount */}
           <div>
-            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Amount (₱)</label>
-            <input
-              type="number"
-              value={payoutAmount}
-              onChange={e => setPayoutAmount(e.target.value)}
-              placeholder="0.00"
-              min="1"
-              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
-            />
-          </div>
-
-          {/* Purpose */}
-          <div>
-            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Purpose <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <input
-              type="text"
-              value={payoutPurpose}
-              onChange={e => setPayoutPurpose(e.target.value)}
-              placeholder="Cash-in payout"
-              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
-            />
+            <label className="text-[12px] font-bold text-foreground mb-1.5 block">Amount</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-black text-muted-foreground">₱</span>
+              <input
+                type="number"
+                value={payoutAmount}
+                onChange={e => setPayoutAmount(e.target.value)}
+                placeholder="0.00"
+                min="1"
+                className="w-full h-14 rounded-2xl border border-border bg-muted/30 pl-9 pr-4 text-[22px] font-black focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
+              />
+            </div>
           </div>
 
           {/* Result */}
           {payoutResult && (
-            <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold ${
-              payoutResult.ok ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"
+            <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[13px] font-semibold ${
+              payoutResult.ok
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
             }`}>
-              {payoutResult.ok ? "✅" : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+              <span className="text-xl">{payoutResult.ok ? "✅" : "❌"}</span>
               {payoutResult.msg}
             </div>
           )}
@@ -780,15 +818,17 @@ export default function EWalletPage() {
           {/* Submit */}
           <button
             onClick={handlePayout}
-            disabled={payoutLoading || !payoutAccount || !payoutAmount}
-            className="w-full h-12 rounded-xl bg-rose-500 text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all disabled:opacity-50 shadow-md shadow-rose-500/30"
+            disabled={payoutLoading || !payoutAccount || !payoutAmount || !payoutChannel}
+            className="w-full h-14 rounded-2xl bg-rose-500 text-white font-black text-[16px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all disabled:opacity-40 shadow-lg shadow-rose-500/30"
           >
             {payoutLoading ? (
               <span className="animate-pulse">Sending...</span>
             ) : (
-              <><Send className="h-4 w-4" /> Send Payout</>
+              <><Send className="h-5 w-5" /> Send ₱{payoutAmount || "0"}</>
             )}
           </button>
+
+          <div className="h-4" />
         </div>
       </BottomSheet>
 

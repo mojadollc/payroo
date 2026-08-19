@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.1.3"
+export const APP_VERSION = "2.1.4"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Fixed checkout scroll - Total always visible at bottom with many cart items"
+export const VERSION_CHANGELOG = "Improved search UX - dropdown stays open when clearing text, closes only on outside tap"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

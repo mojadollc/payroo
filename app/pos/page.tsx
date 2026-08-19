@@ -294,7 +294,9 @@ export default function POSPage() {
   const handleInputChange = (value: string) => {
     setBarcodeInput(value)
     const q = value.trim().toLowerCase()
-    if (!q) { setSearchSuggestions([]); return }
+    // Don't close dropdown when input is cleared - let user type new keywords
+    // Dropdown closes only on outside click
+    if (!q) return
 
     // Always use fresh DB data — products state is only set from API, never from stale cache
     const pool = products.length > 0 ? products : productsRef.current

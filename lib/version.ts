@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.1.6"
+export const APP_VERSION = "2.1.7"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Fixed dropdown not closing on mobile - added touchstart listener"
+export const VERSION_CHANGELOG = "Instant load on pull-to-refresh - show cache first, fetch fresh in background"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

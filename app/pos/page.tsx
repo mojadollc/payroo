@@ -171,12 +171,20 @@ export default function POSPage() {
     })
   }, [shuffledProducts.length > 0])
 
-  // Load products on mount — always fetch fresh from DB first, cache is display-only
+  // Load products: show cache instantly, fetch fresh in background
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
 
-    // Always fetch fresh from DB immediately
+    // Step 1: Paint cache immediately so grid is never blank on refresh
+    const cached = getCachedProducts() as Product[]
+    if (cached.length > 0 && productsRef.current.length === 0) {
+      setProducts(cached)
+      setShuffledProducts(shuffleArray(cached))
+      productsRef.current = cached
+    }
+
+    // Step 2: Fetch fresh data in background — update silently
     fetch(`/api/products?storeId=${storeId}&pos=1`)
       .then(r => r.json())
       .then(({ data }) => {
@@ -186,24 +194,19 @@ export default function POSPage() {
         productsRef.current = data
         freshLoadedRef.current = true
         cacheProducts(data)
-        // Defer IndexedDB write — don't compete with render
         setTimeout(() => {
           localPutMany("products", data.map((d: Product) => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
         }, 2000)
       })
       .catch(() => {
-        const cached = getCachedProducts()
-        if (cached.length > 0) {
-          setProducts(cached as Product[])
-          productsRef.current = cached as Product[]
-        } else {
-          localGetByStoreId<Product>("products").then(idbProducts => {
-            if (idbProducts.length > 0) {
-              setProducts(idbProducts)
-              productsRef.current = idbProducts
-            }
-          }).catch(() => {})
-        }
+        if (productsRef.current.length > 0) return // already showing cache
+        localGetByStoreId<Product>("products").then(idbProducts => {
+          if (idbProducts.length > 0) {
+            setProducts(idbProducts)
+            setShuffledProducts(shuffleArray(idbProducts))
+            productsRef.current = idbProducts
+          }
+        }).catch(() => {})
       })
   }, [])
 

@@ -638,8 +638,7 @@ export default function POSPage() {
                                 for (let j = 1; j < qty; j++) addToCart(p)
                               }
                               setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
-                              setBarcodeInput("")
-                              setSearchSuggestions([])
+                              // Keep dropdown open - don't clear input or suggestions
                             }}
                           >
                             <ShoppingCart className="h-4 w-4" />
@@ -804,7 +803,7 @@ export default function POSPage() {
                                     <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
                                     <span className="w-6 text-center text-sm font-bold">{qty}</span>
                                     <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
-                                    <button type="button" className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold" onClick={() => { for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }); setBarcodeInput(""); setSearchSuggestions([]) }}>Add</button>
+                                    <button type="button" className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold" onClick={(e) => { e.stopPropagation(); for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }) }}>Add</button>
                                   </div>
                                 </div>
                               )

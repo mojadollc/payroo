@@ -26,6 +26,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
 import { useAppRefresh } from "@/components/pwa-update-manager"
 import type { SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
+import { APP_VERSION } from "@/lib/version"
 
 export const STORE_NAME_KEY = "storeName"
 export const DEFAULT_STORE_NAME = "POS Inventory"
@@ -236,6 +237,8 @@ export function Navbar() {
 
           {/* Management & Actions */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Version badge */}
+            <span className="text-[9px] font-mono text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full mr-1">v{APP_VERSION}</span>
             {/* Settings & Users dropdown */}
             <BranchSwitcher />
             {(hasPermission("manageSettings") || hasPermission("manageUsers")) && (

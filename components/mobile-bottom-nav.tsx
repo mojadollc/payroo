@@ -10,6 +10,7 @@ import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
 import type { SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
+import { APP_VERSION } from "@/lib/version"
 
 interface NavItem {
   href: string
@@ -154,9 +155,12 @@ export function MobileBottomNav() {
             </div>
             <div className="flex items-center justify-between px-5 pt-2 pb-3">
               <span className="font-bold text-[15px] tracking-tight">More Features</span>
-              <button onClick={() => setMoreOpen(false)} className="p-1.5 rounded-full bg-muted/60 hover:bg-muted">
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-mono text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">v{APP_VERSION}</span>
+                <button onClick={() => setMoreOpen(false)} className="p-1.5 rounded-full bg-muted/60 hover:bg-muted">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="px-4 pb-6">
               {visibleGroups.map((group, idx) => (

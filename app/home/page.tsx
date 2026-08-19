@@ -49,11 +49,28 @@ const MORE_TILES: NavTile[] = [
   { href: "/settings",            label: "Settings",     icon: Settings,   color: "text-yellow-700", bg: "bg-yellow-100", desc: "Store config" },
 ]
 
+function getPHTime() {
+  return new Date().toLocaleTimeString("en-PH", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: true })
+}
+
 function getGreeting() {
-  const h = new Date().getHours()
+  const h = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })).getHours()
   if (h < 12) return "Good morning"
   if (h < 18) return "Good afternoon"
   return "Good evening"
+}
+
+function wmoToWeather(code: number): { emoji: string; label: string } {
+  if (code === 0) return { emoji: "☀️", label: "Sunny" }
+  if (code <= 2) return { emoji: "⛅", label: "Partly cloudy" }
+  if (code === 3) return { emoji: "☁️", label: "Overcast" }
+  if (code <= 49) return { emoji: "🌫️", label: "Foggy" }
+  if (code <= 59) return { emoji: "🌦️", label: "Drizzle" }
+  if (code <= 69) return { emoji: "🌧️", label: "Rain" }
+  if (code <= 79) return { emoji: "❄️", label: "Snow" }
+  if (code <= 84) return { emoji: "🌧️", label: "Showers" }
+  if (code <= 99) return { emoji: "⛈️", label: "Thunderstorm" }
+  return { emoji: "🌡️", label: "" }
 }
 
 const THEMES = [
@@ -86,8 +103,37 @@ export default function HomePage() {
   const [today, setToday] = useState<TodayData | null>(null)
   const [showLogout, setShowLogout] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [phTime, setPhTime] = useState(getPHTime)
+  const [weather, setWeather] = useState<{ emoji: string; label: string; temp: number } | null>(null)
   const [themeIdx, setThemeIdx] = useState(() => Math.floor(Math.random() * THEMES.length))
   const theme = THEMES[themeIdx]
+
+  useEffect(() => {
+    const t = setInterval(() => setPhTime(getPHTime()), 60000)
+    return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current_weather=true`)
+        .then(r => r.json())
+        .then(d => {
+          const w = wmoToWeather(d.current_weather.weathercode)
+          setWeather({ ...w, temp: Math.round(d.current_weather.temperature) })
+        })
+        .catch(() => {})
+    }, () => {
+      // fallback: Manila coords
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=14.5995&longitude=120.9842&current_weather=true`)
+        .then(r => r.json())
+        .then(d => {
+          const w = wmoToWeather(d.current_weather.weathercode)
+          setWeather({ ...w, temp: Math.round(d.current_weather.temperature) })
+        })
+        .catch(() => {})
+    })
+  }, [])
 
   useEffect(() => {
     const t = setInterval(() => setThemeIdx(i => {
@@ -221,11 +267,26 @@ export default function HomePage() {
                   <p className="font-bold text-[15px] leading-tight" style={{ color: theme.dark }}>{ownerName.split(" ")[0]} 👋</p>
                 </div>
               </div>
-              <Link href="/settings">
-                <div className="h-10 w-10 rounded-2xl bg-black/10 backdrop-blur-sm flex items-center justify-center border border-black/10 active:scale-90 transition-transform">
-                  <Bell className="h-4.5 w-4.5" style={{ color: theme.dark }} />
+              <div className="flex items-center gap-2">
+                {/* Weather + Time pill */}
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex items-center gap-1 bg-black/10 backdrop-blur-sm rounded-full px-2.5 py-1 border border-black/10">
+                    <span className="text-[11px]">🕐</span>
+                    <span className="text-[11px] font-bold" style={{ color: theme.dark }}>{phTime}</span>
+                  </div>
+                  {weather && (
+                    <div className="flex items-center gap-1 bg-black/10 backdrop-blur-sm rounded-full px-2.5 py-1 border border-black/10">
+                      <span className="text-[11px]">{weather.emoji}</span>
+                      <span className="text-[11px] font-bold" style={{ color: theme.dark }}>{weather.temp}°C</span>
+                    </div>
+                  )}
                 </div>
-              </Link>
+                <Link href="/settings">
+                  <div className="h-10 w-10 rounded-2xl bg-black/10 backdrop-blur-sm flex items-center justify-center border border-black/10 active:scale-90 transition-transform">
+                    <Bell className="h-4.5 w-4.5" style={{ color: theme.dark }} />
+                  </div>
+                </Link>
+              </div>
             </div>
 
             {/* Store name */}

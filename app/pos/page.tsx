@@ -595,16 +595,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-l-xl text-red-500 font-bold text-xl flex items-center justify-center active:bg-red-100"
-                              onTouchStart={(e) => {
-                                e.preventDefault()
-                                dropdownLastTouchRef.current = Date.now()
-                                dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
-                                setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
-                                requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
-                              }}
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                if (Date.now() - dropdownLastTouchRef.current < 500) return
+                              onClick={() => {
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -614,16 +605,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-r-xl text-green-600 font-bold text-xl flex items-center justify-center active:bg-green-100"
-                              onTouchStart={(e) => {
-                                e.preventDefault()
-                                dropdownLastTouchRef.current = Date.now()
-                                dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
-                                setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
-                                requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
-                              }}
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                if (Date.now() - dropdownLastTouchRef.current < 500) return
+                              onClick={() => {
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -633,18 +615,12 @@ export default function POSPage() {
                           <button
                             type="button"
                             className="flex-1 h-10 rounded-xl bg-yellow-400 active:bg-yellow-500 text-gray-900 font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-sm"
-                            onTouchStart={(e) => {
-                              e.preventDefault()
-                              dropdownLastTouchRef.current = Date.now()
-                              for (let j = 0; j < qty; j++) addToCart(p)
-                              setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
-                              setBarcodeInput("")
-                              setSearchSuggestions([])
-                            }}
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              if (Date.now() - dropdownLastTouchRef.current < 500) return
-                              for (let j = 0; j < qty; j++) addToCart(p)
+                            onClick={() => {
+                              addToCart(p)
+                              if (qty > 1) {
+                                // Add remaining qty-1 more times
+                                for (let j = 1; j < qty; j++) addToCart(p)
+                              }
                               setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
                               setBarcodeInput("")
                               setSearchSuggestions([])
@@ -812,7 +788,7 @@ export default function POSPage() {
                                     <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
                                     <span className="w-6 text-center text-sm font-bold">{qty}</span>
                                     <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
-                                    <button type="button" className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold" onMouseDown={() => { for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }); setBarcodeInput(""); setSearchSuggestions([]) }}>Add</button>
+                                    <button type="button" className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold" onClick={() => { for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }); setBarcodeInput(""); setSearchSuggestions([]) }}>Add</button>
                                   </div>
                                 </div>
                               )

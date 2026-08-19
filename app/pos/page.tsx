@@ -1031,7 +1031,7 @@ export default function POSPage() {
           <div className="flex flex-col h-full">
 
             {/* Scrollable cart items */}
-            <div className="flex-1 overflow-y-auto overscroll-contain -mx-1 px-1">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1">
               <div className="divide-y divide-border/50">
                 {cart.map((item, idx) => (
                   <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-3 first:pt-1">

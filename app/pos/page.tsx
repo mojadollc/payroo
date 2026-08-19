@@ -364,18 +364,18 @@ export default function POSPage() {
 
   // Close search dropdown when clicking outside
   useEffect(() => {
-    if (!searchSuggestions.length) return
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node
       const dropdown = dropdownScrollRef.current
-      const input = scannerInputRef.current && 'current' in scannerInputRef ? null : (scannerInputRef as any).current
-      if (dropdown && !dropdown.contains(target) && input && !input.contains(target)) {
+      const inputEl = scannerInputRef.current as any
+      if (!dropdown || !inputEl) return
+      if (!dropdown.contains(target) && !inputEl.contains(target)) {
         setSearchSuggestions([])
       }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [searchSuggestions.length])
+  }, [])
 
   const effectivePrice = (product: Product) =>
     product.onSale && product.salePrice ? product.salePrice : product.price

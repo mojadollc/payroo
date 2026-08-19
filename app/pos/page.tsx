@@ -594,14 +594,14 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-l-xl text-red-500 font-bold text-xl flex items-center justify-center active:bg-red-100"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onTouchStart={(e) => {
+                              onMouseDown={(e) => {
                                 e.preventDefault()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
                               }}
-                              onClick={() => {
+                              onTouchStart={(e) => {
+                                e.preventDefault()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -611,14 +611,14 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-r-xl text-green-600 font-bold text-xl flex items-center justify-center active:bg-green-100"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onTouchStart={(e) => {
+                              onMouseDown={(e) => {
                                 e.preventDefault()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
                               }}
-                              onClick={() => {
+                              onTouchStart={(e) => {
+                                e.preventDefault()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -628,15 +628,15 @@ export default function POSPage() {
                           <button
                             type="button"
                             className="flex-1 h-10 rounded-xl bg-yellow-400 active:bg-yellow-500 text-gray-900 font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-sm"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onTouchStart={(e) => {
+                            onMouseDown={(e) => {
                               e.preventDefault()
                               for (let j = 0; j < qty; j++) addToCart(p)
                               setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
                               setBarcodeInput("")
                               setSearchSuggestions([])
                             }}
-                            onClick={() => {
+                            onTouchStart={(e) => {
+                              e.preventDefault()
                               for (let j = 0; j < qty; j++) addToCart(p)
                               setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
                               setBarcodeInput("")

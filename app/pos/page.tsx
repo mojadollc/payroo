@@ -120,6 +120,8 @@ export default function POSPage() {
   const [showCartDrawer, setShowCartDrawer] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
+  const dropdownScrollRef = useRef<HTMLDivElement>(null)
+  const dropdownScrollTop = useRef(0)
   const [variantPicker, setVariantPicker] = useState<{ product: Product; selections: Record<string, string> } | null>(null)
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
@@ -540,7 +542,11 @@ export default function POSPage() {
               onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
             />
             {searchSuggestions.length > 0 && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border-2 border-yellow-400 rounded-2xl shadow-2xl max-h-[68vh] overflow-y-auto">
+              <div
+                ref={dropdownScrollRef}
+                className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border-2 border-yellow-400 rounded-2xl shadow-2xl max-h-[68vh] overflow-y-auto"
+                onScroll={() => { dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0 }}
+              >
                 {searchSuggestions.map((p, i) => {
                   const qty = dropdownQty[p.id!] ?? 1
                   const price = effectivePrice(p)
@@ -585,13 +591,23 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-l-xl text-red-500 font-bold text-xl flex items-center justify-center active:bg-red-100"
-                              onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
+                                setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
+                                requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
+                              }}
                             >−</button>
                             <span className="w-8 text-center text-[15px] font-bold text-gray-900">{qty}</span>
                             <button
                               type="button"
                               className="h-9 w-9 rounded-r-xl text-green-600 font-bold text-xl flex items-center justify-center active:bg-green-100"
-                              onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
+                                setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
+                                requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
+                              }}
                             >+</button>
                           </div>
                           <button

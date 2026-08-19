@@ -14,6 +14,9 @@ import {
   Wallet,
   ChevronRight,
   Smartphone,
+  Send,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,7 +32,24 @@ import type { EWalletTransaction, CommissionSettings } from "@/lib/types"
 const ELOAD_STORE_ID = "8807" // kept for reference, no longer used as gate
 
 type Period = "today" | "week" | "month" | "all"
-type ActiveSheet = "none" | "cashin" | "cashout"
+type ActiveSheet = "none" | "cashin" | "cashout" | "hitpay"
+
+const HITPAY_CHANNELS = [
+  { value: "gcash",     label: "GCash",      emoji: "📱" },
+  { value: "paymaya",   label: "Maya",       emoji: "💳" },
+  { value: "shopeepay", label: "ShopeePay",  emoji: "🛍️" },
+  { value: "grabpay",   label: "GrabPay",    emoji: "🚗" },
+  { value: "bpi",       label: "BPI",        emoji: "🏦" },
+  { value: "unionbank", label: "UnionBank",  emoji: "🏦" },
+  { value: "bdo",       label: "BDO",        emoji: "🏦" },
+  { value: "metrobank", label: "Metrobank",  emoji: "🏦" },
+  { value: "chinabank", label: "China Bank", emoji: "🏦" },
+  { value: "rcbc",      label: "RCBC",       emoji: "🏦" },
+  { value: "landbank",  label: "Landbank",   emoji: "🏦" },
+  { value: "pnb",       label: "PNB",        emoji: "🏦" },
+  { value: "instapay",  label: "InstaPay",   emoji: "⚡" },
+  { value: "pesonet",   label: "PESONet",    emoji: "⚡" },
+]
 
 function getPeriodRange(period: Period): { start?: Date; end?: Date; max?: number } {
   const now = new Date()
@@ -57,6 +77,17 @@ export default function EWalletPage() {
   const [gbitsBalance, setGbitsBalance] = useState<number | null>(null)
   const [gbitsBalanceError, setGbitsBalanceError] = useState(false)
   const [gbitsBalanceLoading, setGbitsBalanceLoading] = useState(false)
+  const [hitpayBalance, setHitpayBalance] = useState<number | null>(null)
+  const [hitpayBalanceLoading, setHitpayBalanceLoading] = useState(false)
+  const [hitpayBalanceError, setHitpayBalanceError] = useState(false)
+  // Payout form state
+  const [payoutChannel, setPayoutChannel] = useState("gcash")
+  const [payoutAccount, setPayoutAccount] = useState("")
+  const [payoutName, setPayoutName] = useState("")
+  const [payoutAmount, setPayoutAmount] = useState("")
+  const [payoutPurpose, setPayoutPurpose] = useState("")
+  const [payoutLoading, setPayoutLoading] = useState(false)
+  const [payoutResult, setPayoutResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const allLimitRef = useRef(50)
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
@@ -101,6 +132,63 @@ export default function EWalletPage() {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period])
+
+  const fetchHitpayBalance = () => {
+    setHitpayBalanceLoading(true)
+    setHitpayBalanceError(false)
+    fetch("/api/hitpay/balance")
+      .then(r => r.json())
+      .then(d => {
+        if (d.balance != null) {
+          setHitpayBalance(d.balance)
+          localStorage.setItem("hitpay_balance", String(d.balance))
+        } else {
+          setHitpayBalanceError(true)
+        }
+      })
+      .catch(() => setHitpayBalanceError(true))
+      .finally(() => setHitpayBalanceLoading(false))
+  }
+
+  useEffect(() => {
+    const cached = localStorage.getItem("hitpay_balance")
+    if (cached != null) setHitpayBalance(parseFloat(cached))
+    fetchHitpayBalance()
+  }, [])
+
+  const handlePayout = async () => {
+    if (!payoutChannel || !payoutAccount || !payoutAmount) return
+    setPayoutLoading(true)
+    setPayoutResult(null)
+    try {
+      const res = await fetch("/api/hitpay/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: payoutChannel,
+          accountNumber: payoutAccount,
+          accountName: payoutName,
+          amount: parseFloat(payoutAmount),
+          purpose: payoutPurpose || "Cash-in payout",
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPayoutResult({ ok: true, msg: "Payout sent successfully!" })
+        setPayoutAccount("")
+        setPayoutName("")
+        setPayoutAmount("")
+        setPayoutPurpose("")
+        fetchHitpayBalance()
+      } else {
+        setPayoutResult({ ok: false, msg: data.error ?? "Payout failed" })
+      }
+    } catch {
+      setPayoutResult({ ok: false, msg: "Network error. Please try again." })
+    } finally {
+      setPayoutLoading(false)
+    }
+  }
 
   useEffect(() => {
     // Read cached balance from localStorage immediately (no flicker)
@@ -183,7 +271,7 @@ export default function EWalletPage() {
 
   // ── Quick Action Bar ────────────────────────────────────────────────────────
   const QuickActions = (
-    <div className={`grid gap-3 ${canUseELoad ? "grid-cols-3" : "grid-cols-2"}`}>
+    <div className={`grid gap-3 ${canUseELoad ? "grid-cols-4" : "grid-cols-3"}`}>
 
       {/* E-Load — only visible to store 8807 */}
       {canUseELoad && (
@@ -229,6 +317,18 @@ export default function EWalletPage() {
         <span className="text-[13px] font-bold">Kiosk</span>
         <span className="text-[10px] opacity-75">Self-service</span>
       </button>
+
+      {/* HitPay Send Payout */}
+      <button
+        onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
+        className="relative flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white py-4 px-2 shadow-lg shadow-rose-500/25 active:scale-[0.97] transition-all hover:from-rose-600 hover:to-pink-700"
+      >
+        <div className="p-2.5 bg-white/20 rounded-xl">
+          <Send className="h-6 w-6" />
+        </div>
+        <span className="text-[13px] font-bold">Send</span>
+        <span className="text-[10px] opacity-75">HitPay</span>
+      </button>
     </div>
   )
 
@@ -248,7 +348,7 @@ export default function EWalletPage() {
 
         {QuickActions}
 
-        {/* GBits Wallet Card — GCash/GoTyme style */}
+        {/* GBits Wallet Card */}
         {canUseELoad && (
           <button
             onClick={() => router.push("/ewallet/load")}
@@ -286,6 +386,53 @@ export default function EWalletPage() {
             </div>
           </button>
         )}
+
+        {/* HitPay Cash-In Wallet Card */}
+        <button
+          onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
+          className="w-full rounded-3xl overflow-hidden shadow-lg active:scale-[0.98] transition-all text-left"
+          style={{ background: "linear-gradient(135deg, #e11d48 0%, #f43f5e 50%, #ec4899 100%)" }}
+        >
+          <div className="px-5 pt-5 pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Send className="h-4 w-4 text-white" />
+                </div>
+                <span className="text-white font-bold text-sm tracking-wide">Cash-In Wallet</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">HitPay</span>
+                <button
+                  onClick={e => { e.stopPropagation(); fetchHitpayBalance() }}
+                  className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+                >
+                  <RefreshCw className={`h-3 w-3 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
+                </button>
+              </div>
+            </div>
+            <div className="mb-1">
+              <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest mb-0.5">Available Balance</p>
+              {hitpayBalanceLoading ? (
+                <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
+              ) : hitpayBalanceError ? (
+                <p className="text-white/60 text-sm font-medium flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" /> Not configured
+                </p>
+              ) : hitpayBalance != null ? (
+                <p className="text-white text-3xl font-black tracking-tight">
+                  ₱{hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              ) : (
+                <p className="text-white/60 text-sm">Tap to check balance</p>
+              )}
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
+              <span className="text-white/60 text-[11px]">Tap to send payout</span>
+              <ChevronRight className="h-4 w-4 text-white/60" />
+            </div>
+          </div>
+        </button>
 
         {PeriodSelect}
 
@@ -570,6 +717,122 @@ export default function EWalletPage() {
           ) : (
             <div className="py-8 text-center text-sm text-muted-foreground">Loading settings...</div>
           )}
+        </div>
+      </BottomSheet>
+
+      {/* HitPay Send Payout Sheet */}
+      <BottomSheet
+        open={activeSheet === "hitpay"}
+        onClose={() => { setActiveSheet("none"); setPayoutResult(null) }}
+        title="Send Payout"
+        description="Send money via HitPay to GCash, Maya, ShopeePay, or any bank"
+      >
+        <div className="pb-24 space-y-4 px-1">
+          {/* Balance display */}
+          <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3">
+            <div>
+              <p className="text-[11px] text-rose-600 font-semibold uppercase tracking-widest">HitPay Balance</p>
+              <p className="text-xl font-black text-rose-700">
+                {hitpayBalanceLoading ? "..." : hitpayBalance != null ? `₱${hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2 })}` : "N/A"}
+              </p>
+            </div>
+            <button onClick={fetchHitpayBalance} className="p-2 rounded-xl bg-rose-100 active:scale-90 transition-transform">
+              <RefreshCw className={`h-4 w-4 text-rose-600 ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          {/* Channel picker */}
+          <div>
+            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Channel</label>
+            <div className="grid grid-cols-3 gap-2">
+              {HITPAY_CHANNELS.map(ch => (
+                <button
+                  key={ch.value}
+                  onClick={() => setPayoutChannel(ch.value)}
+                  className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-xl border text-[11px] font-semibold transition-all ${
+                    payoutChannel === ch.value
+                      ? "bg-rose-500 border-rose-500 text-white shadow-md"
+                      : "bg-white border-border text-foreground active:scale-95"
+                  }`}
+                >
+                  <span className="text-base">{ch.emoji}</span>
+                  {ch.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Account number */}
+          <div>
+            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Account / Phone Number</label>
+            <input
+              type="tel"
+              value={payoutAccount}
+              onChange={e => setPayoutAccount(e.target.value)}
+              placeholder="e.g. 09171234567"
+              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+          </div>
+
+          {/* Account name */}
+          <div>
+            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Account Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={payoutName}
+              onChange={e => setPayoutName(e.target.value)}
+              placeholder="Customer name"
+              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Amount (₱)</label>
+            <input
+              type="number"
+              value={payoutAmount}
+              onChange={e => setPayoutAmount(e.target.value)}
+              placeholder="0.00"
+              min="1"
+              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+          </div>
+
+          {/* Purpose */}
+          <div>
+            <label className="text-[12px] font-semibold text-foreground mb-1.5 block">Purpose <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={payoutPurpose}
+              onChange={e => setPayoutPurpose(e.target.value)}
+              placeholder="Cash-in payout"
+              className="w-full h-11 rounded-xl border border-border bg-white px-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+          </div>
+
+          {/* Result */}
+          {payoutResult && (
+            <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold ${
+              payoutResult.ok ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {payoutResult.ok ? "✅" : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+              {payoutResult.msg}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            onClick={handlePayout}
+            disabled={payoutLoading || !payoutAccount || !payoutAmount}
+            className="w-full h-12 rounded-xl bg-rose-500 text-white font-bold text-[14px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all disabled:opacity-50 shadow-md shadow-rose-500/30"
+          >
+            {payoutLoading ? (
+              <span className="animate-pulse">Sending...</span>
+            ) : (
+              <><Send className="h-4 w-4" /> Send Payout</>
+            )}
+          </button>
         </div>
       </BottomSheet>
 

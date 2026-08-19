@@ -1051,10 +1051,10 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="flex flex-col h-full min-h-0">
+          <div className="flex flex-col min-h-0">
 
-            {/* Scrollable cart items */}
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1">
+            {/* Scrollable cart items — BottomSheet wrapper scrolls this */}
+            <div className="-mx-1 px-1">
               <div className="divide-y divide-border/50">
                 {cart.map((item, idx) => (
                   <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-3 first:pt-1">
@@ -1114,7 +1114,7 @@ export default function POSPage() {
             </div>
 
             {/* Pinned checkout bar — always visible */}
-            <div className="flex-shrink-0 pt-3 pb-2 flex gap-2">
+            <div className="sticky bottom-0 bg-background pt-3 pb-2 flex gap-2">
               <button
                 className="flex-1 h-14 rounded-2xl bg-primary text-primary-foreground font-black text-[16px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all shadow-lg"
                 onClick={() => { setShowCartDrawer(false); setShowCheckout(true) }}

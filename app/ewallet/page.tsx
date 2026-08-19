@@ -343,183 +343,166 @@ export default function EWalletPage() {
         </Button>
       }
     >
-      {/* ── MOBILE ─────────────────────────────────────────────────────────── */}
-      <div className="md:hidden space-y-4">
+      {/* ── MOBILE — GCash-style layout ─────────────────────────────────────── */}
+      <div className="md:hidden -mx-4 -mt-4">
 
-        {QuickActions}
+        {/* ── Hero: two wallet cards side by side ── */}
+        <div className="px-4 pt-4 pb-0 space-y-3">
 
-        {/* GBits Wallet Card */}
-        {canUseELoad && (
-          <button
-            onClick={() => router.push("/ewallet/load")}
-            className="w-full rounded-3xl overflow-hidden shadow-lg active:scale-[0.98] transition-all text-left"
-            style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)" }}
-          >
-            <div className="px-5 pt-5 pb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                    <Zap className="h-4 w-4 text-white" />
-                  </div>
-                  <span className="text-white font-bold text-sm tracking-wide">E-Load Wallet</span>
-                </div>
-                <span className="text-[10px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">LIVE</span>
-              </div>
-              <div className="mb-1">
-                <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest mb-0.5">Available Balance</p>
-                {gbitsBalanceLoading ? (
+          {/* E-Load wallet card */}
+          {canUseELoad && (
+            <button
+              onClick={() => router.push("/ewallet/load")}
+              className="w-full rounded-3xl overflow-hidden active:scale-[0.98] transition-all text-left"
+              style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}
+            >
+              <div className="px-5 pt-5 pb-5">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
+                    <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center">
+                      <Zap className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-[13px] leading-tight">E-Load Wallet</p>
+                      <p className="text-white/50 text-[10px]">GBits · All Networks</p>
+                    </div>
                   </div>
+                  <span className="text-[9px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">LIVE</span>
+                </div>
+                <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest mb-0.5">Available Balance</p>
+                {gbitsBalanceLoading ? (
+                  <div className="h-9 w-36 bg-white/20 rounded-xl animate-pulse" />
                 ) : gbitsBalance != null ? (
-                  <p className="text-white text-3xl font-black tracking-tight">
+                  <p className="text-white text-[32px] font-black tracking-tight leading-none">
                     ₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 ) : (
-                  <p className="text-white/60 text-sm font-medium">Tap to load & check balance</p>
+                  <p className="text-white/50 text-sm">Tap to check balance</p>
                 )}
-              </div>
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
-                <span className="text-white/60 text-[11px]">Tap to send load</span>
-                <ChevronRight className="h-4 w-4 text-white/60" />
-              </div>
-            </div>
-          </button>
-        )}
-
-        {/* HitPay Cash-In Wallet Card */}
-        <button
-          onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
-          className="w-full rounded-3xl overflow-hidden shadow-lg active:scale-[0.98] transition-all text-left"
-          style={{ background: "linear-gradient(135deg, #e11d48 0%, #f43f5e 50%, #ec4899 100%)" }}
-        >
-          <div className="px-5 pt-5 pb-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                  <Send className="h-4 w-4 text-white" />
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/15">
+                  <span className="text-white/50 text-[11px]">Tap to send load</span>
+                  <ChevronRight className="h-4 w-4 text-white/40" />
                 </div>
-                <span className="text-white font-bold text-sm tracking-wide">Cash-In Wallet</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">HitPay</span>
+            </button>
+          )}
+
+          {/* HitPay Cash-In wallet card */}
+          <button
+            onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
+            className="w-full rounded-3xl overflow-hidden active:scale-[0.98] transition-all text-left"
+            style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 8px 32px rgba(190,18,60,0.30)" }}
+          >
+            <div className="px-5 pt-5 pb-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <Send className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-[13px] leading-tight">Cash-In Wallet</p>
+                    <p className="text-white/50 text-[10px]">Powered by HitPay</p>
+                  </div>
+                </div>
                 <button
                   onClick={e => { e.stopPropagation(); fetchHitpayBalance() }}
-                  className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+                  className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
                 >
-                  <RefreshCw className={`h-3 w-3 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`h-3.5 w-3.5 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
                 </button>
               </div>
-            </div>
-            <div className="mb-1">
-              <p className="text-white/60 text-[11px] font-medium uppercase tracking-widest mb-0.5">Available Balance</p>
+              <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest mb-0.5">Available Balance</p>
               {hitpayBalanceLoading ? (
-                <div className="h-8 w-32 bg-white/20 rounded-xl animate-pulse" />
+                <div className="h-9 w-36 bg-white/20 rounded-xl animate-pulse" />
               ) : hitpayBalanceError ? (
-                <p className="text-white/60 text-sm font-medium flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" /> Not configured
-                </p>
+                <p className="text-white/50 text-sm flex items-center gap-1"><AlertCircle className="h-4 w-4" /> Not configured</p>
               ) : hitpayBalance != null ? (
-                <p className="text-white text-3xl font-black tracking-tight">
+                <p className="text-white text-[32px] font-black tracking-tight leading-none">
                   ₱{hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               ) : (
-                <p className="text-white/60 text-sm">Tap to check balance</p>
+                <p className="text-white/50 text-sm">Tap to check balance</p>
               )}
-            </div>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
-              <span className="text-white/60 text-[11px]">Tap to send payout</span>
-              <ChevronRight className="h-4 w-4 text-white/60" />
-            </div>
-          </div>
-        </button>
-
-        {PeriodSelect}
-
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <MobileCard className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-green-500 rounded-md"><TrendingUp className="h-3.5 w-3.5 text-white" /></div>
-              <span className="text-[11px] text-muted-foreground">{periodLabel} Profit</span>
-            </div>
-            <div className="text-[15px] font-bold text-green-600 truncate">
-              ₱{stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </MobileCard>
-
-          <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-blue-500 rounded-md"><ArrowDownToLine className="h-3.5 w-3.5 text-white" /></div>
-              <span className="text-[11px] text-muted-foreground">Cash-In</span>
-            </div>
-            <div className="text-[15px] font-bold text-blue-600 truncate">
-              ₱{stats.grossCashin.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </MobileCard>
-
-          <MobileCard className="p-3 bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="p-1.5 bg-orange-500 rounded-md"><ArrowUpFromLine className="h-3.5 w-3.5 text-white" /></div>
-              <span className="text-[11px] text-muted-foreground">Cash-Out</span>
-            </div>
-            <div className="text-[15px] font-bold text-orange-600 truncate">
-              ₱{stats.grossCashout.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </MobileCard>
-
-          {/* Load stat card — tappable only for store 8807, plain card for others */}
-          {canUseELoad ? (
-            <button
-              onClick={() => router.push("/ewallet/load")}
-              className="text-left p-3 bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl active:scale-[0.97] transition-all"
-            >
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <div className="p-1.5 bg-purple-500 rounded-md"><Signal className="h-3.5 w-3.5 text-white" /></div>
-                <span className="text-[11px] text-muted-foreground">Load</span>
-                <ChevronRight className="h-3 w-3 text-purple-400 ml-auto" />
+              <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/15">
+                <span className="text-white/50 text-[11px]">Tap to send payout</span>
+                <ChevronRight className="h-4 w-4 text-white/40" />
               </div>
-              <div className="text-[15px] font-bold text-purple-600 truncate">
-                ₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </button>
-          ) : (
-            <MobileCard className="p-3 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <div className="p-1.5 bg-purple-500 rounded-md"><Signal className="h-3.5 w-3.5 text-white" /></div>
-                <span className="text-[11px] text-muted-foreground">Load</span>
-              </div>
-              <div className="text-[15px] font-bold text-purple-600 truncate">
-                ₱{stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </MobileCard>
-          )}
+            </div>
+          </button>
         </div>
 
-        {period !== "today" && (
-          <div className="grid grid-cols-2 gap-3">
-            <MobileCard className="p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Today's Profit</span>
+        {/* ── Action buttons row — GCash style ── */}
+        <div className="px-4 pt-5 pb-2">
+          <div className="flex items-start justify-around">
+            {/* Cash-in/out */}
+            <button onClick={() => setActiveSheet("cashin")} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <ArrowDownToLine className="h-6 w-6 text-white" />
               </div>
-              <div className="text-[15px] font-bold text-green-600 truncate">
-                ₱{stats.todayProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </MobileCard>
-            <MobileCard className="p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <History className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Today's Count</span>
-              </div>
-              <div className="text-[15px] font-bold truncate">{stats.todayTransactionsCount.toLocaleString()}</div>
-            </MobileCard>
-          </div>
-        )}
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Cash-in<br/>/ Out</span>
+            </button>
 
-        <div>
-          <MobileSectionHeader title={historyTitle} />
-          <MobileCard>
+            {/* Send payout */}
+            <button onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-rose-500 flex items-center justify-center shadow-lg shadow-rose-500/30">
+                <Send className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Send<br/>Payout</span>
+            </button>
+
+            {/* E-Load */}
+            {canUseELoad && (
+              <button onClick={() => router.push("/ewallet/load")} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
+                <div className="w-14 h-14 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                  <Zap className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-[11px] font-semibold text-foreground text-center leading-tight">E-Load</span>
+              </button>
+            )}
+
+            {/* Kiosk */}
+            <button onClick={() => router.push("/ewallet/cashin")} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <Wallet className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Kiosk</span>
+            </button>
+
+            {/* Settings */}
+            <button onClick={() => setShowSettings(true)} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
+              <div className="w-14 h-14 rounded-2xl bg-slate-500 flex items-center justify-center shadow-lg shadow-slate-500/20">
+                <Settings className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Settings</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Divider ── */}
+        <div className="mx-4 my-3 border-t border-border/40" />
+
+        {/* ── Period selector ── */}
+        <div className="px-4 mb-3">{PeriodSelect}</div>
+
+        {/* ── Stats row ── */}
+        <div className="px-4 grid grid-cols-4 gap-2 mb-3">
+          {[
+            { label: "Profit",   value: `₱${stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 0 })}`,   color: "text-green-600" },
+            { label: "Cash-In",  value: `₱${stats.grossCashin.toLocaleString("en-PH", { minimumFractionDigits: 0 })}`,  color: "text-blue-600" },
+            { label: "Cash-Out", value: `₱${stats.grossCashout.toLocaleString("en-PH", { minimumFractionDigits: 0 })}`, color: "text-orange-600" },
+            { label: "Load",     value: `₱${stats.grossLoad.toLocaleString("en-PH", { minimumFractionDigits: 0 })}`,    color: "text-violet-600" },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-2xl p-3 shadow-sm border border-border/30 text-center">
+              <p className={`text-[13px] font-black truncate ${s.color}`}>{s.value}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Transaction history ── */}
+        <div className="px-4 pb-28">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">{historyTitle}</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-border/30 overflow-hidden">
             <div className="p-3">
               <TransactionHistory
                 transactions={transactions}
@@ -532,7 +515,7 @@ export default function EWalletPage() {
                 emptyHint={period === "today" ? "No transactions today" : `No transactions for ${periodLabel.toLowerCase()}`}
               />
             </div>
-          </MobileCard>
+          </div>
         </div>
       </div>
 

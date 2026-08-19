@@ -88,7 +88,19 @@ export default function EWalletPage() {
   const [payoutPurpose, setPayoutPurpose] = useState("")
   const [payoutLoading, setPayoutLoading] = useState(false)
   const [payoutResult, setPayoutResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const [payoutChannels, setPayoutChannels] = useState<{ id: string; label: string; type: string; logo: string | null; color: string }[]>([])
+  const [payoutChannels, setPayoutChannels] = useState<{ id: string; label: string; type: string; logo: string | null; color: string }[]>([
+    { id: "gcash",     label: "GCash",      type: "wallet", logo: "/wallets/gcash.svg",     color: "#007DFF" },
+    { id: "paymaya",   label: "Maya",       type: "wallet", logo: "/wallets/maya.svg",      color: "#00A651" },
+    { id: "shopeepay", label: "ShopeePay",  type: "wallet", logo: "/wallets/shopeepay.svg", color: "#EE4D2D" },
+    { id: "bpi",       label: "BPI",        type: "bank",   logo: "/wallets/bpi.svg",       color: "#C8102E" },
+    { id: "unionbank", label: "UnionBank",  type: "bank",   logo: "/wallets/unionbank.svg", color: "#003087" },
+    { id: "chinabank", label: "China Bank", type: "bank",   logo: "/wallets/chinabank.svg", color: "#C8102E" },
+    { id: "rcbc",      label: "RCBC",       type: "bank",   logo: "/wallets/rcbc.svg",       color: "#003087" },
+    { id: "bdo",       label: "BDO",        type: "bank",   logo: null,                      color: "#003087" },
+    { id: "metrobank", label: "Metrobank",  type: "bank",   logo: null,                      color: "#003087" },
+    { id: "landbank",  label: "Landbank",   type: "bank",   logo: null,                      color: "#006400" },
+    { id: "pnb",       label: "PNB",        type: "bank",   logo: null,                      color: "#003087" },
+  ])
   const [payoutChannelsLoading, setPayoutChannelsLoading] = useState(false)
   const allLimitRef = useRef(50)
 
@@ -153,19 +165,17 @@ export default function EWalletPage() {
   }
 
   const fetchPayoutChannels = () => {
-    if (payoutChannels.length > 0) return // already loaded
-    setPayoutChannelsLoading(true)
     fetch("/api/hitpay/channels")
       .then(r => r.json())
-      .then(d => { if (d.channels) setPayoutChannels(d.channels) })
+      .then(d => { if (d.channels?.length) setPayoutChannels(d.channels) })
       .catch(() => {})
-      .finally(() => setPayoutChannelsLoading(false))
   }
 
   useEffect(() => {
     const cached = localStorage.getItem("hitpay_balance")
     if (cached != null) setHitpayBalance(parseFloat(cached))
     fetchHitpayBalance()
+    fetchPayoutChannels() // preload in background — sheet opens instantly
   }, [])
 
   const handlePayout = async () => {
@@ -390,7 +400,7 @@ export default function EWalletPage() {
 
           {/* HitPay Cash-In wallet card */}
           <button
-            onClick={() => { setPayoutResult(null); fetchPayoutChannels(); setActiveSheet("hitpay") }}
+            onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
             className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
             style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 6px 20px rgba(190,18,60,0.30)" }}
           >
@@ -433,7 +443,7 @@ export default function EWalletPage() {
               <span className="text-[10px] font-semibold text-foreground text-center">Cash In/Out</span>
             </button>
 
-            <button onClick={() => { setPayoutResult(null); fetchPayoutChannels(); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+            <button onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
               <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shadow-md shadow-rose-500/30">
                 <Send className="h-5 w-5 text-white" />
               </div>

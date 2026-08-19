@@ -90,12 +90,18 @@ export default function POSPage() {
   const CART_KEY = "pos_cart"
   const [products, setProducts] = useState<Product[]>([])
   const [shuffledProducts, setShuffledProducts] = useState<Product[]>(() => {
-    // Seed grid instantly from cache on first render — no blank screen
     if (typeof window === "undefined") return []
     try {
-      const cached = getCachedProducts()
+      // 1st priority: sessionStorage (survives nav away/back, instant)
+      const session = sessionStorage.getItem("pos_shuffled_products")
+      if (session) {
+        const parsed = JSON.parse(session) as Product[]
+        if (parsed.length > 0) return parsed
+      }
+      // 2nd priority: localStorage cache
+      const cached = getCachedProducts() as Product[]
       if (cached.length > 0) {
-        const arr = [...cached] as Product[]
+        const arr = [...cached]
         for (let i = arr.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]
         }
@@ -158,6 +164,12 @@ export default function POSPage() {
     return shuffled
   }
 
+  const setShuffledAndCache = (data: Product[]) => {
+    const shuffled = shuffleArray(data)
+    setShuffledProducts(shuffled)
+    try { sessionStorage.setItem("pos_shuffled_products", JSON.stringify(shuffled)) } catch {}
+  }
+
   // Preload first 4 product images for instant display
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -171,6 +183,15 @@ export default function POSPage() {
     })
   }, [shuffledProducts.length > 0])
 
+  // Seed products + productsRef from cache immediately on mount
+  useEffect(() => {
+    const cached = getCachedProducts() as Product[]
+    if (cached.length > 0 && productsRef.current.length === 0) {
+      setProducts(cached)
+      productsRef.current = cached
+    }
+  }, [])
+
   // Load products: show cache instantly, fetch fresh in background
   useEffect(() => {
     const storeId = getStoreId()
@@ -180,7 +201,7 @@ export default function POSPage() {
     const cached = getCachedProducts() as Product[]
     if (cached.length > 0 && productsRef.current.length === 0) {
       setProducts(cached)
-      setShuffledProducts(shuffleArray(cached))
+      setShuffledAndCache(cached)
       productsRef.current = cached
     }
 
@@ -190,7 +211,7 @@ export default function POSPage() {
       .then(({ data }) => {
         if (!data?.length) return
         setProducts(data)
-        setShuffledProducts(shuffleArray(data))
+        setShuffledAndCache(data)
         productsRef.current = data
         freshLoadedRef.current = true
         cacheProducts(data)
@@ -203,7 +224,7 @@ export default function POSPage() {
         localGetByStoreId<Product>("products").then(idbProducts => {
           if (idbProducts.length > 0) {
             setProducts(idbProducts)
-            setShuffledProducts(shuffleArray(idbProducts))
+            setShuffledAndCache(idbProducts)
             productsRef.current = idbProducts
           }
         }).catch(() => {})
@@ -281,7 +302,7 @@ export default function POSPage() {
       const { data } = await res.json()
       if (data?.length > 0) {
         setProducts(data)
-        setShuffledProducts(shuffleArray(data))
+        setShuffledAndCache(data)
         productsRef.current = data
         cacheProducts(data)
       }
@@ -290,7 +311,7 @@ export default function POSPage() {
       const cached = getCachedProducts()
       if (cached.length > 0) {
         setProducts(cached as Product[])
-        setShuffledProducts(shuffleArray(cached as Product[]))
+        setShuffledAndCache(cached as Product[])
       }
     }
   }

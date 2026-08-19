@@ -346,134 +346,107 @@ export default function EWalletPage() {
       {/* ── MOBILE — GCash-style layout ─────────────────────────────────────── */}
       <div className="md:hidden -mx-4 -mt-4">
 
-        {/* ── Hero: two wallet cards side by side ── */}
-        <div className="px-4 pt-4 pb-0 space-y-3">
+        {/* ── Hero: 2-column wallet cards ── */}
+        <div className="px-4 pt-4 pb-0 grid grid-cols-2 gap-3">
 
           {/* E-Load wallet card */}
-          {canUseELoad && (
-            <button
-              onClick={() => router.push("/ewallet/load")}
-              className="w-full rounded-3xl overflow-hidden active:scale-[0.98] transition-all text-left"
-              style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)", boxShadow: "0 8px 32px rgba(109,40,217,0.35)" }}
-            >
-              <div className="px-5 pt-5 pb-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center">
-                      <Zap className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-white font-bold text-[13px] leading-tight">E-Load Wallet</p>
-                      <p className="text-white/50 text-[10px]">GBits · All Networks</p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-bold text-white/70 bg-white/15 px-2 py-0.5 rounded-full tracking-widest">LIVE</span>
+          <button
+            onClick={() => router.push("/ewallet/load")}
+            className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
+            style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)", boxShadow: "0 6px 20px rgba(109,40,217,0.35)" }}
+          >
+            <div className="px-4 pt-4 pb-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Zap className="h-4 w-4 text-white" />
                 </div>
-                <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest mb-0.5">Available Balance</p>
-                {gbitsBalanceLoading ? (
-                  <div className="h-9 w-36 bg-white/20 rounded-xl animate-pulse" />
-                ) : gbitsBalance != null ? (
-                  <p className="text-white text-[32px] font-black tracking-tight leading-none">
-                    ₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                ) : (
-                  <p className="text-white/50 text-sm">Tap to check balance</p>
-                )}
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/15">
-                  <span className="text-white/50 text-[11px]">Tap to send load</span>
-                  <ChevronRight className="h-4 w-4 text-white/40" />
-                </div>
+                <span className="text-[9px] font-bold text-white/70 bg-white/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
               </div>
-            </button>
-          )}
+              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">E-Load Wallet</p>
+              {gbitsBalanceLoading ? (
+                <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
+              ) : gbitsBalance != null ? (
+                <p className="text-white text-[20px] font-black tracking-tight leading-none">
+                  ₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              ) : (
+                <p className="text-white/50 text-[12px]">Tap to check</p>
+              )}
+              <p className="text-white/40 text-[10px] mt-2">GBits · All Networks</p>
+            </div>
+          </button>
 
           {/* HitPay Cash-In wallet card */}
           <button
             onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
-            className="w-full rounded-3xl overflow-hidden active:scale-[0.98] transition-all text-left"
-            style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 8px 32px rgba(190,18,60,0.30)" }}
+            className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
+            style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 6px 20px rgba(190,18,60,0.30)" }}
           >
-            <div className="px-5 pt-5 pb-5">
+            <div className="px-4 pt-4 pb-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-2xl bg-white/20 flex items-center justify-center">
-                    <Send className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-white font-bold text-[13px] leading-tight">Cash-In Wallet</p>
-                    <p className="text-white/50 text-[10px]">Powered by HitPay</p>
-                  </div>
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Send className="h-4 w-4 text-white" />
                 </div>
                 <button
                   onClick={e => { e.stopPropagation(); fetchHitpayBalance() }}
-                  className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+                  className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`h-3 w-3 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
                 </button>
               </div>
-              <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest mb-0.5">Available Balance</p>
+              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Cash-In Wallet</p>
               {hitpayBalanceLoading ? (
-                <div className="h-9 w-36 bg-white/20 rounded-xl animate-pulse" />
+                <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
               ) : hitpayBalanceError ? (
-                <p className="text-white/50 text-sm flex items-center gap-1"><AlertCircle className="h-4 w-4" /> Not configured</p>
+                <p className="text-white/50 text-[12px]">Not configured</p>
               ) : hitpayBalance != null ? (
-                <p className="text-white text-[32px] font-black tracking-tight leading-none">
+                <p className="text-white text-[20px] font-black tracking-tight leading-none">
                   ₱{hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               ) : (
-                <p className="text-white/50 text-sm">Tap to check balance</p>
+                <p className="text-white/50 text-[12px]">Tap to check</p>
               )}
-              <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/15">
-                <span className="text-white/50 text-[11px]">Tap to send payout</span>
-                <ChevronRight className="h-4 w-4 text-white/40" />
-              </div>
+              <p className="text-white/40 text-[10px] mt-2">Powered by HitPay</p>
             </div>
           </button>
         </div>
 
-        {/* ── Action buttons row — GCash style ── */}
+        {/* ── Action buttons row — 5 icons ── */}
         <div className="px-4 pt-5 pb-2">
-          <div className="flex items-start justify-around">
-            {/* Cash-in/out */}
-            <button onClick={() => setActiveSheet("cashin")} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-              <div className="w-14 h-14 rounded-2xl bg-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <ArrowDownToLine className="h-6 w-6 text-white" />
+          <div className="flex items-start justify-between">
+            <button onClick={() => setActiveSheet("cashin")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center shadow-md shadow-blue-500/30">
+                <ArrowDownToLine className="h-5 w-5 text-white" />
               </div>
-              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Cash-in<br/>/ Out</span>
+              <span className="text-[10px] font-semibold text-foreground text-center">Cash In/Out</span>
             </button>
 
-            {/* Send payout */}
-            <button onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-              <div className="w-14 h-14 rounded-2xl bg-rose-500 flex items-center justify-center shadow-lg shadow-rose-500/30">
-                <Send className="h-6 w-6 text-white" />
+            <button onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shadow-md shadow-rose-500/30">
+                <Send className="h-5 w-5 text-white" />
               </div>
-              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Send<br/>Payout</span>
+              <span className="text-[10px] font-semibold text-foreground text-center">Send</span>
             </button>
 
-            {/* E-Load */}
-            {canUseELoad && (
-              <button onClick={() => router.push("/ewallet/load")} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-                <div className="w-14 h-14 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                  <Zap className="h-6 w-6 text-white" />
-                </div>
-                <span className="text-[11px] font-semibold text-foreground text-center leading-tight">E-Load</span>
-              </button>
-            )}
-
-            {/* Kiosk */}
-            <button onClick={() => router.push("/ewallet/cashin")} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                <Wallet className="h-6 w-6 text-white" />
+            <button onClick={() => router.push("/ewallet/load")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-500/30">
+                <Zap className="h-5 w-5 text-white" />
               </div>
-              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Kiosk</span>
+              <span className="text-[10px] font-semibold text-foreground text-center">Load</span>
             </button>
 
-            {/* Settings */}
-            <button onClick={() => setShowSettings(true)} className="flex flex-col items-center gap-2 active:scale-90 transition-transform">
-              <div className="w-14 h-14 rounded-2xl bg-slate-500 flex items-center justify-center shadow-lg shadow-slate-500/20">
-                <Settings className="h-6 w-6 text-white" />
+            <button onClick={() => router.push("/ewallet/cashin")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
+                <Wallet className="h-5 w-5 text-white" />
               </div>
-              <span className="text-[11px] font-semibold text-foreground text-center leading-tight">Settings</span>
+              <span className="text-[10px] font-semibold text-foreground text-center">Kiosk</span>
+            </button>
+
+            <button onClick={() => setShowSettings(true)} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-slate-400 flex items-center justify-center shadow-md shadow-slate-400/20">
+                <Settings className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-[10px] font-semibold text-foreground text-center">Settings</span>
             </button>
           </div>
         </div>

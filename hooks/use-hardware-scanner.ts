@@ -36,7 +36,14 @@ export function useHardwareScanner({
     if (!enabled) return
 
     // Method 1: Global keydown for standard keyboard-mode scanners
+    // Only fires when the user is NOT actively typing in the search input
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If the focused element is our search input, skip — user is typing manually
+      if (document.activeElement === inputRef.current) {
+        buffer.current = ""
+        return
+      }
+
       if (e.key === "Enter") {
         const code = buffer.current.trim()
         if (code.length >= minLength) {
@@ -70,43 +77,27 @@ export function useHardwareScanner({
     }
 
     // Method 2: Watch for rapid value changes on the input (covers IME, direct injection)
+    // Only triggers when the input receives a large chunk at once (true scanner injection),
+    // NOT when the user is manually typing character by character.
     const handleInputEvent = (e: Event) => {
       const input = e.target as HTMLInputElement
       if (!input || input.tagName !== "INPUT") return
 
-      const now = Date.now()
       const val = input.value || ""
       const prev = lastValue.current
       lastValue.current = val
 
-      // If value grew by many characters at once = scanner injection
+      // Only treat as scanner if value grew by minLength+ chars in a single event
+      // (true scanner injection). Ignore single-char additions from manual typing.
       const added = val.length - prev.length
       if (added >= minLength) {
         const barcode = val.slice(-added).trim()
         if (barcode.length >= minLength) {
           setTimeout(() => { onScanRef.current(barcode) }, 30)
-          return
         }
       }
-
-      // Track rapid sequential single-char additions
-      const gap = now - lastChangeTime.current
-      lastChangeTime.current = now
-
-      // Hardware scanners type < 50ms per char
-      if (gap < 50 && val.length >= minLength) {
-        if (timer.current) clearTimeout(timer.current)
-        timer.current = setTimeout(() => {
-          const currentVal = inputRef.current?.value || input.value || ""
-          if (currentVal.length >= minLength) {
-            onScanRef.current(currentVal.trim())
-            if (inputRef.current) {
-              inputRef.current.value = ""
-              inputRef.current.dispatchEvent(new Event("input", { bubbles: true }))
-            }
-          }
-        }, 150)
-      }
+      // Removed the rapid-keystroke detection entirely — it was falsely triggering
+      // on fast manual typing and adding wrong products to the cart.
     }
 
     // Method 3: Paste events

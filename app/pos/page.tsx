@@ -121,6 +121,7 @@ export default function POSPage() {
   const [showScanner, setShowScanner] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
   const dropdownScrollRef = useRef<HTMLDivElement>(null)
+  const searchWrapperRef = useRef<HTMLDivElement>(null)
   const dropdownScrollTop = useRef(0)
   const dropdownTouchingRef = useRef(false)
   const dropdownLastTouchRef = useRef(0)
@@ -362,19 +363,20 @@ export default function POSPage() {
   // Keep hardware scanner callback up to date
   handleBarcodeSubmitRef.current = handleBarcodeSubmit
 
-  // Close search dropdown when clicking outside
+  // Close search dropdown when tapping/clicking outside — handles both mouse and touch
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
+    const close = (e: Event) => {
       const target = e.target as Node
-      const dropdown = dropdownScrollRef.current
-      const inputEl = scannerInputRef.current as any
-      if (!dropdown || !inputEl) return
-      if (!dropdown.contains(target) && !inputEl.contains(target)) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(target)) {
         setSearchSuggestions([])
       }
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('mousedown', close)
+    document.addEventListener('touchstart', close, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('touchstart', close)
+    }
   }, [])
 
   const effectivePrice = (product: Product) =>
@@ -550,7 +552,7 @@ export default function POSPage() {
       }
       stickyBar={
         <div className="md:hidden flex items-center gap-2">
-          <div className="relative flex-1">
+          <div ref={searchWrapperRef} className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               ref={scannerInputRef}

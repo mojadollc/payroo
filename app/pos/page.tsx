@@ -125,6 +125,7 @@ export default function POSPage() {
   const dropdownTouchingRef = useRef(false)
   const dropdownLastTouchRef = useRef(0)
   const [variantPicker, setVariantPicker] = useState<{ product: Product; selections: Record<string, string> } | null>(null)
+  const [searchFocused, setSearchFocused] = useState(false)
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
   const stockBlockedRef = useRef(false)
@@ -359,6 +360,21 @@ export default function POSPage() {
   // Keep hardware scanner callback up to date
   handleBarcodeSubmitRef.current = handleBarcodeSubmit
 
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    if (!searchSuggestions.length) return
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      const dropdown = dropdownScrollRef.current
+      const input = scannerInputRef.current && 'current' in scannerInputRef ? null : (scannerInputRef as any).current
+      if (dropdown && !dropdown.contains(target) && input && !input.contains(target)) {
+        setSearchSuggestions([])
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [searchSuggestions.length])
+
   const effectivePrice = (product: Product) =>
     product.onSale && product.salePrice ? product.salePrice : product.price
 
@@ -541,15 +557,13 @@ export default function POSPage() {
               onChange={(e) => handleInputChange(e.target.value)}
               className="pl-9 h-10 text-base rounded-xl border border-border/60 bg-white/80 focus:border-primary/50 focus:bg-white shadow-sm"
               autoFocus
-              onBlur={() => setTimeout(() => { if (!dropdownTouchingRef.current) setSearchSuggestions([]) }, 200)}
             />
             {searchSuggestions.length > 0 && (
               <div
                 ref={dropdownScrollRef}
                 className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white border-2 border-yellow-400 rounded-2xl shadow-2xl max-h-[68vh] overflow-y-auto"
                 onScroll={() => { dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0 }}
-                onTouchStart={() => { dropdownTouchingRef.current = true }}
-                onTouchEnd={() => { dropdownTouchingRef.current = false }}
+                onMouseDown={() => { dropdownTouchingRef.current = true }}
               >
                 {searchSuggestions.map((p, i) => {
                   const qty = dropdownQty[p.id!] ?? 1
@@ -595,7 +609,8 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-l-xl text-red-500 font-bold text-xl flex items-center justify-center active:bg-red-100"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -605,7 +620,8 @@ export default function POSPage() {
                             <button
                               type="button"
                               className="h-9 w-9 rounded-r-xl text-green-600 font-bold text-xl flex items-center justify-center active:bg-green-100"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -615,10 +631,10 @@ export default function POSPage() {
                           <button
                             type="button"
                             className="flex-1 h-10 rounded-xl bg-yellow-400 active:bg-yellow-500 text-gray-900 font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-sm"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation()
                               addToCart(p)
                               if (qty > 1) {
-                                // Add remaining qty-1 more times
                                 for (let j = 1; j < qty; j++) addToCart(p)
                               }
                               setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })

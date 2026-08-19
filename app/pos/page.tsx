@@ -1002,8 +1002,8 @@ export default function POSPage() {
         open={showCartDrawer}
         onClose={() => setShowCartDrawer(false)}
         title="Shopping Cart"
-        description={cart.length > 0 ? `${cart.length} items` : "Your cart is empty"}
-        maxHeight="82vh"
+        description={cart.length > 0 ? `${cart.reduce((s,i) => s + i.quantity, 0)} items · ₱${calculateTotal().toFixed(2)}` : "Your cart is empty"}
+        maxHeight="92vh"
       >
         {cart.length === 0 ? (
           <div className="py-16 text-center">
@@ -1012,55 +1012,53 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="flex flex-col min-h-0 flex-1">
-            {/* Scrollable items + summary */}
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          <div className="flex flex-col h-full">
+
+            {/* Scrollable cart items */}
+            <div className="flex-1 overflow-y-auto overscroll-contain -mx-1 px-1">
               <div className="divide-y divide-border/50">
                 {cart.map((item, idx) => (
-                  <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-2.5 first:pt-0">
-                    <div className="flex items-center justify-between">
+                  <div key={`${item.id}_${item.selectedVariants ? Object.values(item.selectedVariants).join("-") : idx}`} className="py-3 first:pt-1">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-medium truncate">{item.name}</p>
+                        <p className="text-[14px] font-semibold leading-tight">{item.name}</p>
                         {item.selectedVariants && (
-                          <p className="text-[11px] text-primary font-medium">{Object.values(item.selectedVariants).join(" · ")}</p>
+                          <p className="text-[11px] text-primary font-medium mt-0.5">{Object.values(item.selectedVariants).join(" · ")}</p>
                         )}
-                        <p className="text-[12px] text-muted-foreground">₱{item.price.toFixed(2)} × {item.quantity}</p>
+                        <p className="text-[12px] text-muted-foreground mt-0.5">₱{item.price.toFixed(2)} each</p>
                       </div>
-                      <div className="text-[14px] font-semibold text-emerald-700 ml-2">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 ml-1 text-destructive/60" onClick={() => removeFromCart(item.cartLineId || item.id!)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-[14px] font-bold text-emerald-700">₱{((liveQuantities[item.id!] ?? item.quantity) * item.price).toFixed(2)}</span>
+                        <button className="h-7 w-7 rounded-full bg-red-50 flex items-center justify-center active:scale-90 transition-transform" onClick={() => removeFromCart(item.cartLineId || item.id!)}>
+                          <X className="h-3.5 w-3.5 text-red-500" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 rounded-md border-red-200 text-red-500"
-                        onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </Button>
-                      <CartQuantityInput
-                        item={item}
-                        onUpdate={updateQuantity}
-                        onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.cartLineId || item.id!]: q }))}
-                        className="h-8 w-12 text-center p-0 text-[14px] font-semibold rounded-md border"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 rounded-md border-green-200 text-green-600"
-                        onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center bg-muted rounded-xl overflow-hidden">
+                        <button
+                          className="h-9 w-9 flex items-center justify-center text-red-500 font-bold text-lg active:bg-red-100 transition-colors"
+                          onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
+                        >−</button>
+                        <CartQuantityInput
+                          item={item}
+                          onUpdate={updateQuantity}
+                          onLiveChange={(q) => setLiveQuantities(prev => ({ ...prev, [item.cartLineId || item.id!]: q }))}
+                          className="h-9 w-10 text-center p-0 text-[14px] font-bold bg-transparent border-0 focus:ring-0"
+                        />
+                        <button
+                          className="h-9 w-9 flex items-center justify-center text-green-600 font-bold text-lg active:bg-green-100 transition-colors"
+                          onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
+                        >+</button>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground ml-auto">{item.stock} in stock</span>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Summary */}
-              <div className="border-t pt-3 space-y-1.5 mt-2">
+              {/* Order summary */}
+              <div className="mt-3 pt-3 border-t space-y-1.5">
                 <div className="flex justify-between text-[13px]">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">₱{calculateTotal().toFixed(2)}</span>
@@ -1069,33 +1067,28 @@ export default function POSPage() {
                   <span className="text-muted-foreground">Est. Profit</span>
                   <span className="font-medium text-teal-600">₱{calculateProfit().toFixed(2)}</span>
                 </div>
-                <Separator />
-                <div className="flex justify-between text-[16px] font-bold">
+                <div className="flex justify-between text-[16px] font-black pt-1">
                   <span>Total</span>
                   <span className="text-emerald-700">₱{calculateTotal().toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Inline action buttons — always pinned at bottom */}
-            <div className="flex-shrink-0 flex gap-2 pt-3 pb-5 border-t bg-background">
-              <Button
-                size="lg"
-                className="flex-1 h-12 text-[14px] font-bold rounded-xl shadow-md"
-                onClick={() => {
-                  setShowCartDrawer(false)
-                  setShowCheckout(true)
-                }}
+            {/* Pinned checkout bar — always visible */}
+            <div className="flex-shrink-0 pt-3 pb-2 flex gap-2">
+              <button
+                className="flex-1 h-14 rounded-2xl bg-primary text-primary-foreground font-black text-[16px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all shadow-lg"
+                onClick={() => { setShowCartDrawer(false); setShowCheckout(true) }}
               >
+                <ShoppingCart className="h-5 w-5" />
                 Checkout · ₱{calculateTotal().toFixed(2)}
-              </Button>
-              <Button
-                size="lg"
-                className="h-12 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white border-0 shadow-md flex-shrink-0"
+              </button>
+              <button
+                className="h-14 w-14 rounded-2xl bg-red-500 flex items-center justify-center active:scale-[0.97] transition-all shadow-md flex-shrink-0"
                 onClick={clearCart}
               >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+                <Trash2 className="h-5 w-5 text-white" />
+              </button>
             </div>
           </div>
         )}

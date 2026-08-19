@@ -1028,7 +1028,7 @@ export default function POSPage() {
             <p className="text-sm text-muted-foreground mt-2">Add products to get started</p>
           </div>
         ) : (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full min-h-0">
 
             {/* Scrollable cart items */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain -mx-1 px-1">

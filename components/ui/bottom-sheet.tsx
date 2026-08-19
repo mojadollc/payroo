@@ -51,7 +51,7 @@ export function BottomSheet({
           "animate-in slide-in-from-bottom duration-300 ease-out",
           "flex flex-col"
         )}
-        style={{ maxHeight }}
+        style={{ height: maxHeight }}
       >
         {/* Handle bar */}
         <div className="flex justify-center pt-3 pb-2">
@@ -87,7 +87,7 @@ export function BottomSheet({
         )}
 
         {/* Content */}
-        <div className="flex-1 min-h-0 px-6 pb-6 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6 flex flex-col">
           {children}
         </div>
       </div>

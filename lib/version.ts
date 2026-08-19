@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.1.2"
+export const APP_VERSION = "2.1.3"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Improved POS search UX - dropdown stays open after adding products, auto-add bug fixed"
+export const VERSION_CHANGELOG = "Fixed checkout scroll - Total always visible at bottom with many cart items"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

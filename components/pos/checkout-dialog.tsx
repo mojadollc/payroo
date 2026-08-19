@@ -573,13 +573,13 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md w-[calc(100%-2rem)] sm:w-full mx-auto max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-md w-[calc(100%-2rem)] sm:w-full mx-auto max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>Complete Sale</DialogTitle>
           <DialogDescription>Select payment method and complete transaction</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto px-6 flex-1">
           {/* Order Summary */}
           <div className="rounded-lg bg-muted p-4 space-y-2">
             <div className="flex justify-between">
@@ -723,7 +723,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t bg-background shrink-0">
           <Button variant="outline" onClick={onClose} disabled={isProcessing} className="bg-transparent">
             Cancel
           </Button>

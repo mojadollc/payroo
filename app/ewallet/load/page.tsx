@@ -48,6 +48,7 @@ export default function ELoadPage() {
   const [error, setError] = useState("")
   const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [pressedKey, setPressedKey] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
@@ -118,6 +119,12 @@ export default function ELoadPage() {
     setPhone("")
     setSearch("")
     setStep("phone")
+  }
+
+  const handleKeyPress = (key: string) => {
+    setPressedKey(key)
+    handlePhoneInput(key)
+    setTimeout(() => setPressedKey(null), 150)
   }
 
   const handlePhoneInput = (val: string) => {
@@ -240,7 +247,7 @@ export default function ELoadPage() {
       <div className="min-h-screen bg-gray-50 flex flex-col">
         {/* Header */}
         <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-20">
-          <button onClick={() => router.push("/ewallet")} className="flex items-center gap-1 text-gray-400 hover:text-gray-600 text-sm font-medium">
+          <button onClick={() => router.push("/ewallet")} className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-xl transition-all active:scale-95" style={{ color: "#6366F1", backgroundColor: "#EEF2FF" }}>
             <ChevronLeft className="h-5 w-5" /> Back
           </button>
           <div className="text-center">
@@ -388,7 +395,7 @@ export default function ELoadPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setStep("browse")} className="flex items-center gap-1 text-gray-400 text-sm font-medium">
+          <button onClick={() => setStep("browse")} className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-xl transition-all active:scale-95" style={{ color: networkColor, backgroundColor: networkColor + "18" }}>
             <ChevronLeft className="h-5 w-5" /> Back
           </button>
           <p className="font-bold text-gray-800">Enter {isAN ? "Account No." : "Mobile No."}</p>
@@ -439,24 +446,36 @@ export default function ELoadPage() {
 
           {/* Numpad */}
           <div className="grid grid-cols-3 gap-2">
-            {["1","2","3","4","5","6","7","8","9","C","0","⌫"].map(key => (
-              <button
-                key={key}
-                onClick={() => handlePhoneInput(key)}
-                className={`h-14 rounded-2xl text-xl font-bold transition-all active:scale-90 active:opacity-70 ${
-                  key === "C" ? "bg-red-50 text-red-500 border border-red-100" :
-                  key === "⌫" ? "bg-gray-100 text-gray-500 flex items-center justify-center" :
-                  "bg-white text-gray-800 shadow-sm border border-gray-100 hover:bg-gray-50"
-                }`}
-              >
-                {key === "⌫" ? <Delete className="h-5 w-5" /> : key}
-              </button>
-            ))}
+            {["1","2","3","4","5","6","7","8","9","C","0","⌫"].map(key => {
+              const pressed = pressedKey === key
+              const isC = key === "C"
+              const isDel = key === "⌫"
+              return (
+                <button
+                  key={key}
+                  onPointerDown={() => handleKeyPress(key)}
+                  className={`h-14 rounded-2xl text-xl font-bold ${isDel ? "flex items-center justify-center" : ""}`}
+                  style={{
+                    backgroundColor: pressed
+                      ? isC ? "#EF4444" : isDel ? "#6B7280" : networkColor
+                      : isC ? "#FEF2F2" : isDel ? "#F3F4F6" : "#FFFFFF",
+                    color: pressed ? "#FFFFFF" : isC ? "#EF4444" : isDel ? "#6B7280" : "#1F2937",
+                    border: isC ? "1px solid #FECACA" : isDel ? "none" : "1px solid #F3F4F6",
+                    boxShadow: isDel ? "none" : "0 1px 3px rgba(0,0,0,0.08)",
+                    transform: pressed ? "scale(0.92)" : "scale(1)",
+                    transition: "background-color 0.1s, transform 0.1s",
+                  }}
+                >
+                  {isDel ? <Delete className="h-5 w-5" /> : key}
+                </button>
+              )
+            })}
           </div>
 
           <div className="grid grid-cols-5 gap-2">
             <button onClick={() => setStep("browse")}
-              className="col-span-2 h-13 py-3.5 rounded-2xl bg-gray-100 text-gray-500 font-bold text-sm flex items-center justify-center gap-1">
+              className="col-span-2 h-13 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-1 transition-all active:scale-95"
+              style={{ color: networkColor, backgroundColor: networkColor + "18" }}>
               <ChevronLeft className="h-4 w-4" /> Back
             </button>
             <button
@@ -478,7 +497,7 @@ export default function ELoadPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setStep("phone")} className="flex items-center gap-1 text-gray-400 text-sm font-medium">
+          <button onClick={() => setStep("phone")} className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-xl transition-all active:scale-95" style={{ color: networkColor, backgroundColor: networkColor + "18" }}>
             <ChevronLeft className="h-5 w-5" /> Back
           </button>
           <p className="font-bold text-gray-800">Review & Confirm</p>

@@ -107,7 +107,7 @@ const SendPayoutSheet = memo(function SendPayoutSheet({
         setAccount(""); setName(""); setAmount(""); setPurpose("")
         onPayoutSuccess()
       } else {
-        setResult({ ok: false, msg: data.error ?? "Payout failed" })
+        setResult({ ok: false, msg: data.error ?? data.raw ?? "Payout failed" })
       }
     } catch {
       setResult({ ok: false, msg: "Network error. Please try again." })

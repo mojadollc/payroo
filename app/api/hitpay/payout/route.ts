@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     }
     if (email) body.email = email
 
-    const res = await fetch(`${apiUrl}/payouts`, {
-      method: "POST",
+    const res = await fetch(`${apiUrl}/business/payouts`, {
+      method: "PUT",
       headers: {
         "X-BUSINESS-API-KEY": apiKey,
         "Content-Type": "application/json",

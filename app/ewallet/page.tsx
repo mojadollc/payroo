@@ -777,7 +777,7 @@ export default function EWalletPage() {
               value={payoutAccount}
               onChange={e => setPayoutAccount(e.target.value)}
               placeholder={selectedPayoutChannelType === "wallet" ? "09171234567" : "Account number"}
-              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
+              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
             />
           </div>
 
@@ -789,7 +789,7 @@ export default function EWalletPage() {
               value={payoutName}
               onChange={e => setPayoutName(e.target.value)}
               placeholder="Customer name"
-              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
+              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
             />
           </div>
 
@@ -804,7 +804,7 @@ export default function EWalletPage() {
                 onChange={e => setPayoutAmount(e.target.value)}
                 placeholder="0.00"
                 min="1"
-                className="w-full h-14 rounded-2xl border border-border bg-muted/30 pl-9 pr-4 text-[22px] font-black focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
+                className="w-full h-14 rounded-2xl border border-border bg-muted/30 pl-9 pr-4 text-[22px] font-black focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
               />
             </div>
           </div>
@@ -825,7 +825,7 @@ export default function EWalletPage() {
           <button
             onClick={handlePayout}
             disabled={payoutLoading || !payoutAccount || !payoutAmount || !payoutChannel}
-            className="w-full h-14 rounded-2xl bg-rose-500 text-white font-black text-[16px] flex items-center justify-center gap-2 active:scale-[0.97] transition-all disabled:opacity-40 shadow-lg shadow-rose-500/30"
+            className="w-full h-14 rounded-2xl bg-rose-500 text-white font-black text-[16px] flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-rose-500/30"
           >
             {payoutLoading ? (
               <span className="animate-pulse">Sending...</span>

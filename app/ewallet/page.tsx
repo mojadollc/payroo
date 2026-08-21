@@ -716,8 +716,8 @@ export default function EWalletPage() {
                 {payoutChannels.map(ch => (
                   <button
                     key={ch.id}
-                    onClick={() => setPayoutChannel(ch.id)}
-                    className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all active:scale-95 ${
+                    onPointerDown={() => setPayoutChannel(ch.id)}
+                    className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-colors ${
                       payoutChannel === ch.id
                         ? "border-rose-500 bg-rose-50 shadow-md"
                         : "border-transparent bg-muted/40"
@@ -752,8 +752,8 @@ export default function EWalletPage() {
                 {["instapay", "pesonet"].map(rail => (
                   <button
                     key={rail}
-                    onClick={() => setPayoutPurpose(rail)}
-                    className={`py-3 rounded-2xl border-2 text-[13px] font-bold transition-all active:scale-95 ${
+                    onPointerDown={() => setPayoutPurpose(rail)}
+                    className={`py-3 rounded-2xl border-2 text-[13px] font-bold transition-colors ${
                       payoutPurpose === rail
                         ? "border-rose-500 bg-rose-50 text-rose-600"
                         : "border-transparent bg-muted/40 text-foreground"

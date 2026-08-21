@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react"
 import { useRouter } from "next/navigation"
 import {
   Settings,
@@ -51,6 +51,157 @@ const HITPAY_CHANNELS = [
   { value: "pesonet",   label: "PESONet",    emoji: "⚡" },
 ]
 
+// ── Send Payout Sheet (isolated so typing never re-renders parent) ──────────
+const DEFAULT_PAYOUT_CHANNELS = [
+  { id: "gcash",     label: "GCash",      type: "wallet", logo: "/wallets/gcash.svg",     color: "#007DFF" },
+  { id: "paymaya",   label: "Maya",       type: "wallet", logo: "/wallets/maya.svg",      color: "#00A651" },
+  { id: "shopeepay", label: "ShopeePay",  type: "wallet", logo: "/wallets/shopeepay.svg", color: "#EE4D2D" },
+  { id: "bpi",       label: "BPI",        type: "bank",   logo: "/wallets/bpi.svg",       color: "#C8102E" },
+  { id: "unionbank", label: "UnionBank",  type: "bank",   logo: "/wallets/unionbank.svg", color: "#003087" },
+  { id: "chinabank", label: "China Bank", type: "bank",   logo: "/wallets/chinabank.svg", color: "#C8102E" },
+  { id: "rcbc",      label: "RCBC",       type: "bank",   logo: "/wallets/rcbc.svg",       color: "#003087" },
+  { id: "bdo",       label: "BDO",        type: "bank",   logo: null,                      color: "#003087" },
+  { id: "metrobank", label: "Metrobank",  type: "bank",   logo: null,                      color: "#003087" },
+  { id: "landbank",  label: "Landbank",   type: "bank",   logo: null,                      color: "#006400" },
+  { id: "pnb",       label: "PNB",        type: "bank",   logo: null,                      color: "#003087" },
+]
+
+const SendPayoutSheet = memo(function SendPayoutSheet({
+  open, onClose, onPayoutSuccess,
+}: { open: boolean; onClose: () => void; onPayoutSuccess: () => void }) {
+  const [channel, setChannel] = useState("gcash")
+  const [account, setAccount] = useState("")
+  const [name, setName] = useState("")
+  const [amount, setAmount] = useState("")
+  const [purpose, setPurpose] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [channels, setChannels] = useState(DEFAULT_PAYOUT_CHANNELS)
+
+  useEffect(() => {
+    fetch("/api/hitpay/channels")
+      .then(r => r.json())
+      .then(d => { if (d.channels?.length) setChannels(d.channels) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!open) { setAccount(""); setName(""); setAmount(""); setPurpose(""); setResult(null) }
+  }, [open])
+
+  const selectedType = channels.find(c => c.id === channel)?.type ?? "wallet"
+
+  const handleSend = async () => {
+    if (!channel || !account || !amount) return
+    setLoading(true)
+    setResult(null)
+    try {
+      const res = await fetch("/api/hitpay/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel, accountNumber: account, accountName: name, amount: parseFloat(amount), purpose: purpose || "Cash-in payout" }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setResult({ ok: true, msg: "Payout sent successfully!" })
+        setAccount(""); setName(""); setAmount(""); setPurpose("")
+        onPayoutSuccess()
+      } else {
+        setResult({ ok: false, msg: data.error ?? "Payout failed" })
+      }
+    } catch {
+      setResult({ ok: false, msg: "Network error. Please try again." })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Send Payout" description="Select a channel and fill in the details">
+      <div className="space-y-5 pt-2">
+        <div>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Select Channel</p>
+          <div className="grid grid-cols-4 gap-2">
+            {channels.map(ch => (
+              <button key={ch.id} onPointerDown={() => setChannel(ch.id)}
+                className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-colors ${
+                  channel === ch.id ? "border-rose-500 bg-rose-50 shadow-md" : "border-transparent bg-muted/40"
+                }`}>
+                {ch.logo ? (
+                  <img src={ch.logo} alt={ch.label} className="w-8 h-8 rounded-xl object-contain"
+                    onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
+                ) : (
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-black" style={{ background: ch.color }}>
+                    {ch.label.slice(0, 2)}
+                  </div>
+                )}
+                <span className={`text-[10px] font-semibold text-center leading-tight ${
+                  channel === ch.id ? "text-rose-600" : "text-foreground"
+                }`}>{ch.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {selectedType === "bank" && (
+          <div>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Payment Rail</p>
+            <div className="grid grid-cols-2 gap-2">
+              {["instapay", "pesonet"].map(rail => (
+                <button key={rail} onPointerDown={() => setPurpose(rail)}
+                  className={`py-3 rounded-2xl border-2 text-[13px] font-bold transition-colors ${
+                    purpose === rail ? "border-rose-500 bg-rose-50 text-rose-600" : "border-transparent bg-muted/40 text-foreground"
+                  }`}>
+                  {rail === "instapay" ? "⚡ InstaPay" : "🏦 PESONet"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="text-[12px] font-bold text-foreground mb-1.5 block">
+            {selectedType === "wallet" ? "Mobile Number" : "Account Number"}
+          </label>
+          <input type="tel" inputMode="numeric" value={account} onChange={e => setAccount(e.target.value)}
+            placeholder={selectedType === "wallet" ? "09171234567" : "Account number"}
+            className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white" />
+        </div>
+
+        <div>
+          <label className="text-[12px] font-bold text-foreground mb-1.5 block">Account Name</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Customer name"
+            className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white" />
+        </div>
+
+        <div>
+          <label className="text-[12px] font-bold text-foreground mb-1.5 block">Amount</label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-black text-muted-foreground">₱</span>
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" min="1"
+              className="w-full h-14 rounded-2xl border border-border bg-muted/30 pl-9 pr-4 text-[22px] font-black focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white" />
+          </div>
+        </div>
+
+        {result && (
+          <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[13px] font-semibold ${
+            result.ok ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"
+          }`}>
+            <span className="text-xl">{result.ok ? "✅" : "❌"}</span>
+            {result.msg}
+          </div>
+        )}
+
+        <button onClick={handleSend} disabled={loading || !account || !amount || !channel}
+          className="w-full h-14 rounded-2xl bg-rose-500 text-white font-black text-[16px] flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-rose-500/30">
+          {loading ? <span className="animate-pulse">Sending...</span> : <><Send className="h-5 w-5" /> Send ₱{amount || "0"}</>}
+        </button>
+        <div className="h-4" />
+      </div>
+    </BottomSheet>
+  )
+})
+
 function getPeriodRange(period: Period): { start?: Date; end?: Date; max?: number } {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
@@ -80,31 +231,7 @@ export default function EWalletPage() {
   const [hitpayBalance, setHitpayBalance] = useState<number | null>(null)
   const [hitpayBalanceLoading, setHitpayBalanceLoading] = useState(false)
   const [hitpayBalanceError, setHitpayBalanceError] = useState(false)
-  // Payout form state
-  const [payoutChannel, setPayoutChannel] = useState("gcash")
-  const [payoutAccount, setPayoutAccount] = useState("")
-  const [payoutName, setPayoutName] = useState("")
-  const [payoutAmount, setPayoutAmount] = useState("")
-  const [payoutPurpose, setPayoutPurpose] = useState("")
-  const [payoutLoading, setPayoutLoading] = useState(false)
-  const [payoutResult, setPayoutResult] = useState<{ ok: boolean; msg: string } | null>(null)
-  const [payoutChannels, setPayoutChannels] = useState<{ id: string; label: string; type: string; logo: string | null; color: string }[]>([
-    { id: "gcash",     label: "GCash",      type: "wallet", logo: "/wallets/gcash.svg",     color: "#007DFF" },
-    { id: "paymaya",   label: "Maya",       type: "wallet", logo: "/wallets/maya.svg",      color: "#00A651" },
-    { id: "shopeepay", label: "ShopeePay",  type: "wallet", logo: "/wallets/shopeepay.svg", color: "#EE4D2D" },
-    { id: "bpi",       label: "BPI",        type: "bank",   logo: "/wallets/bpi.svg",       color: "#C8102E" },
-    { id: "unionbank", label: "UnionBank",  type: "bank",   logo: "/wallets/unionbank.svg", color: "#003087" },
-    { id: "chinabank", label: "China Bank", type: "bank",   logo: "/wallets/chinabank.svg", color: "#C8102E" },
-    { id: "rcbc",      label: "RCBC",       type: "bank",   logo: "/wallets/rcbc.svg",       color: "#003087" },
-    { id: "bdo",       label: "BDO",        type: "bank",   logo: null,                      color: "#003087" },
-    { id: "metrobank", label: "Metrobank",  type: "bank",   logo: null,                      color: "#003087" },
-    { id: "landbank",  label: "Landbank",   type: "bank",   logo: null,                      color: "#006400" },
-    { id: "pnb",       label: "PNB",        type: "bank",   logo: null,                      color: "#003087" },
-  ])
-  const [payoutChannelsLoading, setPayoutChannelsLoading] = useState(false)
   const allLimitRef = useRef(50)
-
-  const selectedPayoutChannelType = payoutChannels.find(c => c.id === payoutChannel)?.type ?? "wallet"
 
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
   const canUseELoad = true
@@ -166,53 +293,11 @@ export default function EWalletPage() {
       .finally(() => setHitpayBalanceLoading(false))
   }
 
-  const fetchPayoutChannels = () => {
-    fetch("/api/hitpay/channels")
-      .then(r => r.json())
-      .then(d => { if (d.channels?.length) setPayoutChannels(d.channels) })
-      .catch(() => {})
-  }
-
   useEffect(() => {
     const cached = localStorage.getItem("hitpay_balance")
     if (cached != null) setHitpayBalance(parseFloat(cached))
     fetchHitpayBalance()
-    fetchPayoutChannels() // preload in background — sheet opens instantly
   }, [])
-
-  const handlePayout = async () => {
-    if (!payoutChannel || !payoutAccount || !payoutAmount) return
-    setPayoutLoading(true)
-    setPayoutResult(null)
-    try {
-      const res = await fetch("/api/hitpay/payout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channel: payoutChannel,
-          accountNumber: payoutAccount,
-          accountName: payoutName,
-          amount: parseFloat(payoutAmount),
-          purpose: payoutPurpose || "Cash-in payout",
-        }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setPayoutResult({ ok: true, msg: "Payout sent successfully!" })
-        setPayoutAccount("")
-        setPayoutName("")
-        setPayoutAmount("")
-        setPayoutPurpose("")
-        fetchHitpayBalance()
-      } else {
-        setPayoutResult({ ok: false, msg: data.error ?? "Payout failed" })
-      }
-    } catch {
-      setPayoutResult({ ok: false, msg: "Network error. Please try again." })
-    } finally {
-      setPayoutLoading(false)
-    }
-  }
 
   useEffect(() => {
     // Read cached balance from localStorage immediately (no flicker)
@@ -268,7 +353,7 @@ export default function EWalletPage() {
     return { totalProfit, todayProfit, totalTransactions: transactions.length, todayTransactionsCount: todayTransactions.length, grossCashin, grossCashout, grossLoad }
   }
 
-  const stats = calculateStats()
+  const stats = useMemo(() => calculateStats(), [transactions]) // eslint-disable-line react-hooks/exhaustive-deps
   const periodLabel = period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "All Time"
   const historyTitle = period === "today" ? "Today's Transactions" : `Transactions · ${periodLabel}`
 
@@ -344,7 +429,7 @@ export default function EWalletPage() {
 
       {/* HitPay Send Payout */}
       <button
-        onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
+        onClick={() => setActiveSheet("hitpay")}
         className="relative flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white py-4 px-2 shadow-lg shadow-rose-500/25 active:scale-[0.97] transition-all hover:from-rose-600 hover:to-pink-700"
       >
         <div className="p-2.5 bg-white/20 rounded-xl">
@@ -402,7 +487,7 @@ export default function EWalletPage() {
 
           {/* HitPay Cash-In wallet card */}
           <button
-            onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }}
+            onClick={() => setActiveSheet("hitpay")}
             className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
             style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 6px 20px rgba(190,18,60,0.30)" }}
           >
@@ -445,7 +530,7 @@ export default function EWalletPage() {
               <span className="text-[10px] font-semibold text-foreground text-center">Cash In/Out</span>
             </button>
 
-            <button onClick={() => { setPayoutResult(null); setActiveSheet("hitpay") }} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+            <button onClick={() => setActiveSheet("hitpay")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
               <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shadow-md shadow-rose-500/30">
                 <Send className="h-5 w-5 text-white" />
               </div>
@@ -694,149 +779,11 @@ export default function EWalletPage() {
       </BottomSheet>
 
       {/* HitPay Send Payout Sheet */}
-      <BottomSheet
+      <SendPayoutSheet
         open={activeSheet === "hitpay"}
-        onClose={() => { setActiveSheet("none"); setPayoutResult(null) }}
-        title="Send Payout"
-        description="Select a channel and fill in the details"
-      >
-        <div className="space-y-5 pt-2">
-
-          {/* Channel picker */}
-          <div>
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Select Channel</p>
-            {payoutChannelsLoading ? (
-              <div className="grid grid-cols-4 gap-2">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="h-16 rounded-2xl bg-muted animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-2">
-                {payoutChannels.map(ch => (
-                  <button
-                    key={ch.id}
-                    onPointerDown={() => setPayoutChannel(ch.id)}
-                    className={`flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-colors ${
-                      payoutChannel === ch.id
-                        ? "border-rose-500 bg-rose-50 shadow-md"
-                        : "border-transparent bg-muted/40"
-                    }`}
-                  >
-                    {ch.logo ? (
-                      <img
-                        src={ch.logo}
-                        alt={ch.label}
-                        className="w-8 h-8 rounded-xl object-contain"
-                        onError={e => { (e.target as HTMLImageElement).style.display = "none" }}
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-[11px] font-black" style={{ background: ch.color }}>
-                        {ch.label.slice(0, 2)}
-                      </div>
-                    )}
-                    <span className={`text-[10px] font-semibold text-center leading-tight ${
-                      payoutChannel === ch.id ? "text-rose-600" : "text-foreground"
-                    }`}>{ch.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Bank channel — InstaPay or PESONet */}
-          {selectedPayoutChannelType === "bank" && (
-            <div>
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Payment Rail</p>
-              <div className="grid grid-cols-2 gap-2">
-                {["instapay", "pesonet"].map(rail => (
-                  <button
-                    key={rail}
-                    onPointerDown={() => setPayoutPurpose(rail)}
-                    className={`py-3 rounded-2xl border-2 text-[13px] font-bold transition-colors ${
-                      payoutPurpose === rail
-                        ? "border-rose-500 bg-rose-50 text-rose-600"
-                        : "border-transparent bg-muted/40 text-foreground"
-                    }`}
-                  >
-                    {rail === "instapay" ? "⚡ InstaPay" : "🏦 PESONet"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Account number */}
-          <div>
-            <label className="text-[12px] font-bold text-foreground mb-1.5 block">
-              {selectedPayoutChannelType === "wallet" ? "Mobile Number" : "Account Number"}
-            </label>
-            <input
-              type="tel"
-              inputMode="numeric"
-              value={payoutAccount}
-              onChange={e => setPayoutAccount(e.target.value)}
-              placeholder={selectedPayoutChannelType === "wallet" ? "09171234567" : "Account number"}
-              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
-            />
-          </div>
-
-          {/* Account name */}
-          <div>
-            <label className="text-[12px] font-bold text-foreground mb-1.5 block">Account Name</label>
-            <input
-              type="text"
-              value={payoutName}
-              onChange={e => setPayoutName(e.target.value)}
-              placeholder="Customer name"
-              className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
-            />
-          </div>
-
-          {/* Amount */}
-          <div>
-            <label className="text-[12px] font-bold text-foreground mb-1.5 block">Amount</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-black text-muted-foreground">₱</span>
-              <input
-                type="number"
-                value={payoutAmount}
-                onChange={e => setPayoutAmount(e.target.value)}
-                placeholder="0.00"
-                min="1"
-                className="w-full h-14 rounded-2xl border border-border bg-muted/30 pl-9 pr-4 text-[22px] font-black focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
-              />
-            </div>
-          </div>
-
-          {/* Result */}
-          {payoutResult && (
-            <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[13px] font-semibold ${
-              payoutResult.ok
-                ? "bg-green-50 border border-green-200 text-green-700"
-                : "bg-red-50 border border-red-200 text-red-700"
-            }`}>
-              <span className="text-xl">{payoutResult.ok ? "✅" : "❌"}</span>
-              {payoutResult.msg}
-            </div>
-          )}
-
-          {/* Submit */}
-          <button
-            onClick={handlePayout}
-            disabled={payoutLoading || !payoutAccount || !payoutAmount || !payoutChannel}
-            className="w-full h-14 rounded-2xl bg-rose-500 text-white font-black text-[16px] flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-rose-500/30"
-          >
-            {payoutLoading ? (
-              <span className="animate-pulse">Sending...</span>
-            ) : (
-              <><Send className="h-5 w-5" /> Send ₱{payoutAmount || "0"}</>
-            )}
-          </button>
-
-          <div className="h-4" />
-        </div>
-      </BottomSheet>
+        onClose={() => setActiveSheet("none")}
+        onPayoutSuccess={fetchHitpayBalance}
+      />
 
       {commissionSettings && (
         <CommissionSettingsDialog

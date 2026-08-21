@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="45" fill="#06B6D4"/>
-  <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">DITO</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256" height="256" viewBox="0 0 256 256">
+  <!-- Uniform 256x256 canvas; preserve aspect ratio; transparent background. -->
+  <!-- DITO official-logo source copy. -->
+  <image x="33.0" y="80.5" width="190" height="95"
+         href="https://commons.wikimedia.org/wiki/Special:Redirect/file/Dito-logo.svg" xlink:href="https://commons.wikimedia.org/wiki/Special:Redirect/file/Dito-logo.svg"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>

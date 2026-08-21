@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="45" fill="#00B900"/>
-  <text x="50" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">SMART</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256" height="256" viewBox="0 0 256 256">
+  <!-- Uniform 256x256 canvas; preserve aspect ratio; transparent background. -->
+  <!-- Smart Communications logo reference; source is a Wikimedia Commons copy of the Smart Communications primary logo. -->
+  <image x="33.0" y="95.5" width="190" height="65"
+         href="https://commons.wikimedia.org/wiki/Special:Redirect/file/SmartCommunications%20Primary%20Logo%20(4).png" xlink:href="https://commons.wikimedia.org/wiki/Special:Redirect/file/SmartCommunications%20Primary%20Logo%20(4).png"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>

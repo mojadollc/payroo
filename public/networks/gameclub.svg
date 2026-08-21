@@ -1,5 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="45" fill="#8B5CF6"/>
-  <text x="50" y="55" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">GAME</text>
-  <text x="50" y="68" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white" text-anchor="middle">CLUB</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256" height="256" viewBox="0 0 256 256">
+  <!-- Uniform 256x256 canvas; preserve aspect ratio; transparent background. -->
+  <!-- GameClub square logo from the company's press-kit source as mirrored on Wikimedia Commons. -->
+  <image x="38.0" y="38.0" width="180" height="180"
+         href="https://commons.wikimedia.org/wiki/Special:Redirect/file/GameClub_Logo_Square.png" xlink:href="https://commons.wikimedia.org/wiki/Special:Redirect/file/GameClub_Logo_Square.png"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>

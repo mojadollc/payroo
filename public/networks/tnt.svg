@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="45" fill="#F59E0B"/>
-  <text x="50" y="58" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">TNT</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256" height="256" viewBox="0 0 256 256">
+  <!-- Uniform 256x256 canvas; preserve aspect ratio; transparent background. -->
+  <!-- TNT Tropang 5G reference from Wikimedia Commons. -->
+  <image x="43.0" y="43.0" width="170" height="170"
+         href="https://commons.wikimedia.org/wiki/Special:Redirect/file/TNT_Tropang_5G_logo_2025.webp" xlink:href="https://commons.wikimedia.org/wiki/Special:Redirect/file/TNT_Tropang_5G_logo_2025.webp"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>

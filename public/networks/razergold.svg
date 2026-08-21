@@ -1,5 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="45" fill="#84CC16"/>
-  <text x="50" y="52" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">RAZER</text>
-  <text x="50" y="68" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">GOLD</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256" height="256" viewBox="0 0 256 256">
+  <!-- Uniform 256x256 canvas; preserve aspect ratio; transparent background. -->
+  <!-- Razer Gold logo reference. Verify trademark/asset-use permissions for production/commercial use. -->
+  <image x="33.0" y="88.0" width="190" height="80"
+         href="https://seeklogo.com/images/R/razer-gold-logo-9B3B6D5A8D-seeklogo.com.png" xlink:href="https://seeklogo.com/images/R/razer-gold-logo-9B3B6D5A8D-seeklogo.com.png"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>

@@ -79,9 +79,26 @@ async function fetchGbitsBalance(): Promise<number | null> {
   return null
 }
 
+// SKU cache: avoid hitting Gbits on every page load
+let skuCache: { products: any[]; at: number } | null = null
+const SKU_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+function isSkuActive(s: any): boolean {
+  const status = s.skuStatus
+  // Treat as inactive only if explicitly false/0/"inactive"/"disabled"
+  if (status === false || status === 0 || status === "false" || status === "inactive" || status === "disabled") return false
+  // Null/undefined = include (Gbits sometimes omits the field for active SKUs)
+  return true
+}
+
 function mapSkus(skus: any[]) {
-  return skus
-    .filter((s) => s.skuStatus === true || s.skuStatus === 1 || s.skuStatus === "true" || s.skuStatus === "active")
+  const active = skus.filter(isSkuActive)
+  console.log(`[eload] total SKUs: ${skus.length}, active: ${active.length}, filtered out: ${skus.length - active.length}`)
+  if (skus.length - active.length > 0) {
+    const dropped = skus.filter(s => !isSkuActive(s))
+    console.log("[eload] dropped SKU statuses:", [...new Set(dropped.map(s => s.skuStatus))])
+  }
+  return active
     .map((s) => ({
       promoId: s.promoId, name: s.skuName, network: s.serviceGroup,
       service: s.service, category: s.category, amount: s.amount,
@@ -100,6 +117,12 @@ export async function GET(req: NextRequest) {
     const action = req.nextUrl.searchParams.get("action")
     const txnId = req.nextUrl.searchParams.get("txnId")
 
+    if (action === "refresh-skus") {
+      skuCache = null
+      console.log("[eload] SKU cache cleared")
+      // Fall through to re-fetch below
+    }
+
     if (action === "status" && txnId) {
       const data = await gbitsGet(`/eload/status/${txnId}`)
       const raw = (data.content?.status || "").toLowerCase()
@@ -117,14 +140,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ balance: settings?.gbitsBalance ?? null })
     }
 
-    // Fetch SKUs only (no balance endpoint exists on GBits)
+    // Fetch SKUs — use cache if fresh
+    if (skuCache && Date.now() - skuCache.at < SKU_CACHE_TTL) {
+      console.log("[eload] serving SKUs from cache, age:", Math.round((Date.now() - skuCache.at) / 1000), "s")
+      return NextResponse.json({ products: skuCache.products, balance: null })
+    }
+
     const skuData = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`)
     if (skuData.errorCode === 0) {
-      console.log("[eload] SKU count:", (skuData.content || []).length)
+      console.log("[eload] SKU raw count from Gbits:", (skuData.content || []).length)
+      // Log unique skuStatus values to understand what Gbits sends
+      const statuses = [...new Set((skuData.content || []).map((s: any) => s.skuStatus))]
+      console.log("[eload] unique skuStatus values:", statuses)
     } else {
       console.error("[eload] SKU fetch error:", skuData.message)
     }
     const products = mapSkus(skuData.errorCode === 0 ? skuData.content || [] : [])
+    skuCache = { products, at: Date.now() }
     return NextResponse.json({ products, balance: null })
   } catch (error: any) {
     console.error("eload GET error:", error.message)

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ChevronLeft, ChevronRight, CheckCircle, XCircle, AlertTriangle,
-  Loader2, Delete, RotateCcw,
+  Loader2, Delete, RotateCcw, RefreshCw,
 } from "lucide-react"
 import type { CommissionSettings } from "@/lib/types"
 import { getStoreId } from "@/lib/store-id"
@@ -51,10 +51,14 @@ export default function ELoadPage() {
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
-  useEffect(() => {
+  const loadSkus = async (forceRefresh = false) => {
+    setLoading(true)
+    setError("")
     const storeId = getStoreId()
-
-    fetch(`/api/eload?storeId=${storeId}`)
+    const url = forceRefresh
+      ? `/api/eload?storeId=${storeId}&action=refresh-skus`
+      : `/api/eload?storeId=${storeId}`
+    fetch(url)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const ct = r.headers.get("content-type") || ""
@@ -70,6 +74,11 @@ export default function ELoadPage() {
       })
       .catch((err) => { setError(err.message || "Failed to load products") })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    const storeId = getStoreId()
+    loadSkus()
 
     // Fetch balance from DB — synced across all devices
     fetch(`/api/eload?storeId=${storeId}&action=balance`)
@@ -238,7 +247,15 @@ export default function ELoadPage() {
             <p className="font-bold text-gray-800 text-lg">E-Load</p>
             <p className="text-[10px] text-gray-400">{storeName}</p>
           </div>
-          <div className="text-right">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadSkus(true)}
+              disabled={loading}
+              className="p-1.5 rounded-full bg-gray-100 active:bg-gray-200 transition-colors"
+              title="Refresh SKUs from Gbits"
+            >
+              <RefreshCw className={`h-4 w-4 text-gray-500 ${loading ? "animate-spin" : ""}`} />
+            </button>
             {walletBalance != null ? (
               <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-2.5 py-1">
                 <p className="text-[9px] text-indigo-400 font-semibold uppercase tracking-wide">E-Load Balance</p>

@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.1.8"
+export const APP_VERSION = "2.1.9"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Instant product grid on nav back and pull-to-refresh via sessionStorage cache"
+export const VERSION_CHANGELOG = "E-Load: fix SKU filter to include all active Gbits SKUs, add 5min cache + refresh button"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

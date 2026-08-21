@@ -57,21 +57,24 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     })
 
-    const data = await res.json().catch(() => ({}))
+    const resText = await res.text()
+    console.error(`[hitpay/payout] HTTP ${res.status} raw body:`, resText)
+    let data: any = null
+    try { data = JSON.parse(resText) } catch {}
 
     if (!res.ok) {
-      const raw = data.message ?? data.error ?? JSON.stringify(data)
+      const raw = data?.message ?? data?.error ?? data?.errors ?? (data ? JSON.stringify(data) : `HTTP ${res.status}`)
       const status = res.status
       console.error(`[hitpay/payout] HTTP ${status}:`, raw, data)
       let friendly: string
       if (status === 401 || status === 403) friendly = "Invalid HitPay API key. Please check your credentials."
-      else if (raw.toLowerCase().includes("insufficient") || raw.toLowerCase().includes("balance")) friendly = "Insufficient HitPay wallet balance. Please top up your HitPay account."
-      else if (raw.toLowerCase().includes("minimum") || (raw.toLowerCase().includes("amount") && !raw.toLowerCase().includes("account"))) friendly = "Amount is below the minimum allowed by HitPay."
-      else if (raw.toLowerCase().includes("account") || raw.toLowerCase().includes("invalid") || raw.toLowerCase().includes("phone")) friendly = "Invalid account number or mobile number. Please double-check and try again."
-      else if (raw.toLowerCase().includes("channel") || raw.toLowerCase().includes("method")) friendly = "This payment channel is currently unavailable. Try a different one."
-      else if (raw.toLowerCase().includes("limit")) friendly = "Transaction limit exceeded. Please try a smaller amount."
-      else if (raw.toLowerCase().includes("duplicate")) friendly = "Duplicate transaction detected. Please wait before retrying."
-      else friendly = raw || `Payout failed (HTTP ${status}). Please try again.`
+      else if (typeof raw === "string" && (raw.toLowerCase().includes("insufficient") || raw.toLowerCase().includes("balance"))) friendly = "Insufficient HitPay wallet balance. Please top up your HitPay account."
+      else if (typeof raw === "string" && (raw.toLowerCase().includes("minimum") || (raw.toLowerCase().includes("amount") && !raw.toLowerCase().includes("account")))) friendly = "Amount is below the minimum allowed by HitPay."
+      else if (typeof raw === "string" && (raw.toLowerCase().includes("account") || raw.toLowerCase().includes("invalid") || raw.toLowerCase().includes("phone"))) friendly = "Invalid account number or mobile number. Please double-check and try again."
+      else if (typeof raw === "string" && (raw.toLowerCase().includes("channel") || raw.toLowerCase().includes("method"))) friendly = "This payment channel is currently unavailable. Try a different one."
+      else if (typeof raw === "string" && raw.toLowerCase().includes("limit")) friendly = "Transaction limit exceeded. Please try a smaller amount."
+      else if (typeof raw === "string" && raw.toLowerCase().includes("duplicate")) friendly = "Duplicate transaction detected. Please wait before retrying."
+      else friendly = typeof raw === "string" ? raw : JSON.stringify(raw)
       return NextResponse.json({ error: friendly, raw, status }, { status })
     }
 

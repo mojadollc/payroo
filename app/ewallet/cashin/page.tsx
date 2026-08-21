@@ -261,10 +261,11 @@ function Kiosk() {
                   { id: "GCASH", name: "GCash", color: "#007DFE", icon: "/wallets/gcash.svg" },
                   { id: "MAYA", name: "Maya", color: "#00B900", icon: "/wallets/maya.svg" },
                   { id: "SHOPEEPAY", name: "ShopeePay", color: "#EE4D2D", icon: "/wallets/shopeepay.svg" },
+                  { id: "GRABPAY", name: "GrabPay", color: "#00B14F", icon: "/wallets/grabpay.svg" },
                 ].map(w => (
                   <button key={w.id} onClick={() => selectChannel(w.id, w.name, w.color)}
                     className="bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-blue-400 hover:shadow-lg transition-all active:scale-[0.96] flex flex-col items-center gap-2">
-                    <Image src={w.icon} alt={w.name} width={56} height={56} className="rounded-xl" />
+                    <img src={w.icon} alt={w.name} className="w-14 h-14 object-contain rounded-xl" />
                     <p className="font-bold text-gray-800 text-sm">{w.name}</p>
                   </button>
                 ))}
@@ -283,7 +284,7 @@ function Kiosk() {
                 ].map(b => (
                   <button key={b.id} onClick={() => selectChannel(b.id, b.name, b.color)}
                     className="bg-white rounded-2xl p-4 shadow-sm border-2 border-transparent hover:border-blue-400 hover:shadow-lg transition-all active:scale-[0.96] flex items-center gap-3">
-                    <Image src={b.icon} alt={b.name} width={44} height={44} className="rounded-lg" />
+                    <img src={b.icon} alt={b.name} className="w-11 h-11 object-contain rounded-lg" />
                     <div className="text-left">
                       <p className="font-bold text-gray-800 text-sm">{b.name}</p>
                       <p className="text-[10px] text-gray-400">Bank Transfer</p>
@@ -303,7 +304,7 @@ function Kiosk() {
                 ].map(b => (
                   <button key={b.id} onClick={() => selectChannel(b.id, b.name, b.color)}
                     className="bg-white rounded-2xl p-4 shadow-sm border-2 border-transparent hover:border-yellow-400 hover:shadow-lg transition-all active:scale-[0.96] flex items-center gap-3">
-                    <Image src={b.icon} alt={b.name} width={44} height={44} className="rounded-lg" />
+                    <img src={b.icon} alt={b.name} className="w-11 h-11 object-contain rounded-lg" />
                     <div className="text-left">
                       <p className="font-bold text-gray-800 text-sm">{b.name}</p>
                       <p className="text-[10px] text-gray-400">OTC</p>

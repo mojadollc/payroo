@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { CheckCircle, XCircle, AlertTriangle, Loader2, Delete, ChevronLeft, RotateCcw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getStoreId } from "@/lib/store-id"
@@ -30,26 +29,32 @@ function Kiosk() {
   const [submitting, setSubmitting] = useState(false)
   const [resultType, setResultType] = useState<ResultType>("success")
   const [resultMsg, setResultMsg] = useState("")
-  const [feeRate, setFeeRate] = useState(0)
-  const [xenditFlatFee, setXenditFlatFee] = useState(10)
-  const [xenditVatRate, setXenditVatRate] = useState(0.12)
-  const [adminChargeRate, setAdminChargeRate] = useState(0.01)
+  const [feeRate, setFeeRate] = useState(() => typeof window !== "undefined" ? parseFloat(localStorage.getItem("cs_feeRate") || "0") : 0)
+  const [xenditFlatFee, setXenditFlatFee] = useState(() => typeof window !== "undefined" ? parseFloat(localStorage.getItem("cs_xenditFlatFee") || "10") : 10)
+  const [xenditVatRate, setXenditVatRate] = useState(() => typeof window !== "undefined" ? parseFloat(localStorage.getItem("cs_xenditVatRate") || "0.12") : 0.12)
+  const [adminChargeRate, setAdminChargeRate] = useState(() => typeof window !== "undefined" ? parseFloat(localStorage.getItem("cs_adminChargeRate") || "0.01") : 0.01)
   const [isOnline, setIsOnline] = useState(true)
 
   const storeId = typeof window !== "undefined" ? getStoreId() : ""
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
-  // Load commission rate
+  // Load commission rate — fetch in background, cache in localStorage for instant load next time
   useEffect(() => {
-    getStoreId() && fetch(`/api/commission-settings?storeId=${getStoreId()}`)
+    const sid = getStoreId()
+    if (!sid) return
+    fetch(`/api/commission-settings?storeId=${sid}`)
       .then(r => r.json())
-      .then(({ data: settings }) => {
-        if (settings) {
-          setFeeRate(settings.sellerCashinRate || settings.gcashCashinRate || 0.02)
-          setXenditFlatFee(settings.xenditFlatFee ?? 10)
-          setXenditVatRate(settings.xenditVatRate ?? 0.12)
-          setAdminChargeRate(settings.adminChargeRate ?? 0.01)
-        }
+      .then(({ data: s }) => {
+        if (!s) return
+        const fr = s.sellerCashinRate || s.gcashCashinRate || 0.02
+        const xff = s.xenditFlatFee ?? 10
+        const xvr = s.xenditVatRate ?? 0.12
+        const acr = s.adminChargeRate ?? 0.01
+        setFeeRate(fr); setXenditFlatFee(xff); setXenditVatRate(xvr); setAdminChargeRate(acr)
+        localStorage.setItem("cs_feeRate", String(fr))
+        localStorage.setItem("cs_xenditFlatFee", String(xff))
+        localStorage.setItem("cs_xenditVatRate", String(xvr))
+        localStorage.setItem("cs_adminChargeRate", String(acr))
       }).catch(() => {})
   }, [])
 
@@ -614,13 +619,5 @@ function Kiosk() {
 }
 
 export default function CashInPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    }>
-      <Kiosk />
-    </Suspense>
-  )
+  return <Kiosk />
 }

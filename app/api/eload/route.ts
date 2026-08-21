@@ -83,27 +83,23 @@ async function fetchGbitsBalance(): Promise<number | null> {
 let skuCache: { products: any[]; at: number } | null = null
 const SKU_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
-function isSkuActive(s: any): boolean {
-  const status = s.skuStatus
-  // Treat as inactive only if explicitly false/0/"inactive"/"disabled"
-  if (status === false || status === 0 || status === "false" || status === "inactive" || status === "disabled") return false
-  // Null/undefined = include (Gbits sometimes omits the field for active SKUs)
-  return true
-}
-
 function mapSkus(skus: any[]) {
-  const active = skus.filter(isSkuActive)
-  console.log(`[eload] total SKUs: ${skus.length}, active: ${active.length}, filtered out: ${skus.length - active.length}`)
-  if (skus.length - active.length > 0) {
-    const dropped = skus.filter(s => !isSkuActive(s))
-    console.log("[eload] dropped SKU statuses:", [...new Set(dropped.map(s => s.skuStatus))])
-  }
+  // Gbits returns strictly boolean true/false for skuStatus
+  const active = skus.filter(s => s.skuStatus === true)
+  console.log(`[eload] Gbits total: ${skus.length}, active (skuStatus=true): ${active.length}, inactive: ${skus.length - active.length}`)
   return active
     .map((s) => ({
-      promoId: s.promoId, name: s.skuName, network: s.serviceGroup,
-      service: s.service, category: s.category, amount: s.amount,
-      description: s.description, validity: s.validity,
-      addressType: s.addressType, addressMin: s.addressMin, addressMax: s.addressMax,
+      promoId: s.promoId,
+      name: s.skuName,
+      network: s.serviceGroup,
+      service: s.service,
+      category: s.category,
+      amount: s.amount,
+      description: s.description,
+      validity: s.validity,
+      addressType: s.addressType,
+      addressMin: s.addressMin,
+      addressMax: s.addressMax,
     }))
     .sort((a, b) => a.amount - b.amount)
 }
@@ -147,12 +143,7 @@ export async function GET(req: NextRequest) {
     }
 
     const skuData = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`)
-    if (skuData.errorCode === 0) {
-      console.log("[eload] SKU raw count from Gbits:", (skuData.content || []).length)
-      // Log unique skuStatus values to understand what Gbits sends
-      const statuses = [...new Set((skuData.content || []).map((s: any) => s.skuStatus))]
-      console.log("[eload] unique skuStatus values:", statuses)
-    } else {
+    if (skuData.errorCode !== 0) {
       console.error("[eload] SKU fetch error:", skuData.message)
     }
     const products = mapSkus(skuData.errorCode === 0 ? skuData.content || [] : [])

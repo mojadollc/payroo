@@ -1,10 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg"
-     xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="256" height="256" viewBox="0 0 256 256">
-  <!-- Uniform 256x256 canvas; preserve aspect ratio; transparent background. -->
-  <!-- GOMO brand reference. This is the GoMo logo source available online; Philippines GOMO is operated by Globe. -->
-  <image x="40.5" y="70.5" width="175" height="115"
-         href="https://commons.wikimedia.org/wiki/Special:Redirect/file/GoMo_Ireland_logo.svg" xlink:href="https://commons.wikimedia.org/wiki/Special:Redirect/file/GoMo_Ireland_logo.svg"
-         preserveAspectRatio="xMidYMid meet"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="32" fill="#14B8A6"/>
+  <text x="128" y="150" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">GOMO</text>
 </svg>

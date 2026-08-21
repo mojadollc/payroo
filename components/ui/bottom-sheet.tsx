@@ -40,7 +40,7 @@ export function BottomSheet({
     <div className="fixed inset-0 z-[60] md:hidden">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/60 animate-in fade-in duration-150"
         onClick={onClose}
       />
 
@@ -48,7 +48,7 @@ export function BottomSheet({
       <div
         className={cn(
           "absolute bottom-0 left-0 right-0 bg-background rounded-t-3xl shadow-2xl",
-          "animate-in slide-in-from-bottom duration-300 ease-out",
+          "animate-in slide-in-from-bottom duration-200 ease-out",
           "flex flex-col"
         )}
         style={{ height: maxHeight }}

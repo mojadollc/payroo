@@ -104,6 +104,8 @@ export default function EWalletPage() {
   const [payoutChannelsLoading, setPayoutChannelsLoading] = useState(false)
   const allLimitRef = useRef(50)
 
+  const selectedPayoutChannelType = payoutChannels.find(c => c.id === payoutChannel)?.type ?? "wallet"
+
   // Evaluated once on render — storeId is set at login and doesn't change mid-session
   const canUseELoad = true
 
@@ -743,7 +745,7 @@ export default function EWalletPage() {
           </div>
 
           {/* Bank channel — InstaPay or PESONet */}
-          {payoutChannels.find(c => c.id === payoutChannel)?.type === "bank" && (
+          {selectedPayoutChannelType === "bank" && (
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Payment Rail</p>
               <div className="grid grid-cols-2 gap-2">
@@ -767,13 +769,14 @@ export default function EWalletPage() {
           {/* Account number */}
           <div>
             <label className="text-[12px] font-bold text-foreground mb-1.5 block">
-              {payoutChannels.find(c => c.id === payoutChannel)?.type === "wallet" ? "Mobile Number" : "Account Number"}
+              {selectedPayoutChannelType === "wallet" ? "Mobile Number" : "Account Number"}
             </label>
             <input
               type="tel"
+              inputMode="numeric"
               value={payoutAccount}
               onChange={e => setPayoutAccount(e.target.value)}
-              placeholder={payoutChannels.find(c => c.id === payoutChannel)?.type === "wallet" ? "09171234567" : "Account number"}
+              placeholder={selectedPayoutChannelType === "wallet" ? "09171234567" : "Account number"}
               className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
             />
           </div>

@@ -503,7 +503,7 @@ export default function EWalletPage() {
                   <RefreshCw className={`h-3 w-3 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
                 </button>
               </div>
-              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Cash-In Wallet</p>
+              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Payout Wallet</p>
               {hitpayBalanceLoading ? (
                 <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
               ) : hitpayBalanceError ? (
@@ -695,6 +695,22 @@ export default function EWalletPage() {
                 </Card>
               </button>
             )}
+
+            <button onClick={fetchHitpayBalance} className="text-left">
+              <Card className="border-rose-200 hover:border-rose-400 hover:shadow-md transition-all cursor-pointer h-full">
+                <CardHeader className="p-3 pb-1">
+                  <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Send className="h-3 w-3 text-rose-500" />Xendit Balance
+                    <RefreshCw className={`h-3 w-3 ml-auto text-rose-400 ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                  <div className="text-lg font-bold text-rose-600">
+                    {hitpayBalanceLoading ? "..." : hitpayBalanceError ? "N/A" : hitpayBalance != null ? `₱${hitpayBalance.toFixed(2)}` : "N/A"}
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
 
             <Card>
               <CardHeader className="p-3 pb-1">

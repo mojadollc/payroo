@@ -463,13 +463,6 @@ export default function EWalletPage() {
               </div>
               <span className="text-[10px] font-semibold text-foreground text-center">Kiosk</span>
             </button>
-
-            <button onClick={() => setShowSettings(true)} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
-              <div className="w-12 h-12 rounded-2xl bg-slate-400 flex items-center justify-center shadow-md shadow-slate-400/20">
-                <Settings className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-[10px] font-semibold text-foreground text-center">Settings</span>
-            </button>
           </div>
         </div>
 

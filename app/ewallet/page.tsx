@@ -436,7 +436,7 @@ export default function EWalletPage() {
           <Send className="h-6 w-6" />
         </div>
         <span className="text-[13px] font-bold">Send</span>
-        <span className="text-[10px] opacity-75">HitPay</span>
+        <span className="text-[10px] opacity-75">Xendit</span>
       </button>
     </div>
   )
@@ -515,7 +515,7 @@ export default function EWalletPage() {
               ) : (
                 <p className="text-white/50 text-[12px]">Tap to check</p>
               )}
-              <p className="text-white/40 text-[10px] mt-2">Powered by HitPay</p>
+              <p className="text-white/40 text-[10px] mt-2">Powered by Xendit</p>
             </div>
           </button>
         </div>

@@ -32,16 +32,16 @@ const NETWORK_COLORS: Record<string, string> = {
 }
 
 const NETWORK_LOGOS: Record<string, string> = {
-  SMART: "/networks/smart.svg",
-  GLOBE: "/networks/globe.svg",
-  TNT: "/networks/tnt.svg",
-  DITO: "/networks/dito.svg",
-  TM: "/networks/tm.svg",
-  GOMO: "/networks/gomo.svg",
-  SUN: "/networks/sun.svg",
-  "GAME CLUB": "/networks/gameclub.svg",
-  "RAZER GOLD": "/networks/razergold.svg",
-  CIGNAL: "/networks/cignal.svg",
+  SMART: "/networks/smart.png",
+  GLOBE: "/networks/globe.png",
+  TNT: "/networks/tnt.png",
+  DITO: "/networks/Dito.png",
+  TM: "/networks/tm.png",
+  GOMO: "/networks/gomo.png",
+  SUN: "/networks/sun.png",
+  "GAME CLUB": "/networks/gameclub.png",
+  "RAZER GOLD": "/networks/razergold.png",
+  CIGNAL: "/networks/Cignal.png",
 }
 
 

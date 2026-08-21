@@ -31,6 +31,19 @@ const NETWORK_COLORS: Record<string, string> = {
   "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16", CIGNAL: "#0EA5E9",
 }
 
+const NETWORK_LOGOS: Record<string, string> = {
+  SMART: "/networks/smart.svg",
+  GLOBE: "/networks/globe.svg",
+  TNT: "/networks/tnt.svg",
+  DITO: "/networks/dito.svg",
+  TM: "/networks/tm.svg",
+  GOMO: "/networks/gomo.svg",
+  SUN: "/networks/sun.svg",
+  "GAME CLUB": "/networks/gameclub.svg",
+  "RAZER GOLD": "/networks/razergold.svg",
+  CIGNAL: "/networks/cignal.svg",
+}
+
 
 export default function ELoadPage() {
   const router = useRouter()
@@ -283,6 +296,7 @@ export default function ELoadPage() {
               <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
                 {networks.map(net => {
                   const color = NETWORK_COLORS[net] || "#6366F1"
+                  const logo = NETWORK_LOGOS[net]
                   const active = selectedNetwork === net
                   return (
                     <button
@@ -293,7 +307,10 @@ export default function ELoadPage() {
                       }`}
                       style={active ? { backgroundColor: color } : {}}
                     >
-                      <span className={`text-sm font-black tracking-tight ${active ? "text-white" : "text-gray-700"}`}>
+                      {logo && (
+                        <img src={logo} alt={net} className={`w-8 h-8 object-contain ${active ? "brightness-0 invert" : ""}`} />
+                      )}
+                      <span className={`text-xs font-bold tracking-tight ${active ? "text-white" : "text-gray-700"}`}>
                         {net}
                       </span>
                     </button>
@@ -359,9 +376,13 @@ export default function ELoadPage() {
                       onClick={() => handleBuy(p)}
                       className="bg-white rounded-2xl px-4 py-3.5 border border-gray-100 shadow-sm active:scale-[0.98] transition-all text-left flex items-center gap-3"
                     >
-                      {/* Amount badge */}
+                      {/* Network logo badge */}
                       <div className="shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: netColor + "18" }}>
-                        <span className="text-base font-black leading-none text-center" style={{ color: netColor }}>₱{p.amount}</span>
+                        {NETWORK_LOGOS[p.network] ? (
+                          <img src={NETWORK_LOGOS[p.network]} alt={p.network} className="w-10 h-10 object-contain" />
+                        ) : (
+                          <span className="text-base font-black leading-none text-center" style={{ color: netColor }}>₱{p.amount}</span>
+                        )}
                       </div>
                       {/* Info */}
                       <div className="flex-1 min-w-0">

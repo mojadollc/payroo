@@ -10,11 +10,12 @@ export async function GET(req: NextRequest) {
       where: { status: { in: ["active", "partial"] }, customerName: { contains: search, mode: "insensitive" } },
       orderBy: { createdAt: "desc" },
       take: 50,
+      include: { items: true },
     })
     return NextResponse.json({ data: items })
   }
   if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
-  const items = await prisma.utangRecord.findMany({ where: { storeId }, orderBy: { createdAt: "desc" } })
+  const items = await prisma.utangRecord.findMany({ where: { storeId }, orderBy: { createdAt: "desc" }, include: { items: true } })
   return NextResponse.json({ data: items })
 }
 
@@ -40,7 +41,6 @@ export async function POST(req: NextRequest) {
           notes,
           items: {
             create: (items ?? []).map((item: any) => ({
-              id: item.id,
               productName: item.productName,
               quantity: item.quantity,
               price: item.price,

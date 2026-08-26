@@ -74,7 +74,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
   }, [])
 
   const change = Number.parseFloat(amountReceived) - total
-  const isValidPayment = Number.parseFloat(amountReceived) >= total
+  const isValidPayment = paymentMethod === "utang" || Number.parseFloat(amountReceived) >= total
 
   const handleCheckout = async () => {
     if (!isValidPayment) {

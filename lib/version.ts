@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.2.1"
+export const APP_VERSION = "2.2.2"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "E-Load refresh button fixed - bypasses cache and fetches live SKUs from Gbits"
+export const VERSION_CHANGELOG = "Fix utang checkout error - skip amount validation for utang payment method"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

@@ -113,12 +113,6 @@ export async function GET(req: NextRequest) {
     const action = req.nextUrl.searchParams.get("action")
     const txnId = req.nextUrl.searchParams.get("txnId")
 
-    if (action === "refresh-skus") {
-      skuCache = null
-      console.log("[eload] SKU cache cleared")
-      // Fall through to re-fetch below
-    }
-
     if (action === "status" && txnId) {
       const data = await gbitsGet(`/eload/status/${txnId}`)
       const raw = (data.content?.status || "").toLowerCase()
@@ -130,27 +124,32 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === "balance") {
-      // Read cached balance from DB — synced across all devices
       const settings = await prisma.commissionSettings.findUnique({ where: { storeId } })
-      console.log("[eload] balance from DB for", storeId, ":", settings?.gbitsBalance)
       return NextResponse.json({ balance: settings?.gbitsBalance ?? null })
     }
 
-    // Fetch SKUs — use cache if fresh
-    if (skuCache && Date.now() - skuCache.at < SKU_CACHE_TTL) {
-      console.log("[eload] serving SKUs from cache, age:", Math.round((Date.now() - skuCache.at) / 1000), "s")
+    // SKU fetch — force=true bypasses cache (used by refresh button)
+    const force = action === "refresh-skus"
+    if (force) skuCache = null
+
+    if (!force && skuCache && Date.now() - skuCache.at < SKU_CACHE_TTL) {
       return NextResponse.json({ products: skuCache.products, balance: null })
     }
 
     const skuData = await gbitsGet(`/eload/sku/${GBITS_BUSINESS_ID}`)
     if (skuData.errorCode !== 0) {
       console.error("[eload] SKU fetch error:", skuData.message)
+      // Return cached data if available even if stale, rather than empty
+      if (skuCache) return NextResponse.json({ products: skuCache.products, balance: null })
     }
     const products = mapSkus(skuData.errorCode === 0 ? skuData.content || [] : [])
     skuCache = { products, at: Date.now() }
+    console.log(`[eload] fetched ${products.length} active SKUs from Gbits (force=${force})`)
     return NextResponse.json({ products, balance: null })
   } catch (error: any) {
     console.error("eload GET error:", error.message)
+    // Return stale cache on error rather than failing
+    if (skuCache) return NextResponse.json({ products: skuCache.products, balance: null })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

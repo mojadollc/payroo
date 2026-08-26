@@ -40,8 +40,8 @@ const COLOR_MAP: Record<string, string> = {
 const ALL_CHANNELS = [
   { id: "gcash",     label: "GCash",      type: "wallet" },
   { id: "paymaya",   label: "Maya",       type: "wallet" },
-  { id: "shopeepay", label: "ShopeePay",  type: "wallet" },
   { id: "grabpay",   label: "GrabPay",    type: "wallet" },
+  { id: "shopeepay", label: "ShopeePay",  type: "wallet" },
   { id: "bpi",       label: "BPI",        type: "bank" },
   { id: "unionbank", label: "UnionBank",  type: "bank" },
   { id: "bdo",       label: "BDO",        type: "bank" },
@@ -61,7 +61,8 @@ export async function GET() {
   let available: string[] | null = null
   if (apiKey) {
     try {
-      const res = await fetch(`${apiUrl}/payment-methods?currency=PHP`, {
+      const url = (process.env.HITPAY_API_URL ?? "https://api.hit-pay.com/v1").replace(/\/+$/, "")
+      const res = await fetch(`${url}/payment-methods?currency=PHP`, {
         headers: { "X-BUSINESS-API-KEY": apiKey },
         next: { revalidate: 300 },
       })

@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.2.0"
+export const APP_VERSION = "2.2.1"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "E-Load: show only active SKUs (skuStatus=true) from Gbits - 622 active out of 1064 total"
+export const VERSION_CHANGELOG = "E-Load refresh button fixed - bypasses cache and fetches live SKUs from Gbits"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

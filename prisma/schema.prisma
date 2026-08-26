@@ -794,7 +794,9 @@ model BillPayment {
   amount        Float
   serviceFee    Float    @default(0)
   totalAmount   Float
-  status        String   @default("completed")
+  status        String   @default("PENDING")
+  paymentCode   String?
+  xenditPaymentId String?
   notes         String?
   createdAt     DateTime @default(now())
 

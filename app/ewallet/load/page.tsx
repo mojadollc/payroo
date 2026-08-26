@@ -69,25 +69,24 @@ export default function ELoadPage() {
     setLoading(true)
     setError("")
     const storeId = getStoreId()
-    const url = forceRefresh
-      ? `/api/eload?storeId=${storeId}&action=refresh-skus`
-      : `/api/eload?storeId=${storeId}`
-    fetch(url)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        const ct = r.headers.get("content-type") || ""
-        if (!ct.includes("application/json")) throw new Error("API not deployed yet")
-        return r.json()
-      })
-      .then(data => {
-        const prods: Product[] = data.products || []
-        setProducts(prods)
-        const nets = [...new Set(prods.map(p => p.network))]
-        setNetworks(nets)
-        if (nets.length > 0) setSelectedNetwork(nets[0])
-      })
-      .catch((err) => { setError(err.message || "Failed to load products") })
-      .finally(() => setLoading(false))
+    const url = `/api/eload?storeId=${storeId}${forceRefresh ? "&action=refresh-skus" : ""}`
+    try {
+      const r = await fetch(url)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const ct = r.headers.get("content-type") || ""
+      if (!ct.includes("application/json")) throw new Error("API not deployed yet")
+      const data = await r.json()
+      const prods: Product[] = data.products || []
+      setProducts(prods)
+      const nets = [...new Set(prods.map(p => p.network))] as string[]
+      setNetworks(nets)
+      // Only reset selected network if current one no longer exists
+      setSelectedNetwork(prev => nets.includes(prev) ? prev : (nets[0] || ""))
+    } catch (err: any) {
+      setError(err.message || "Failed to load products")
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {

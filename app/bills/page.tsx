@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Receipt, Plus, Trash2, CheckCircle2, Zap, Wifi, Droplets, Flame, Phone, Tv, Building2 } from "lucide-react"
+import { Receipt, Plus, Trash2, CheckCircle2, Zap, Wifi, Droplets, Flame, Phone, Tv, Building2, Copy } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,11 @@ import { useToast } from "@/hooks/use-toast"
 import { getStoreId } from "@/lib/store-id"
 import { Badge } from "@/components/ui/badge"
 
+const XENDIT_OTC = ["CEBUANA", "LBC"]
+
 const BILLERS = [
+  { name: "CEBUANA", icon: Building2, color: "bg-yellow-100 text-yellow-700", xendit: true },
+  { name: "LBC", icon: Building2, color: "bg-red-100 text-red-700", xendit: true },
   { name: "MERALCO", icon: Zap, color: "bg-yellow-100 text-yellow-700" },
   { name: "GLOBE", icon: Phone, color: "bg-blue-100 text-blue-700" },
   { name: "SMART", icon: Phone, color: "bg-green-100 text-green-700" },
@@ -38,6 +42,7 @@ interface BillPayment {
   status: string
   notes?: string
   createdAt: string
+  paymentCode?: string | null
 }
 
 export default function BillsPage() {
@@ -49,6 +54,7 @@ export default function BillsPage() {
 
   const [form, setForm] = useState({
     billerName: "",
+    customerName: "",
     accountNumber: "",
     amount: "",
     serviceFee: "",
@@ -56,6 +62,7 @@ export default function BillsPage() {
   })
 
   const storeId = getStoreId()
+  const isXenditOTC = XENDIT_OTC.includes(form.billerName.toUpperCase())
 
   const loadTransactions = async () => {
     setLoading(true)
@@ -80,7 +87,7 @@ export default function BillsPage() {
     e.preventDefault()
     if (!form.billerName) { toast({ title: "Select a biller", variant: "destructive" }); return }
     if (!amount || amount <= 0) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
-    if (!serviceFee && serviceFee !== 0) { toast({ title: "Enter service fee", variant: "destructive" }); return }
+    if (isXenditOTC && !form.customerName.trim()) { toast({ title: "Customer name is required for " + form.billerName, variant: "destructive" }); return }
 
     setSubmitting(true)
     try {
@@ -92,7 +99,7 @@ export default function BillsPage() {
       if (!res.ok) throw new Error((await res.json()).error)
       const { data } = await res.json()
       setSuccess(data)
-      setForm({ billerName: "", accountNumber: "", amount: "", serviceFee: "", notes: "" })
+      setForm({ billerName: "", customerName: "", accountNumber: "", amount: "", serviceFee: "", notes: "" })
       loadTransactions()
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
@@ -101,14 +108,9 @@ export default function BillsPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await fetch(`/api/bill-payments?id=${id}`, { method: "DELETE" })
-      setTransactions(prev => prev.filter(t => t.id !== id))
-      toast({ title: "Transaction deleted" })
-    } catch {
-      toast({ title: "Failed to delete", variant: "destructive" })
-    }
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code)
+    toast({ title: "Payment code copied!" })
   }
 
   return (
@@ -129,8 +131,36 @@ export default function BillsPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <span className="font-bold text-green-700">Payment Successful!</span>
+              <span className="font-bold text-green-700">
+                {success.paymentCode ? "Payment Code Generated!" : "Payment Recorded!"}
+              </span>
             </div>
+
+            {/* Xendit OTC payment code highlight */}
+            {success.paymentCode && (
+              <div className="bg-white border-2 border-yellow-400 rounded-xl p-4 mb-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">
+                  {success.billerName} Payment Code
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-3xl font-extrabold font-mono tracking-widest text-yellow-700">
+                    {success.paymentCode}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyCode(success.paymentCode!)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Show this code at any {success.billerName} branch to complete payment
+                </p>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg p-3 space-y-1.5 text-sm font-mono border border-green-200">
               <div className="flex justify-between"><span className="text-muted-foreground">TXN REF</span><span className="font-bold">{success.txnRef}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">BILLER</span><span className="font-bold">{success.billerName}</span></div>
@@ -140,7 +170,13 @@ export default function BillsPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">SERVICE FEE</span><span>₱{success.serviceFee.toFixed(2)}</span></div>
                 <div className="flex justify-between font-bold text-base mt-1"><span>TOTAL</span><span className="text-green-700">₱{success.totalAmount.toFixed(2)}</span></div>
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t"><span>DATE</span><span>{new Date(success.createdAt).toLocaleString("en-PH")}</span></div>
+              <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t">
+                <span>STATUS</span>
+                <Badge variant={success.status === "PENDING" ? "outline" : "default"} className="text-[10px]">
+                  {success.status}
+                </Badge>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground"><span>DATE</span><span>{new Date(success.createdAt).toLocaleString("en-PH")}</span></div>
             </div>
             <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setSuccess(null)}>
               <Plus className="h-4 w-4 mr-1" /> New Transaction
@@ -175,6 +211,9 @@ export default function BillsPage() {
                       >
                         <Icon className="h-5 w-5" />
                         {b.name}
+                        {b.xendit && (
+                          <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded">LIVE</span>
+                        )}
                       </button>
                     )
                   })}
@@ -185,6 +224,19 @@ export default function BillsPage() {
                   onChange={e => setForm(f => ({ ...f, billerName: e.target.value }))}
                 />
               </div>
+
+              {/* Customer name — required for Xendit OTC */}
+              {isXenditOTC && (
+                <div className="space-y-2">
+                  <Label>Customer Name * <span className="text-xs text-blue-600">(required for {form.billerName})</span></Label>
+                  <Input
+                    placeholder="e.g. Juan Dela Cruz"
+                    value={form.customerName}
+                    onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
+                    required
+                  />
+                </div>
+              )}
 
               {/* Account number */}
               <div className="space-y-2">
@@ -230,18 +282,26 @@ export default function BillsPage() {
                 <span className="text-2xl font-extrabold text-blue-700">₱{totalAmount.toFixed(2)}</span>
               </div>
 
+              {isXenditOTC && (
+                <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  ✓ A real Xendit payment code will be generated for {form.billerName}. Customer pays at any {form.billerName} branch.
+                </p>
+              )}
+
               {/* Notes */}
               <div className="space-y-2">
                 <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
                 <Input
-                  placeholder="e.g. Customer name, reference..."
+                  placeholder="e.g. reference, remarks..."
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 />
               </div>
 
               <Button type="submit" className="w-full h-12 text-base font-bold" disabled={submitting}>
-                {submitting ? "Processing..." : `Confirm Payment · ₱${totalAmount.toFixed(2)}`}
+                {submitting
+                  ? isXenditOTC ? "Generating Payment Code..." : "Processing..."
+                  : `Confirm Payment · ₱${totalAmount.toFixed(2)}`}
               </Button>
             </form>
           </CardContent>
@@ -263,32 +323,62 @@ export default function BillsPage() {
             <div className="p-6 text-center text-sm text-muted-foreground">No transactions yet</div>
           ) : (
             <div className="divide-y">
-              {transactions.map(t => (
-                <div key={t.id} className="px-4 py-3 flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm">{t.billerName}</span>
-                      <Badge variant="outline" className="text-[10px] font-mono">{t.txnRef}</Badge>
+              {transactions.map(t => {
+                const paymentCode = t.notes?.startsWith("PAYMENT_CODE:")
+                  ? t.notes.split("|")[0].replace("PAYMENT_CODE:", "").trim()
+                  : null
+                return (
+                  <div key={t.id} className="px-4 py-3 flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm">{t.billerName}</span>
+                        <Badge variant="outline" className="text-[10px] font-mono">{t.txnRef}</Badge>
+                        <Badge
+                          variant={t.status === "PENDING" ? "outline" : "default"}
+                          className="text-[10px]"
+                        >
+                          {t.status}
+                        </Badge>
+                      </div>
+                      {paymentCode && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs font-mono font-bold text-yellow-700 bg-yellow-50 border border-yellow-200 px-2 py-0.5 rounded">
+                            {paymentCode}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={() => copyCode(paymentCode)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Acct: {t.accountNumber} · {new Date(t.createdAt).toLocaleDateString("en-PH")}
+                      </div>
+                      <div className="text-xs mt-0.5 flex gap-3">
+                        <span>Bill: <span className="font-semibold">₱{t.amount.toFixed(2)}</span></span>
+                        <span>Fee: <span className="font-semibold text-orange-600">₱{t.serviceFee.toFixed(2)}</span></span>
+                        <span>Total: <span className="font-bold text-blue-700">₱{t.totalAmount.toFixed(2)}</span></span>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      Acct: {t.accountNumber} · {new Date(t.createdAt).toLocaleDateString("en-PH")}
-                    </div>
-                    <div className="text-xs mt-0.5 flex gap-3">
-                      <span>Bill: <span className="font-semibold">₱{t.amount.toFixed(2)}</span></span>
-                      <span>Fee: <span className="font-semibold text-orange-600">₱{t.serviceFee.toFixed(2)}</span></span>
-                      <span>Total: <span className="font-bold text-blue-700">₱{t.totalAmount.toFixed(2)}</span></span>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive shrink-0"
+                      onClick={async () => {
+                        await fetch(`/api/bill-payments?id=${t.id}`, { method: "DELETE" })
+                        setTransactions(prev => prev.filter(x => x.id !== t.id))
+                        toast({ title: "Transaction deleted" })
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive shrink-0"
-                    onClick={() => handleDelete(t.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

@@ -23,15 +23,24 @@ const BANK_CHANNELS: Record<string, string> = {
 }
 
 // ── HitPay channel map (wallet key → HitPay payment_instrument) ───────────────
+// Philippines supported: gcash, paymaya (maya), grabpay + banks via instapay/pesonet
 const HITPAY_CHANNELS: Record<string, string> = {
   gcash:     "gcash",
   paymaya:   "paymaya",
+  maya:      "paymaya",
   grabpay:   "grabpay",
   bpi:       "bpi",
   bdo:       "bdo",
   unionbank: "unionbank",
   metrobank: "metrobank",
+  rcbc:      "rcbc",
+  chinabank: "chinabank",
+  landbank:  "landbank",
+  pnb:       "pnb",
 }
+
+// Wallet channels that use phone number as account_number
+const HITPAY_WALLET_CHANNELS = new Set(["gcash", "paymaya", "maya", "grabpay"])
 
 const normalizePhone = (num: string) => {
   const digits = num.replace(/\D/g, "")
@@ -132,14 +141,14 @@ async function payoutHitPay(
     const beneBody = {
       name:               accountName || "Customer",
       payment_instrument: HITPAY_CHANNELS[channel],
-      account_number:     channel in WALLET_CHANNELS
+      account_number:     HITPAY_WALLET_CHANNELS.has(channel)
         ? normalizePhone(accountNumber)
         : accountNumber.replace(/\D/g, ""),
     }
 
     console.log("[hitpay/payout] create beneficiary:", JSON.stringify(beneBody))
 
-    const beneRes = await fetch(`${apiUrl}/v1/beneficiaries`, {
+    const beneRes = await fetch(`${apiUrl}/beneficiaries`, {
       method: "POST",
       headers: { "X-BUSINESS-API-KEY": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify(beneBody),
@@ -166,7 +175,7 @@ async function payoutHitPay(
 
   console.log("[hitpay/payout] create transfer:", JSON.stringify(transferBody))
 
-  const txRes = await fetch(`${apiUrl}/v1/transfers`, {
+  const txRes = await fetch(`${apiUrl}/transfers`, {
     method: "POST",
     headers: { "X-BUSINESS-API-KEY": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify(transferBody),
@@ -198,7 +207,7 @@ export async function POST(req: NextRequest) {
 
     if (provider === "hitpay") {
       const apiKey = process.env.HITPAY_API_KEY
-      const apiUrl = process.env.HITPAY_API_URL ?? "https://api.hit-pay.com"
+      const apiUrl = (process.env.HITPAY_API_URL ?? "https://api.hit-pay.com/v1").replace(/\/+$/, "")
       if (!apiKey) return NextResponse.json({ error: "HitPay not configured" }, { status: 500 })
       return payoutHitPay(apiKey, apiUrl, body)
     }

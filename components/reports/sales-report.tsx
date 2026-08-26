@@ -121,10 +121,13 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                 <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
                   sale.paymentMethod === "cash" ? "bg-green-100" :
                   sale.paymentMethod === "gcash" ? "bg-blue-100" :
+                  sale.paymentMethod === "utang" ? "bg-red-100" :
                   "bg-purple-100"
                 }`}>
                   <span className="text-xs font-bold uppercase">
-                    {sale.paymentMethod === "cash" ? "₱" : sale.paymentMethod.charAt(0).toUpperCase()}
+                    {sale.paymentMethod === "cash" ? "₱" :
+                     sale.paymentMethod === "utang" ? "U" :
+                     sale.paymentMethod.charAt(0).toUpperCase()}
                   </span>
                 </div>
 
@@ -134,9 +137,16 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                     <span className="text-[13px] font-semibold">
                       {totalQty} item{totalQty !== 1 ? "s" : ""}
                     </span>
-                    <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize">
-                      {sale.paymentMethod}
+                    <Badge variant="outline" className={`text-[10px] h-4 px-1.5 capitalize ${
+                      sale.paymentMethod === "utang" ? "border-red-300 text-red-600 bg-red-50" : ""
+                    }`}>
+                      {sale.paymentMethod === "utang" ? "Utang" : sale.paymentMethod}
                     </Badge>
+                    {(sale as any).utangCustomerName && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-orange-300 text-orange-700 bg-orange-50">
+                        👤 {(sale as any).utangCustomerName}
+                      </Badge>
+                    )}
                     {isVoided && (
                       <Badge variant="destructive" className="text-[10px] h-4 px-1.5 gap-0.5">
                         <Ban className="h-2.5 w-2.5" /> Void
@@ -146,6 +156,9 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Clock className="h-3 w-3" />
                     {formatDate(sale.createdAt)}
+                    {(sale as any).utangId && (
+                      <span className="text-orange-500 font-medium">· Utang {(sale as any).utangCustomerName ? `paid by ${(sale as any).utangCustomerName}` : ""}</span>
+                    )}
                   </p>
                 </div>
 

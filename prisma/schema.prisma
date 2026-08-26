@@ -44,6 +44,7 @@ enum PaymentMethod {
   cash
   gcash
   maya
+  utang
 }
 
 enum EWalletType {
@@ -165,15 +166,17 @@ model Category {
 // ─── Sales ────────────────────────────────────────────────────────────────────
 
 model Sale {
-  id            String        @id @default(uuid())
-  storeId       String
-  total         Float
-  profit        Float         @default(0)
-  paymentMethod PaymentMethod
-  status        SaleStatus    @default(completed)
-  voidedAt      DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                 String        @id @default(uuid())
+  storeId            String
+  total              Float
+  profit             Float         @default(0)
+  paymentMethod      PaymentMethod
+  status             SaleStatus    @default(completed)
+  utangCustomerName  String?       // set when paymentMethod = utang or utang payment
+  utangId            String?       // links to UtangRecord when this is a payment
+  voidedAt           DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   items SaleItem[]
 

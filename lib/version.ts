@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.2.2"
+export const APP_VERSION = "2.2.3"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Fix utang checkout error - skip amount validation for utang payment method"
+export const VERSION_CHANGELOG = "Utang: stock deduction on checkout + payments show in sales report with customer name"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

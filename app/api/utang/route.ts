@@ -22,30 +22,85 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { id, storeId, storeName, customerName, customerPhone, totalAmount, amountPaid, balance, status, dueDate, notes, items } = body
-    const record = await prisma.utangRecord.create({
-      data: {
-        id,
-        storeId,
-        storeName,
-        customerName,
-        customerPhone,
-        totalAmount,
-        amountPaid: amountPaid ?? 0,
-        balance,
-        status: status ?? "active",
-        dueDate: dueDate ? new Date(dueDate) : null,
-        notes,
-        items: {
-          create: (items ?? []).map((item: any) => ({
-            id: item.id,
-            productName: item.productName,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.subtotal,
-          })),
+
+    const record = await prisma.$transaction(async (tx) => {
+      // Create utang record
+      const created = await tx.utangRecord.create({
+        data: {
+          id,
+          storeId,
+          storeName,
+          customerName,
+          customerPhone,
+          totalAmount,
+          amountPaid: amountPaid ?? 0,
+          balance,
+          status: status ?? "active",
+          dueDate: dueDate ? new Date(dueDate) : null,
+          notes,
+          items: {
+            create: (items ?? []).map((item: any) => ({
+              id: item.id,
+              productName: item.productName,
+              quantity: item.quantity,
+              price: item.price,
+              subtotal: item.subtotal,
+            })),
+          },
         },
-      },
+      })
+
+      // Deduct stock for each item that has a productId
+      for (const item of items ?? []) {
+        if (!item.productId) continue
+        const product = await tx.product.findUnique({ where: { id: item.productId } })
+        if (!product) continue
+        const newStock = Math.max(0, product.stock - item.quantity)
+        await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } })
+        await tx.inventoryTransaction.create({
+          data: {
+            storeId,
+            productId: item.productId,
+            productName: item.productName,
+            type: "sale",
+            quantity: -item.quantity,
+            previousStock: product.stock,
+            newStock,
+            notes: `Utang - ${customerName}`,
+          },
+        })
+      }
+
+      // Create a sale record for utang so it appears in reports
+      const profit = (items ?? []).reduce((sum: number, item: any) => {
+        const cost = item.cost ?? 0
+        return sum + (item.price - cost) * item.quantity
+      }, 0)
+      await tx.sale.create({
+        data: {
+          storeId,
+          total: totalAmount,
+          profit,
+          paymentMethod: "utang",
+          status: "completed",
+          utangCustomerName: customerName,
+          utangId: created.id,
+          items: {
+            create: (items ?? []).filter((item: any) => item.productId).map((item: any) => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              price: item.price,
+              cost: item.cost ?? 0,
+              subtotal: item.subtotal,
+            })),
+          },
+        },
+      })
+
+      return created
     })
+
     return NextResponse.json({ data: record })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

@@ -156,8 +156,8 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Clock className="h-3 w-3" />
                     {formatDate(sale.createdAt)}
-                    {(sale as any).utangId && (
-                      <span className="text-orange-500 font-medium">· Utang {(sale as any).utangCustomerName ? `paid by ${(sale as any).utangCustomerName}` : ""}</span>
+                    {(sale as any).utangCustomerName && sale.paymentMethod !== "utang" && (
+                      <span className="text-orange-500 font-medium">· Utang paid by {(sale as any).utangCustomerName}</span>
                     )}
                   </p>
                 </div>

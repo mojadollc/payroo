@@ -71,33 +71,6 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // Create a sale record for utang so it appears in reports
-      const profit = (items ?? []).reduce((sum: number, item: any) => {
-        const cost = item.cost ?? 0
-        return sum + (item.price - cost) * item.quantity
-      }, 0)
-      await tx.sale.create({
-        data: {
-          storeId,
-          total: totalAmount,
-          profit,
-          paymentMethod: "utang",
-          status: "completed",
-          utangCustomerName: customerName,
-          utangId: created.id,
-          items: {
-            create: (items ?? []).filter((item: any) => item.productId).map((item: any) => ({
-              productId: item.productId,
-              productName: item.productName,
-              quantity: item.quantity,
-              price: item.price,
-              cost: item.cost ?? 0,
-              subtotal: item.subtotal,
-            })),
-          },
-        },
-      })
-
       return created
     })
 

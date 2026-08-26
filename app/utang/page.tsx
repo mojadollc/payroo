@@ -220,6 +220,8 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
     setExpanded(e => !e)
   }
 
+  const hasItems = record.items && record.items.length > 0
+
   const statusColor = record.status === "settled" ? "bg-green-100 text-green-700" : record.status === "partial" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
   const createdAt = new Date(record.createdAt)
 
@@ -234,6 +236,15 @@ function UtangRow({ record, onPay, onQR, onDelete }: { record: UtangRecord; onPa
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{record.storeName} · {createdAt.toLocaleDateString()}</p>
           {record.notes && <p className="text-xs text-muted-foreground truncate">{record.notes}</p>}
+          {hasItems && (
+            <div className="mt-1 space-y-0.5">
+              {record.items.map((item, i) => (
+                <p key={i} className="text-xs text-muted-foreground">
+                  {item.quantity}× {item.productName} — ₱{item.subtotal.toFixed(2)}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
         <div className="text-right shrink-0">
           <p className="font-bold text-red-600">₱{record.balance.toFixed(2)}</p>

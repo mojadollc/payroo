@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.2.3"
+export const APP_VERSION = "2.2.4"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Utang: stock deduction on checkout + payments show in sales report with customer name"
+export const VERSION_CHANGELOG = "Utang: items shown on utang page, sale only recorded on payment (not on checkout), correct tagline in sales report"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

@@ -22,8 +22,11 @@ export async function POST(req: NextRequest) {
         data: { balance: Math.max(0, newBalance), amountPaid: { increment: amount }, status },
       })
 
-      // Create a sale record for the payment so it shows in reports
-      const utang = await tx.utangRecord.findUnique({ where: { id: utangId } })
+      // Create a sale record for the payment with the original utang items
+      const utang = await tx.utangRecord.findUnique({
+        where: { id: utangId },
+        include: { items: true },
+      })
       if (utang) {
         await tx.sale.create({
           data: {
@@ -34,6 +37,15 @@ export async function POST(req: NextRequest) {
             status: "completed",
             utangCustomerName: customerName,
             utangId,
+            items: {
+              create: utang.items.map((item) => ({
+                productName: item.productName,
+                quantity: item.quantity,
+                price: item.price,
+                cost: 0,
+                subtotal: item.subtotal,
+              })),
+            },
           },
         })
       }

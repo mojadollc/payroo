@@ -6,9 +6,25 @@ const GBITS_BUSINESS_ID = process.env.GBITS_BUSINESS_ID!
 const GBITS_BUSINESS_CODE = process.env.GBITS_BUSINESS_CODE!
 const GBITS_USERNAME = process.env.GBITS_USERNAME!
 const GBITS_PASSWORD = process.env.GBITS_PASSWORD!
-const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 let cachedToken: string | null = null
+let tokenExpiresAt: number = 0
+
+function getTokenExpiry(token: string): number {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64").toString())
+    return (payload.exp || 0) * 1000 // convert to ms
+  } catch {
+    return 0
+  }
+}
+
+function isTokenValid(): boolean {
+  if (!cachedToken) return false
+  // Refresh 5 minutes before actual expiry
+  return Date.now() < tokenExpiresAt - 5 * 60 * 1000
+}
 
 async function authenticate(): Promise<string> {
   const r = await fetch(`${GBITS_API_URL}/auth`, {
@@ -19,18 +35,26 @@ async function authenticate(): Promise<string> {
   const data = await r.json()
   if (data.errorCode !== 0) throw new Error(data.message || "Gbits auth failed")
   cachedToken = data.content.accessToken
+  tokenExpiresAt = getTokenExpiry(cachedToken!)
+  console.log("[eload] authenticated, token expires at:", new Date(tokenExpiresAt).toISOString())
+  return cachedToken!
+}
+
+async function getToken(): Promise<string> {
+  if (!isTokenValid()) await authenticate()
   return cachedToken!
 }
 
 async function gbitsGet(path: string): Promise<any> {
-  if (!cachedToken) cachedToken = await authenticate()
+  const token = await getToken()
   const r = await fetch(`${GBITS_API_URL}${path}`, {
-    headers: { Authorization: cachedToken, Accept: "application/json", "User-Agent": UA },
+    headers: { Authorization: token, Accept: "application/json", "User-Agent": UA },
   })
   if (r.status === 401) {
-    cachedToken = await authenticate()
+    cachedToken = null
+    const freshToken = await authenticate()
     const retry = await fetch(`${GBITS_API_URL}${path}`, {
-      headers: { Authorization: cachedToken, Accept: "application/json", "User-Agent": UA },
+      headers: { Authorization: freshToken, Accept: "application/json", "User-Agent": UA },
     })
     return retry.json()
   }
@@ -162,27 +186,25 @@ export async function POST(req: NextRequest) {
     }
     if (!address || !amount) return NextResponse.json({ error: "address and amount are required" }, { status: 400 })
 
-    if (!cachedToken) cachedToken = await authenticate()
-
+    const token = await getToken()
     const txnId = generateTxnId()
     const params = new URLSearchParams({ address, transactionId: txnId })
     if (promoId) {
-      // SKU-based load — amount is fixed by the promo, do NOT send amount
       params.append("promoId", String(promoId))
     } else {
-      // Open-amount regular load — amount is required
       params.append("amount", String(amount))
     }
 
     let r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
       method: "POST",
-      headers: { Authorization: cachedToken!, Accept: "application/json", "User-Agent": UA },
+      headers: { Authorization: token, Accept: "application/json", "User-Agent": UA },
     })
     if (r.status === 401) {
-      cachedToken = await authenticate()
+      cachedToken = null
+      const freshToken = await authenticate()
       r = await fetch(`${GBITS_API_URL}/eload/buy?${params.toString()}`, {
         method: "POST",
-        headers: { Authorization: cachedToken!, Accept: "application/json", "User-Agent": UA },
+        headers: { Authorization: freshToken, Accept: "application/json", "User-Agent": UA },
       })
     }
     const result = await r.json()

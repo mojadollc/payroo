@@ -26,17 +26,14 @@ interface Product {
 }
 
 const NETWORK_COLORS: Record<string, string> = {
+  // Mobile networks
   SMART: "#00B900", GLOBE: "#007DFE", TNT: "#F59E0B", DITO: "#06B6D4",
-  TM: "#6366F1", GOMO: "#14B8A6", SUN: "#F97316",
-  "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16", CIGNAL: "#0EA5E9",
+  TM: "#6366F1", GOMO: "#14B8A6", SUN: "#F97316", "GOMO PH": "#14B8A6",
+  // Game pins
+  "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16", VIVA: "#E11D48", "VIVA GAMES": "#E11D48",
+  // Cable / TV
+  CIGNAL: "#0EA5E9", "CIGNAL TV": "#0EA5E9", SKY: "#0284C7", "SKY CABLE": "#0284C7",
 }
-
-// Product type categories (top-level)
-const PRODUCT_TYPES = [
-  { id: "mobile", label: "Mobile E-Load", icon: "📱", networks: ["GLOBE", "TM", "SMART", "TNT", "DITO", "GOMO", "SUN"] },
-  { id: "games", label: "Game Pins", icon: "🎮", networks: ["GAME CLUB", "RAZER GOLD"] },
-  { id: "cable", label: "Cable / TV", icon: "📺", networks: ["CIGNAL"] },
-]
 
 const NETWORK_LOGOS: Record<string, string> = {
   SMART: "/networks/smart.png",
@@ -47,9 +44,13 @@ const NETWORK_LOGOS: Record<string, string> = {
   GOMO: "/networks/gomo.png",
   SUN: "/networks/sun.png",
   "GAME CLUB": "/networks/gameclub.png",
-  "RAZER GOLD": "/networks/razergold.png",
   CIGNAL: "/networks/Cignal.png",
 }
+
+// Known network categories for grouping
+const MOBILE_NETWORKS = ["GLOBE", "TM", "SMART", "TNT", "DITO", "GOMO", "GOMO PH", "SUN"]
+const GAME_NETWORKS = ["GAME CLUB", "RAZER GOLD", "VIVA", "VIVA GAMES"]
+const CABLE_NETWORKS = ["CIGNAL", "CIGNAL TV", "SKY", "SKY CABLE"]
 
 
 export default function ELoadPage() {
@@ -88,9 +89,11 @@ export default function ELoadPage() {
       setProducts(prods)
       const nets = [...new Set(prods.map(p => p.network))] as string[]
       setNetworks(nets)
-      // Auto-select first network in current type category
-      const typeNets = PRODUCT_TYPES.find(t => t.id === selectedType)?.networks || []
-      const available = typeNets.filter(n => nets.includes(n))
+      // Auto-select first network in mobile category (default)
+      const mobile = nets.filter(n => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
+      const games = nets.filter(n => GAME_NETWORKS.some(g => n.toUpperCase().includes(g)))
+      const cable = nets.filter(n => CABLE_NETWORKS.some(c => n.toUpperCase().includes(c)))
+      const available = [...mobile, ...games, ...cable]
       setSelectedNetwork(prev => nets.includes(prev) ? prev : (available[0] || nets[0] || ""))
     } catch (err: any) {
       setError(err.message || "Failed to load products")
@@ -126,8 +129,31 @@ export default function ELoadPage() {
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
 
-  // Get networks available for current type
-  const typeNetworks = PRODUCT_TYPES.find(t => t.id === selectedType)?.networks.filter(n => networks.includes(n)) || []
+  // Dynamically categorize networks from actual API response
+  const mobileNets = networks.filter(n => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
+  const gameNets = networks.filter(n => GAME_NETWORKS.some(g => n.toUpperCase().includes(g)))
+  const cableNets = networks.filter(n => CABLE_NETWORKS.some(c => n.toUpperCase().includes(c)))
+  const otherNets = networks.filter(n => 
+    !mobileNets.includes(n) && !gameNets.includes(n) && !cableNets.includes(n)
+  )
+
+  // Get networks for current type
+  const getTypeNetworks = () => {
+    if (selectedType === "mobile") return mobileNets
+    if (selectedType === "games") return gameNets
+    if (selectedType === "cable") return cableNets
+    if (selectedType === "others") return otherNets
+    return networks
+  }
+  const typeNetworks = getTypeNetworks()
+
+  // Available types based on what's returned
+  const availableTypes = [
+    { id: "mobile", label: "Mobile E-Load", count: mobileNets.length },
+    { id: "games", label: "Game Pins", count: gameNets.length },
+    { id: "cable", label: "Cable / TV", count: cableNets.length },
+    ...(otherNets.length > 0 ? [{ id: "others", label: "Others", count: otherNets.length }] : []),
+  ].filter(t => t.count > 0)
 
   const filtered = products
     .filter(p => p.network === selectedNetwork)
@@ -298,28 +324,42 @@ export default function ELoadPage() {
         </div>
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Product Type Tabs — Mobile / Games / Cable */}
-          <div className="bg-white border-b border-gray-100 px-3 py-2">
-            <div className="flex gap-2">
-              {PRODUCT_TYPES.map(type => {
-                const available = type.networks.filter(n => networks.includes(n))
-                if (available.length === 0 && !loading) return null
+          {/* Product Type Tabs — circular icons */}
+          <div className="bg-white border-b border-gray-100 px-3 py-3">
+            <div className="flex gap-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+              {availableTypes.map(type => {
                 const active = selectedType === type.id
+                const typeColors: Record<string, string> = {
+                  mobile: "#007DFE",
+                  games: "#8B5CF6", 
+                  cable: "#0EA5E9",
+                  others: "#6B7280",
+                }
+                const bg = typeColors[type.id] || "#6B7280"
                 return (
                   <button
                     key={type.id}
                     onClick={() => {
                       setSelectedType(type.id)
-                      const nets = type.networks.filter(n => networks.includes(n))
+                      const nets = getTypeNetworks()
                       setSelectedNetwork(nets[0] || "")
                       setFilter("all")
                     }}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                      active ? "bg-indigo-600 text-white shadow-md" : "bg-gray-100 text-gray-600"
-                    }`}
+                    className={`shrink-0 flex flex-col items-center gap-1.5 transition-all`}
                   >
-                    <span>{type.icon}</span>
-                    <span>{type.label}</span>
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+                        active ? "shadow-lg scale-105" : "opacity-60"
+                      }`}
+                      style={{ backgroundColor: bg }}
+                    >
+                      <span className="text-white text-xs font-black">
+                        {type.label.split(" ")[0].slice(0, 3).toUpperCase()}
+                      </span>
+                    </div>
+                    <span className={`text-[11px] font-bold ${active ? "text-gray-900" : "text-gray-500"}`}>
+                      {type.label}
+                    </span>
                   </button>
                 )
               })}

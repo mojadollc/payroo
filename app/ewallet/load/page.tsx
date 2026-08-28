@@ -31,6 +31,13 @@ const NETWORK_COLORS: Record<string, string> = {
   "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16", CIGNAL: "#0EA5E9",
 }
 
+// Product type categories (top-level)
+const PRODUCT_TYPES = [
+  { id: "mobile", label: "Mobile E-Load", icon: "📱", networks: ["GLOBE", "TM", "SMART", "TNT", "DITO", "GOMO", "SUN"] },
+  { id: "games", label: "Game Pins", icon: "🎮", networks: ["GAME CLUB", "RAZER GOLD"] },
+  { id: "cable", label: "Cable / TV", icon: "📺", networks: ["CIGNAL"] },
+]
+
 const NETWORK_LOGOS: Record<string, string> = {
   SMART: "/networks/smart.png",
   GLOBE: "/networks/globe.png",
@@ -51,6 +58,7 @@ export default function ELoadPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [networks, setNetworks] = useState<string[]>([])
   const [selectedNetwork, setSelectedNetwork] = useState<string>("")
+  const [selectedType, setSelectedType] = useState<string>("mobile")
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -80,8 +88,10 @@ export default function ELoadPage() {
       setProducts(prods)
       const nets = [...new Set(prods.map(p => p.network))] as string[]
       setNetworks(nets)
-      // Only reset selected network if current one no longer exists
-      setSelectedNetwork(prev => nets.includes(prev) ? prev : (nets[0] || ""))
+      // Auto-select first network in current type category
+      const typeNets = PRODUCT_TYPES.find(t => t.id === selectedType)?.networks || []
+      const available = typeNets.filter(n => nets.includes(n))
+      setSelectedNetwork(prev => nets.includes(prev) ? prev : (available[0] || nets[0] || ""))
     } catch (err: any) {
       setError(err.message || "Failed to load products")
     } finally {
@@ -115,6 +125,9 @@ export default function ELoadPage() {
   }
 
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
+
+  // Get networks available for current type
+  const typeNetworks = PRODUCT_TYPES.find(t => t.id === selectedType)?.networks.filter(n => networks.includes(n)) || []
 
   const filtered = products
     .filter(p => p.network === selectedNetwork)
@@ -285,6 +298,34 @@ export default function ELoadPage() {
         </div>
 
         <div className="flex flex-col flex-1 overflow-hidden">
+          {/* Product Type Tabs — Mobile / Games / Cable */}
+          <div className="bg-white border-b border-gray-100 px-3 py-2">
+            <div className="flex gap-2">
+              {PRODUCT_TYPES.map(type => {
+                const available = type.networks.filter(n => networks.includes(n))
+                if (available.length === 0 && !loading) return null
+                const active = selectedType === type.id
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      setSelectedType(type.id)
+                      const nets = type.networks.filter(n => networks.includes(n))
+                      setSelectedNetwork(nets[0] || "")
+                      setFilter("all")
+                    }}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                      active ? "bg-indigo-600 text-white shadow-md" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <span>{type.icon}</span>
+                    <span>{type.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Network selector — horizontal scrollable chips */}
           <div className="bg-white border-b border-gray-100 px-3 py-3">
             {loading ? (
@@ -293,7 +334,7 @@ export default function ELoadPage() {
               </div>
             ) : (
               <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-                {networks.map(net => {
+                {typeNetworks.map(net => {
                   const color = NETWORK_COLORS[net] || "#6366F1"
                   const logo = NETWORK_LOGOS[net]
                   const active = selectedNetwork === net

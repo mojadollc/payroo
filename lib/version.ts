@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.2.7"
+export const APP_VERSION = "2.2.8"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "Reports: clearer labels - Total Gross Revenue, Overall Net Profit, Sales of Goods"
+export const VERSION_CHANGELOG = "E-Load: fixed category groupings (Viva/VIU/GSat=Cable, Roblox/Riot/Steam/Garena=Games), fixed tab click bug"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

@@ -30,9 +30,13 @@ const NETWORK_COLORS: Record<string, string> = {
   SMART: "#00B900", GLOBE: "#007DFE", TNT: "#F59E0B", DITO: "#06B6D4",
   TM: "#6366F1", GOMO: "#14B8A6", SUN: "#F97316", "GOMO PH": "#14B8A6",
   // Game pins
-  "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16", VIVA: "#E11D48", "VIVA GAMES": "#E11D48",
+  "GAME CLUB": "#8B5CF6", "RAZER GOLD": "#84CC16",
+  "ROBLOX": "#E11D48", "RIOT": "#D4163C", "STEAM": "#1B2838",
+  "GARENA": "#F97316", "GENSHIN": "#6366F1", "MOBILE LEGENDS": "#F59E0B", "MLBB": "#F59E0B",
   // Cable / TV
   CIGNAL: "#0EA5E9", "CIGNAL TV": "#0EA5E9", SKY: "#0284C7", "SKY CABLE": "#0284C7",
+  VIVA: "#E11D48", VIVAMAX: "#E11D48", "VIVA ONE": "#E11D48", "VIVA GAMES": "#E11D48",
+  SATELLITE: "#64748B", SATLIT: "#64748B", VIU: "#7C3AED", GSAT: "#0F766E", "G-SAT": "#0F766E",
 }
 
 const NETWORK_LOGOS: Record<string, string> = {
@@ -49,8 +53,8 @@ const NETWORK_LOGOS: Record<string, string> = {
 
 // Known network categories for grouping
 const MOBILE_NETWORKS = ["GLOBE", "TM", "SMART", "TNT", "DITO", "GOMO", "GOMO PH", "SUN"]
-const GAME_NETWORKS = ["GAME CLUB", "RAZER GOLD", "VIVA", "VIVA GAMES"]
-const CABLE_NETWORKS = ["CIGNAL", "CIGNAL TV", "SKY", "SKY CABLE"]
+const GAME_NETWORKS = ["GAME CLUB", "RAZER GOLD", "ROBLOX", "RIOT", "STEAM", "GARENA", "GENSHIN", "MOBILE LEGENDS", "MLBB", "CODM", "CALL OF DUTY"]
+const CABLE_NETWORKS = ["CIGNAL", "CIGNAL TV", "SKY", "SKY CABLE", "VIVA", "VIVAMAX", "VIVA ONE", "VIVA GAMES", "SATELLITE", "SATLIT", "VIU", "GSAT", "G-SAT"]
 
 
 export default function ELoadPage() {
@@ -91,10 +95,8 @@ export default function ELoadPage() {
       setNetworks(nets)
       // Auto-select first network in mobile category (default)
       const mobile = nets.filter(n => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
-      const games = nets.filter(n => GAME_NETWORKS.some(g => n.toUpperCase().includes(g)))
-      const cable = nets.filter(n => CABLE_NETWORKS.some(c => n.toUpperCase().includes(c)))
-      const available = [...mobile, ...games, ...cable]
-      setSelectedNetwork(prev => nets.includes(prev) ? prev : (available[0] || nets[0] || ""))
+      setSelectedType("mobile")
+      setSelectedNetwork(mobile[0] || nets[0] || "")
     } catch (err: any) {
       setError(err.message || "Failed to load products")
     } finally {
@@ -340,8 +342,12 @@ export default function ELoadPage() {
                   <button
                     key={type.id}
                     onClick={() => {
+                      const nets =
+                        type.id === "mobile" ? mobileNets :
+                        type.id === "games" ? gameNets :
+                        type.id === "cable" ? cableNets :
+                        otherNets
                       setSelectedType(type.id)
-                      const nets = getTypeNetworks()
                       setSelectedNetwork(nets[0] || "")
                       setFilter("all")
                     }}

@@ -233,8 +233,10 @@ export default function EWalletPage() {
   const [hitpayBalanceError, setHitpayBalanceError] = useState(false)
   const allLimitRef = useRef(50)
 
-  // Evaluated once on render — storeId is set at login and doesn't change mid-session
-  const canUseELoad = true
+  // E-Load and HitPay Payout exclusive to store 8807
+  const storeId = getStoreId()
+  const canUseELoad = storeId === "8807"
+  const canUseHitpay = storeId === "8807"
 
   const loadData = useCallback(async (opts?: { append?: boolean; nextLimit?: number }) => {
     const isAppend = opts?.append === true
@@ -458,71 +460,97 @@ export default function EWalletPage() {
         {/* ── Hero: 2-column wallet cards ── */}
         <div className="px-4 pt-4 pb-0 grid grid-cols-2 gap-3">
 
-          {/* E-Load wallet card */}
-          <button
-            onClick={() => router.push("/ewallet/load")}
-            className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
-            style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)", boxShadow: "0 6px 20px rgba(109,40,217,0.35)" }}
-          >
-            <div className="px-4 pt-4 pb-4">
+          {/* E-Load wallet card — exclusive to store 8807 */}
+          {canUseELoad ? (
+            <button
+              onClick={() => router.push("/ewallet/load")}
+              className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
+              style={{ background: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 50%, #4f46e5 100%)", boxShadow: "0 6px 20px rgba(109,40,217,0.35)" }}
+            >
+              <div className="px-4 pt-4 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="text-[9px] font-bold text-white/70 bg-white/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
+                </div>
+                <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">E-Load Wallet</p>
+                {gbitsBalanceLoading ? (
+                  <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
+                ) : gbitsBalance != null ? (
+                  <p className="text-white text-[20px] font-black tracking-tight leading-none">
+                    ₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                ) : (
+                  <p className="text-white/50 text-[12px]">Tap to check</p>
+                )}
+                <p className="text-white/40 text-[10px] mt-2">GBits · All Networks</p>
+              </div>
+            </button>
+          ) : (
+            <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white px-4 pt-4 pb-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                  <Zap className="h-4 w-4 text-white" />
+                  <ArrowDownToLine className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-[9px] font-bold text-white/70 bg-white/15 px-1.5 py-0.5 rounded-full tracking-widest">LIVE</span>
               </div>
-              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">E-Load Wallet</p>
-              {gbitsBalanceLoading ? (
-                <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
-              ) : gbitsBalance != null ? (
-                <p className="text-white text-[20px] font-black tracking-tight leading-none">
-                  ₱{gbitsBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              ) : (
-                <p className="text-white/50 text-[12px]">Tap to check</p>
-              )}
-              <p className="text-white/40 text-[10px] mt-2">GBits · All Networks</p>
+              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Quick Record</p>
+              <p className="text-white text-[16px] font-black">Cash-in/out</p>
+              <p className="text-white/40 text-[10px] mt-2">GCash · Maya</p>
             </div>
-          </button>
+          )}
 
-          {/* HitPay Cash-In wallet card */}
-          <button
-            onClick={() => setActiveSheet("hitpay")}
-            className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
-            style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 6px 20px rgba(190,18,60,0.30)" }}
-          >
-            <div className="px-4 pt-4 pb-4">
+          {/* HitPay Payout wallet card — exclusive to store 8807 */}
+          {canUseHitpay ? (
+            <button
+              onClick={() => setActiveSheet("hitpay")}
+              className="rounded-2xl overflow-hidden active:scale-[0.97] transition-all text-left"
+              style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 50%, #fb7185 100%)", boxShadow: "0 6px 20px rgba(190,18,60,0.30)" }}
+            >
+              <div className="px-4 pt-4 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Send className="h-4 w-4 text-white" />
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); fetchHitpayBalance() }}
+                    className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
+                  >
+                    <RefreshCw className={`h-3 w-3 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+                <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Payout Wallet</p>
+                {hitpayBalanceLoading ? (
+                  <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
+                ) : hitpayBalanceError ? (
+                  <p className="text-white/50 text-[12px]">Not configured</p>
+                ) : hitpayBalance != null ? (
+                  <p className="text-white text-[20px] font-black tracking-tight leading-none">
+                    ₱{hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                ) : (
+                  <p className="text-white/50 text-[12px]">Tap to check</p>
+                )}
+                <p className="text-white/40 text-[10px] mt-2">Powered by Xendit</p>
+              </div>
+            </button>
+          ) : (
+            <button onClick={() => setActiveSheet("cashin")} className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white px-4 pt-4 pb-4 text-left">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                  <Send className="h-4 w-4 text-white" />
+                  <Wallet className="h-4 w-4 text-white" />
                 </div>
-                <button
-                  onClick={e => { e.stopPropagation(); fetchHitpayBalance() }}
-                  className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center active:scale-90 transition-transform"
-                >
-                  <RefreshCw className={`h-3 w-3 text-white ${hitpayBalanceLoading ? "animate-spin" : ""}`} />
-                </button>
               </div>
-              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Payout Wallet</p>
-              {hitpayBalanceLoading ? (
-                <div className="h-7 w-24 bg-white/20 rounded-lg animate-pulse" />
-              ) : hitpayBalanceError ? (
-                <p className="text-white/50 text-[12px]">Not configured</p>
-              ) : hitpayBalance != null ? (
-                <p className="text-white text-[20px] font-black tracking-tight leading-none">
-                  ₱{hitpayBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              ) : (
-                <p className="text-white/50 text-[12px]">Tap to check</p>
-              )}
-              <p className="text-white/40 text-[10px] mt-2">Powered by Xendit</p>
-            </div>
-          </button>
+              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Self-Service</p>
+              <p className="text-white text-[16px] font-black">Kiosk</p>
+              <p className="text-white/40 text-[10px] mt-2">Tap to open</p>
+            </button>
+          )}
         </div>
 
-        {/* ── Action buttons row — 5 icons ── */}
+        {/* ── Action buttons row — visible to all stores ── */}
         <div className="px-4 pt-5 pb-2">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-2">
             <button onClick={() => setActiveSheet("cashin")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
               <div className="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center shadow-md shadow-blue-500/30">
                 <ArrowDownToLine className="h-5 w-5 text-white" />
@@ -530,19 +558,23 @@ export default function EWalletPage() {
               <span className="text-[10px] font-semibold text-foreground text-center">Cash In/Out</span>
             </button>
 
-            <button onClick={() => setActiveSheet("hitpay")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shadow-md shadow-rose-500/30">
-                <Send className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-[10px] font-semibold text-foreground text-center">Send</span>
-            </button>
+            {canUseHitpay && (
+              <button onClick={() => setActiveSheet("hitpay")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shadow-md shadow-rose-500/30">
+                  <Send className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-[10px] font-semibold text-foreground text-center">Send</span>
+              </button>
+            )}
 
-            <button onClick={() => router.push("/ewallet/load")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
-              <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-500/30">
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-[10px] font-semibold text-foreground text-center">Load</span>
-            </button>
+            {canUseELoad && (
+              <button onClick={() => router.push("/ewallet/load")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
+                <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-500/30">
+                  <Zap className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-[10px] font-semibold text-foreground text-center">Load</span>
+              </button>
+            )}
 
             <button onClick={() => router.push("/ewallet/cashin")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">

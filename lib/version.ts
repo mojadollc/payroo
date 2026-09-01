@@ -9,10 +9,10 @@
  * PATCH - Bug fixes / small improvements
  */
 
-export const APP_VERSION = "2.2.5"
+export const APP_VERSION = "2.2.7"
 
 // Human-readable changelog for the current version
-export const VERSION_CHANGELOG = "E-Load: organized into Mobile/Games/Cable categories with GCash-style UI"
+export const VERSION_CHANGELOG = "Reports: clearer labels - Total Gross Revenue, Overall Net Profit, Sales of Goods"
 
 // Build timestamp (auto-updated)
 export const BUILD_DATE = new Date().toISOString().split('T')[0]

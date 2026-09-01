@@ -459,10 +459,10 @@ export default function ReportsPage() {
             <div className="bg-background rounded-xl p-3 border">
               <div className="flex items-center gap-1 mb-1">
                 <CircleDollarSign className="h-3 w-3 text-muted-foreground" />
-                <span className="text-[11px] text-muted-foreground">Total Net Profit</span>
+                <span className="text-[11px] text-muted-foreground">Today's Net Profit</span>
               </div>
               <div className="text-[15px] font-bold text-orange-600 truncate">₱{(today.profit + today.eProfit).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">All products incl. tobacco + E-Wallet comm.</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Sales profit + E-Wallet comm.</div>
             </div>
 
             <div className="bg-background rounded-xl p-3 border col-span-2">
@@ -505,10 +505,10 @@ export default function ReportsPage() {
               <div className="p-1.5 bg-green-500 rounded-md">
                 <ArrowUpRight className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">Total Revenue</span>
+              <span className="text-[11px] text-muted-foreground">Total Gross Revenue</span>
             </div>
             <div className="text-[15px] font-bold text-green-600 truncate">₱{stats.totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">Sales + E-Wallet</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">All Sales + E-Wallet</div>
           </MobileCard>
 
           <MobileCard className="p-3 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
@@ -516,10 +516,10 @@ export default function ReportsPage() {
               <div className="p-1.5 bg-emerald-500 rounded-md">
                 <TrendingUp className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">Net Profit</span>
+              <span className="text-[11px] text-muted-foreground">Overall Net Profit</span>
             </div>
             <div className="text-[15px] font-bold text-emerald-600 truncate">₱{stats.totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">After cost of goods</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">After COGS + E-Wallet comm.</div>
           </MobileCard>
 
           <MobileCard className="p-3 bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
@@ -527,7 +527,7 @@ export default function ReportsPage() {
               <div className="p-1.5 bg-blue-500 rounded-md">
                 <ShoppingCart className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-[11px] text-muted-foreground">Sales</span>
+              <span className="text-[11px] text-muted-foreground">Sales of Goods</span>
             </div>
             <div className="text-[15px] font-bold text-blue-600 truncate">₱{stats.salesRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="text-[11px] text-green-600 font-medium mt-0.5 truncate">Profit: ₱{stats.salesProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -574,7 +574,7 @@ export default function ReportsPage() {
               <TabsList className="w-full grid grid-cols-3 h-10">
                 <TabsTrigger value="sales" className="gap-1.5 text-[13px] data-[state=active]:bg-green-500 data-[state=active]:text-white">
                   <ShoppingCart className="h-3.5 w-3.5" />
-                  Sales
+                  Sales of Goods
                 </TabsTrigger>
                 <TabsTrigger value="ewallet" className="gap-1.5 text-[13px] data-[state=active]:bg-blue-500 data-[state=active]:text-white">
                   <Wallet className="h-3.5 w-3.5" />
@@ -628,9 +628,9 @@ export default function ReportsPage() {
                 <p className="text-xs text-muted-foreground">Commission: ₱{today.eProfit.toFixed(2)}</p>
               </div>
               <div className="rounded-lg bg-background border p-3">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><CircleDollarSign className="h-3 w-3" /> Total Net Profit</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1"><CircleDollarSign className="h-3 w-3" /> Today's Net Profit</p>
                 <p className="text-xl font-bold text-orange-600">₱{(today.profit + today.eProfit).toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">All products incl. tobacco + E-Wallet comm.</p>
+                <p className="text-xs text-muted-foreground">Sales profit + E-Wallet comm.</p>
               </div>
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
                 <p className="text-xs text-muted-foreground flex items-center gap-1"><Cigarette className="h-3 w-3 text-amber-600" /> Tobacco Only</p>
@@ -661,29 +661,29 @@ export default function ReportsPage() {
           <Card>
             <CardHeader className="p-3 pb-1">
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <BadgeDollarSign className="h-3 w-3" /> Gross Revenue
+                <BadgeDollarSign className="h-3 w-3" /> Total Gross Revenue
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0">
               <div className="text-lg font-bold">₱{stats.totalRevenue.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">Sales + E-Wallet</p>
+              <p className="text-xs text-muted-foreground">All Sales + E-Wallet</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="p-3 pb-1">
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> Net Profit
+                <TrendingUp className="h-3 w-3" /> Overall Net Profit
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0">
               <div className="text-lg font-bold text-green-600">₱{stats.totalProfit.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">After cost of goods</p>
+              <p className="text-xs text-muted-foreground">After COGS + E-Wallet comm.</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="p-3 pb-1">
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <ShoppingCart className="h-3 w-3" /> Sales ({stats.totalSales})
+                <ShoppingCart className="h-3 w-3" /> Sales of Goods ({stats.totalSales})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0">
@@ -719,7 +719,7 @@ export default function ReportsPage() {
         <Tabs defaultValue="sales" className="space-y-4">
           <TabsList>
             <TabsTrigger value="sales" className="gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <ShoppingCart className="h-4 w-4" /> Sales Report
+              <ShoppingCart className="h-4 w-4" /> Sales of Goods
             </TabsTrigger>
             <TabsTrigger value="ewallet" className="gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Wallet className="h-4 w-4" /> E-Wallet Report

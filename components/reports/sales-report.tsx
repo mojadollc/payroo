@@ -90,7 +90,7 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
     <>
       {/* Summary bar */}
       <div className="flex items-center justify-between px-1 mb-3">
-        <span className="text-[12px] font-medium">Today's Transactions</span>
+        <span className="text-[12px] font-medium">Today's Sales of Goods</span>
         <span className="text-[11px] text-muted-foreground">{recentSales.length} sale{recentSales.length !== 1 ? "s" : ""}</span>
       </div>
 
@@ -216,7 +216,7 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
         <div className="flex items-center justify-between pt-3 mt-3 border-t text-[12px] text-muted-foreground px-1">
           <span>Active: {activeSales.length} sales</span>
           <span className="font-semibold text-foreground">
-            Total: ₱{activeSales.reduce((s, x) => s + x.total, 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            Gross: ₱{activeSales.reduce((s, x) => s + x.total, 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </span>
         </div>
       )}

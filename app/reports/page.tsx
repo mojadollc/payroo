@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity, Cigarette } from "lucide-react"
+import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity, Cigarette, Package } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { DateRangePicker } from "@/components/reports/date-range-picker"
-import { SalesReport } from "@/components/reports/sales-report"
+import { SalesReport, ProductBreakdown } from "@/components/reports/sales-report"
 import { EWalletReport } from "@/components/reports/ewallet-report"
 import { TobaccoReport } from "@/components/reports/tobacco-report"
 import dynamic from "next/dynamic"
@@ -566,28 +566,35 @@ export default function ReportsPage() {
           </MobileCard>
         </div>
 
-        {/* Recent Transactions */}
+        {/* Period Transactions */}
         <div>
-          <MobileSectionHeader title="Recent Transactions" />
+          <MobileSectionHeader title="Sales Report" />
           <Tabs defaultValue="sales" className="w-full">
             <div className="sticky top-[52px] z-30 bg-background pb-2">
-              <TabsList className="w-full grid grid-cols-3 h-10">
-                <TabsTrigger value="sales" className="gap-1.5 text-[13px] data-[state=active]:bg-green-500 data-[state=active]:text-white">
-                  <ShoppingCart className="h-3.5 w-3.5" />
-                  Sales of Goods
+              <TabsList className="w-full grid grid-cols-4 h-10">
+                <TabsTrigger value="sales" className="gap-1 text-[11px] data-[state=active]:bg-green-500 data-[state=active]:text-white">
+                  <ShoppingCart className="h-3 w-3" />
+                  Sales
                 </TabsTrigger>
-                <TabsTrigger value="ewallet" className="gap-1.5 text-[13px] data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-                  <Wallet className="h-3.5 w-3.5" />
+                <TabsTrigger value="products" className="gap-1 text-[11px] data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                  <Package className="h-3 w-3" />
+                  Products
+                </TabsTrigger>
+                <TabsTrigger value="ewallet" className="gap-1 text-[11px] data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                  <Wallet className="h-3 w-3" />
                   E-Wallet
                 </TabsTrigger>
-                <TabsTrigger value="tobacco" className="gap-1.5 text-[13px] data-[state=active]:bg-amber-500 data-[state=active]:text-white">
-                  <Cigarette className="h-3.5 w-3.5" />
+                <TabsTrigger value="tobacco" className="gap-1 text-[11px] data-[state=active]:bg-amber-500 data-[state=active]:text-white">
+                  <Cigarette className="h-3 w-3" />
                   Tobacco
                 </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="sales" className="mt-0">
               <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
+            </TabsContent>
+            <TabsContent value="products" className="mt-0">
+              <ProductBreakdown sales={sales} isLoading={isLoading} />
             </TabsContent>
             <TabsContent value="ewallet" className="mt-0">
               <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />
@@ -719,17 +726,23 @@ export default function ReportsPage() {
         <Tabs defaultValue="sales" className="space-y-4">
           <TabsList>
             <TabsTrigger value="sales" className="gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <ShoppingCart className="h-4 w-4" /> Sales of Goods
+              <ShoppingCart className="h-4 w-4" /> Sales ({sales.length})
+            </TabsTrigger>
+            <TabsTrigger value="products" className="gap-2 data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+              <Package className="h-4 w-4" /> Products Sold
             </TabsTrigger>
             <TabsTrigger value="ewallet" className="gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Wallet className="h-4 w-4" /> E-Wallet Report
+              <Wallet className="h-4 w-4" /> E-Wallet
             </TabsTrigger>
             <TabsTrigger value="tobacco" className="gap-2 data-[state=active]:bg-amber-500 data-[state=active]:text-white">
-              <Cigarette className="h-4 w-4" /> Tobacco Report
+              <Cigarette className="h-4 w-4" /> Tobacco
             </TabsTrigger>
           </TabsList>
           <TabsContent value="sales">
             <SalesReport sales={sales} isLoading={isLoading} onRefresh={loadData} />
+          </TabsContent>
+          <TabsContent value="products">
+            <ProductBreakdown sales={sales} isLoading={isLoading} />
           </TabsContent>
           <TabsContent value="ewallet">
             <EWalletReport transactions={ewalletTransactions} isLoading={isLoading} />

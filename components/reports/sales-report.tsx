@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, Clock, Ban, Loader2, ChevronDown, ChevronUp } from "lucide-react"
+import { ShoppingCart, Clock, Ban, Loader2, Package, TrendingUp, ArrowUpDown } from "lucide-react"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -19,13 +19,145 @@ interface SalesReportProps {
   onRefresh?: () => void
 }
 
+type SortKey = "qty" | "revenue" | "profit"
+
+// ── Exported so the reports page can render it as a first-class tab ────────────
+export function ProductBreakdown({ sales, isLoading }: { sales: Sale[]; isLoading?: boolean }) {
+  const [sort, setSort] = useState<SortKey>("qty")
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map(i => <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />)}
+      </div>
+    )
+  }
+
+  const activeSales = sales.filter(s => s.status !== "voided")
+
+  const productMap = new Map<string, {
+    name: string; qty: number; revenue: number; profit: number; txCount: number
+  }>()
+
+  for (const sale of activeSales) {
+    for (const item of sale.items) {
+      const key = item.productId || item.productName
+      const itemProfit = (item.price - item.cost) * item.quantity
+      const ex = productMap.get(key)
+      if (ex) {
+        ex.qty += item.quantity
+        ex.revenue += item.subtotal
+        ex.profit += itemProfit
+        ex.txCount++
+      } else {
+        productMap.set(key, { name: item.productName, qty: item.quantity, revenue: item.subtotal, profit: itemProfit, txCount: 1 })
+      }
+    }
+  }
+
+  const products = Array.from(productMap.values()).sort((a, b) => b[sort] - a[sort])
+  const totalQty = products.reduce((s, p) => s + p.qty, 0)
+  const totalRevenue = products.reduce((s, p) => s + p.revenue, 0)
+
+  if (products.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Package className="h-10 w-10 text-muted-foreground/40 mb-3" />
+        <p className="text-sm text-muted-foreground">No products sold in this period</p>
+      </div>
+    )
+  }
+
+  const sortButtons: { key: SortKey; label: string }[] = [
+    { key: "qty", label: "Qty" },
+    { key: "revenue", label: "Revenue" },
+    { key: "profit", label: "Profit" },
+  ]
+
+  return (
+    <div className="space-y-3">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl bg-blue-50 border border-blue-100 p-3 text-center">
+          <p className="text-[11px] text-muted-foreground">Products</p>
+          <p className="text-[17px] font-bold text-blue-700">{products.length}</p>
+        </div>
+        <div className="rounded-xl bg-green-50 border border-green-100 p-3 text-center">
+          <p className="text-[11px] text-muted-foreground">Units Sold</p>
+          <p className="text-[17px] font-bold text-green-700">{totalQty.toLocaleString()}</p>
+        </div>
+        <div className="rounded-xl bg-purple-50 border border-purple-100 p-3 text-center">
+          <p className="text-[11px] text-muted-foreground">Revenue</p>
+          <p className="text-[15px] font-bold text-purple-700">
+            ₱{totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </p>
+        </div>
+      </div>
+
+      {/* Sort toggle */}
+      <div className="flex items-center gap-1.5">
+        <ArrowUpDown className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="text-[11px] text-muted-foreground mr-1">Sort by:</span>
+        {sortButtons.map(b => (
+          <button
+            key={b.key}
+            onClick={() => setSort(b.key)}
+            className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-all ${
+              sort === b.key ? "bg-amber-900 text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Product list */}
+      <div className="space-y-2">
+        {products.map((p, i) => {
+          const revenueShare = totalRevenue > 0 ? (p.revenue / totalRevenue) * 100 : 0
+          const margin = p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0
+          return (
+            <div key={i} className="rounded-xl border bg-card p-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-bold text-muted-foreground/60 w-5 shrink-0">#{i + 1}</span>
+                  <span className="text-[13px] font-semibold truncate">{p.name}</span>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[14px] font-bold">
+                    ₱{p.revenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[11px] text-green-600 font-medium">
+                    +₱{p.profit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full mb-2 overflow-hidden">
+                <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${revenueShare}%` }} />
+              </div>
+              <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                <span><span className="font-semibold text-foreground">{p.qty}</span> units</span>
+                <span>·</span>
+                <span><span className="font-semibold text-foreground">{p.txCount}</span> txns</span>
+                <span>·</span>
+                <span className={`font-semibold ${margin >= 20 ? "text-green-600" : margin >= 10 ? "text-amber-600" : "text-red-500"}`}>
+                  {margin.toFixed(1)}% margin
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── SalesReport — transactions only ───────────────────────────────────────────
 export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
   const { toast } = useToast()
   const { isOwner } = useAuth()
   const [voidTarget, setVoidTarget] = useState<Sale | null>(null)
   const [voidingId, setVoidingId] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [showAll, setShowAll] = useState(false)
 
   const formatDate = (timestamp: any) => {
     const d = new Date(timestamp)
@@ -46,10 +178,7 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
         body: JSON.stringify({ id: voidTarget.id, status: "voided" }),
       })
       if (!res.ok) throw new Error((await res.json()).error || "Failed to void")
-      toast({
-        title: "Sale voided",
-        description: `₱${voidTarget.total.toFixed(2)} reversed — stock restored.`,
-      })
+      toast({ title: "Sale voided", description: `₱${voidTarget.total.toFixed(2)} reversed — stock restored.` })
       onRefresh?.()
     } catch (err: any) {
       toast({ title: "Failed to void sale", description: err.message, variant: "destructive" })
@@ -76,53 +205,52 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
   }
 
   const activeSales = sales.filter(s => s.status !== "voided")
-  const voidedSales = sales.filter(s => s.status === "voided")
-
-  // Show only today's transactions as "Recent"
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const recentSales = sales.filter(s => {
-    const d = new Date(s.createdAt as any)
-    return d >= today
-  })
+  const totalGross = activeSales.reduce((s, x) => s + x.total, 0)
+  const totalProfit = activeSales.reduce((s, x) => s + x.profit, 0)
 
   return (
     <>
-      {/* Summary bar */}
-      <div className="flex items-center justify-between px-1 mb-3">
-        <span className="text-[12px] font-medium">Today's Sales of Goods</span>
-        <span className="text-[11px] text-muted-foreground">{recentSales.length} sale{recentSales.length !== 1 ? "s" : ""}</span>
+      {/* Period summary */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="rounded-xl bg-green-50 border border-green-100 p-3">
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <ShoppingCart className="h-3 w-3" /> Gross Sales
+          </p>
+          <p className="text-[17px] font-bold text-green-700">
+            ₱{totalGross.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[11px] text-muted-foreground">{activeSales.length} active txns</p>
+        </div>
+        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" /> Net Profit
+          </p>
+          <p className="text-[17px] font-bold text-emerald-700">
+            ₱{totalProfit.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {totalGross > 0 ? ((totalProfit / totalGross) * 100).toFixed(1) : "0.0"}% margin
+          </p>
+        </div>
       </div>
 
-      {recentSales.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-[13px] text-muted-foreground">No sales today yet</p>
-        </div>
-      ) : (
-      <div className="space-y-2 -mx-1 px-1">
-        {recentSales.map(sale => {
+      {/* Transaction list */}
+      <div className="space-y-2">
+        {sales.map(sale => {
           const isVoided = sale.status === "voided"
           const isVoiding = voidingId === sale.id
-          const isExpanded = expandedId === sale.id
           const totalQty = sale.items.reduce((sum, i) => sum + i.quantity, 0)
 
           return (
             <div
               key={sale.id}
-              className={`rounded-xl border transition-all ${
-                isVoided ? "bg-muted/30 opacity-60" : "bg-card active:scale-[0.99]"
-              }`}
+              className={`rounded-xl border transition-all ${isVoided ? "bg-muted/30 opacity-60" : "bg-card"}`}
             >
-              {/* Header row */}
-              <div
-                className="flex items-center gap-3 p-3"
-              >
-                {/* Left: payment icon */}
+              <div className="flex items-center gap-3 p-3">
                 <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
                   sale.paymentMethod === "cash" ? "bg-green-100" :
                   sale.paymentMethod === "gcash" ? "bg-blue-100" :
-                  sale.paymentMethod === "utang" ? "bg-red-100" :
-                  "bg-purple-100"
+                  sale.paymentMethod === "utang" ? "bg-red-100" : "bg-purple-100"
                 }`}>
                   <span className="text-xs font-bold uppercase">
                     {sale.paymentMethod === "cash" ? "₱" :
@@ -131,12 +259,9 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                   </span>
                 </div>
 
-                {/* Middle: info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[13px] font-semibold">
-                      {totalQty} item{totalQty !== 1 ? "s" : ""}
-                    </span>
+                    <span className="text-[13px] font-semibold">{totalQty} item{totalQty !== 1 ? "s" : ""}</span>
                     <Badge variant="outline" className={`text-[10px] h-4 px-1.5 capitalize ${
                       sale.paymentMethod === "utang" ? "border-red-300 text-red-600 bg-red-50" : ""
                     }`}>
@@ -156,13 +281,9 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Clock className="h-3 w-3" />
                     {formatDate(sale.createdAt)}
-                    {(sale as any).utangCustomerName && sale.paymentMethod !== "utang" && (
-                      <span className="text-orange-500 font-medium">· Utang paid by {(sale as any).utangCustomerName}</span>
-                    )}
                   </p>
                 </div>
 
-                {/* Right: amount */}
                 <div className="text-right shrink-0">
                   <div className={`text-[15px] font-bold ${isVoided ? "line-through text-muted-foreground" : ""}`}>
                     ₱{sale.total.toFixed(2)}
@@ -173,13 +294,11 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                 </div>
               </div>
 
-              {/* Item details - always visible */}
+              {/* Items */}
               <div className="px-3 pb-2 space-y-0.5">
                 {sale.items.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between text-[12px]">
-                    <span className="text-muted-foreground truncate flex-1">
-                      {item.quantity}× {item.productName}
-                    </span>
+                    <span className="text-muted-foreground truncate flex-1">{item.quantity}× {item.productName}</span>
                     <span className={`font-medium shrink-0 ml-2 ${isVoided ? "line-through text-muted-foreground" : ""}`}>
                       ₱{item.subtotal.toFixed(2)}
                     </span>
@@ -187,20 +306,15 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                 ))}
               </div>
 
-              {/* Void button for owner */}
               {isOwner && !isVoided && (
                 <div className="px-3 pb-2">
                   <Button
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost" size="sm"
                     className="h-7 w-full text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
                     disabled={isVoiding}
                     onClick={(e) => { e.stopPropagation(); setVoidTarget(sale) }}
                   >
-                    {isVoiding
-                      ? <Loader2 className="h-3 w-3 animate-spin" />
-                      : <Ban className="h-3 w-3" />
-                    }
+                    {isVoiding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
                     Void
                   </Button>
                 </div>
@@ -209,14 +323,13 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
           )
         })}
       </div>
-      )}
 
-      {/* Footer summary */}
+      {/* Footer */}
       {activeSales.length > 0 && (
-        <div className="flex items-center justify-between pt-3 mt-3 border-t text-[12px] text-muted-foreground px-1">
-          <span>Active: {activeSales.length} sales</span>
+        <div className="flex items-center justify-between pt-3 mt-2 border-t text-[12px] text-muted-foreground px-1">
+          <span>Active: {activeSales.length} · Voided: {sales.length - activeSales.length}</span>
           <span className="font-semibold text-foreground">
-            Gross: ₱{activeSales.reduce((s, x) => s + x.total, 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            Gross: ₱{totalGross.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
           </span>
         </div>
       )}
@@ -239,7 +352,9 @@ export function SalesReport({ sales, isLoading, onRefresh }: SalesReportProps) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Items</span>
-                      <span className="text-right text-[12px]">{voidTarget.items.map(i => `${i.productName} ×${i.quantity}`).join(", ")}</span>
+                      <span className="text-right text-[12px]">
+                        {voidTarget.items.map(i => `${i.productName} ×${i.quantity}`).join(", ")}
+                      </span>
                     </div>
                   </div>
                 )}

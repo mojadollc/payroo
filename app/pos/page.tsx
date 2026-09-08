@@ -791,11 +791,21 @@ export default function POSPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 pt-0 space-y-3">
+                    <div ref={searchWrapperRef} className="relative">
                     <form
                       onSubmit={(e) => {
                         e.preventDefault()
-                        if (barcodeInput.trim()) {
+                        if (searchSuggestions.length > 0) {
+                          // Add first suggestion from dropdown
+                          const first = searchSuggestions[0]
+                          if (first.stock > 0) {
+                            const addQty = dropdownQty[first.id!] ?? 1
+                            for (let i = 0; i < addQty; i++) addToCart(first)
+                            setDropdownQty(prev => { const n = { ...prev }; delete n[first.id!]; return n })
+                          }
+                          setBarcodeInput("")
                           setSearchSuggestions([])
+                        } else if (barcodeInput.trim()) {
                           handleBarcodeSubmit(barcodeInput.trim())
                         }
                       }}
@@ -809,41 +819,56 @@ export default function POSPage() {
                           onChange={(e) => handleInputChange(e.target.value)}
                           className="w-full"
                           autoFocus
-                          onBlur={() => setTimeout(() => setSearchSuggestions([]), 150)}
                         />
                         {searchSuggestions.length > 0 && (
                           <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-64 overflow-y-auto">
                             {searchSuggestions.map(p => {
                               const qty = dropdownQty[p.id!] ?? 1
+                              const outOfStock = p.stock <= 0
                               return (
-                                <div key={p.id} className="flex items-center gap-2 px-3 py-2 border-b last:border-b-0 hover:bg-muted">
+                                <div key={p.id} className={`flex items-center gap-2 px-3 py-2 border-b last:border-b-0 hover:bg-muted ${outOfStock ? "opacity-50" : ""}`}>
                                   <div className="flex-1 min-w-0">
                                     <div className="font-medium text-sm truncate">{p.name}</div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                       <span className="text-xs text-muted-foreground">₱{effectivePrice(p).toFixed(2)}</span>
                                       <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
-                                        p.stock <= 0 ? "bg-red-500 text-white" : p.stock <= 5 ? "bg-orange-500 text-white" : "bg-emerald-500 text-white"
-                                      }`}>{p.stock <= 0 ? "Out of stock" : `${p.stock} left`}</span>
+                                        outOfStock ? "bg-red-500 text-white" : p.stock <= 5 ? "bg-orange-500 text-white" : "bg-emerald-500 text-white"
+                                      }`}>{outOfStock ? "Out of stock" : `${p.stock} left`}</span>
                                       {p.onSale && p.salePrice && <span className="text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded-full">SALE</span>}
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
-                                    <span className="w-6 text-center text-sm font-bold">{qty}</span>
-                                    <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
-                                    <button type="button" className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold" onClick={(e) => { e.stopPropagation(); for (let i = 0; i < qty; i++) addToCart(p); setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n }) }}>Add</button>
-                                  </div>
+                                  {!outOfStock && (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
+                                      <span className="w-6 text-center text-sm font-bold">{qty}</span>
+                                      <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
+                                      <button
+                                        type="button"
+                                        className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault()
+                                          // Read qty fresh from state to avoid stale closure
+                                          const addQty = dropdownQty[p.id!] ?? 1
+                                          for (let i = 0; i < addQty; i++) addToCart(p)
+                                          setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
+                                          setBarcodeInput("")
+                                          setSearchSuggestions([])
+                                        }}
+                                      >Add{(dropdownQty[p.id!] ?? 1) > 1 ? ` ×${dropdownQty[p.id!]}` : ""}</button>
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
                           </div>
                         )}
                       </div>
-                      <Button type="button" variant="outline" className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500" onClick={() => setShowScanner(true)}>
+                      <Button type="button" variant="outline" className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500" onMouseDown={(e) => { e.preventDefault(); setShowScanner(true) }}>
                         <Barcode className="h-4 w-4" />
                       </Button>
                       <Button type="submit">Add</Button>
                     </form>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

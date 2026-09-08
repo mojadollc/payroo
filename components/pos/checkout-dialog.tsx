@@ -14,7 +14,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { enqueueOfflineSale, enqueueOfflineUtang, isOnline } from "@/lib/offline-sync"
+import { isOnline } from "@/lib/offline-sync"
 import { offlineAddSale, offlineAddUtang } from "@/lib/offline/services"
 import type { Product, UtangRecord, LoyaltyCustomer } from "@/lib/firebase/types"
 import { getStoreId } from "@/lib/store-id"
@@ -97,16 +97,8 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         }
 
         if (!isOnline()) {
-          // Queue utang offline (both legacy localStorage + IndexedDB)
           const storeId = getStoreId()
           const storeName = localStorage.getItem("storeName") || "My Store"
-          enqueueOfflineUtang({
-            customerName: utangCustomer.trim(),
-            storeId,
-            storeName,
-            items: cart.map(item => ({ productName: item.name, quantity: item.quantity, price: item.price, subtotal: item.subtotal })),
-            totalAmount: total,
-          })
           offlineAddUtang({
             customerName: utangCustomer.trim(),
             storeId,
@@ -162,20 +154,6 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
 
       // ── Regular sale (cash / gcash / maya) ──
       if (!isOnline()) {
-        // Queue sale offline (both legacy localStorage + IndexedDB)
-        enqueueOfflineSale({
-          items: cart.map(item => ({
-            productId: item.id!,
-            productName: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            cost: item.cost,
-            subtotal: item.subtotal,
-          })),
-          total,
-          profit,
-          paymentMethod: paymentMethod as "cash" | "gcash" | "maya",
-        })
         offlineAddSale({
           items: cart.map(item => ({
             productId: item.id!,

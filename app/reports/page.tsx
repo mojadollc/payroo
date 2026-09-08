@@ -204,60 +204,55 @@ export default function ReportsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const productsLoadedRef = useRef<string>("")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined)
 
-  useEffect(() => { loadData() }, [dateRange])
-
-  const loadData = async () => {
+  useEffect(() => {
+    const storeId = getStoreId()
+    if (!storeId) { setIsLoading(false); return }
     setIsLoading(true)
-    try {
-      const storeId = getStoreId()
-      console.log("[reports] storeId:", storeId)
-      if (!storeId) {
-        setIsLoading(false)
-        return
-      }
+    setLoadError(null)
 
-      const params = new URLSearchParams({ storeId })
-      if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
-      if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
+    const params = new URLSearchParams({ storeId })
+    if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
+    if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
-      const salesRes = await fetch(`/api/sales?${params}`)
-      const salesJson = await salesRes.json()
-      console.log("[reports] sales:", salesRes.status, salesJson?.data?.length, JSON.stringify(salesJson).slice(0, 200))
+    console.log("[reports] fetching storeId:", storeId, "params:", params.toString())
 
-      const ewalletRes = await fetch(`/api/ewallet-transactions?${params}`)
-      const ewalletJson = await ewalletRes.json()
-      console.log("[reports] ewallet:", ewalletRes.status, ewalletJson?.data?.length)
-
-      const billRes = await fetch(`/api/bill-payments?${params}`)
-      const billJson = await billRes.json()
-      console.log("[reports] bills:", billRes.status, billJson?.data?.length)
-
+    Promise.all([
+      fetch(`/api/sales?${params}`).then(r => r.json()),
+      fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
+      fetch(`/api/bill-payments?${params}`).then(r => r.json()),
+    ]).then(([salesJson, ewalletJson, billJson]) => {
+      console.log("[reports] sales count:", salesJson?.data?.length, "error:", salesJson?.error)
       setSales(salesJson.data ?? [])
       setEWalletTransactions(ewalletJson.data ?? [])
       setBillPayments(billJson.data ?? [])
-
       if (productsLoadedRef.current !== storeId) {
-        const prodRes = await fetch(`/api/products?storeId=${storeId}`)
-        const { data: productsData } = await prodRes.json()
-        setProducts(productsData ?? [])
-        productsLoadedRef.current = storeId
-        // Build tobacco product IDs set
-        const tobaccoIds = new Set<string>(
-          (productsData ?? []).filter((p: any) => {
-            const c = (p.category || "").trim().toLowerCase()
-            return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
-          }).map((p: any) => p.id)
-        )
-        setTobaccoProductIds(tobaccoIds)
+        fetch(`/api/products?storeId=${storeId}`)
+          .then(r => r.json())
+          .then(({ data: productsData }) => {
+            setProducts(productsData ?? [])
+            productsLoadedRef.current = storeId
+            const tobaccoIds = new Set<string>(
+              (productsData ?? []).filter((p: any) => {
+                const c = (p.category || "").trim().toLowerCase()
+                return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+              }).map((p: any) => p.id)
+            )
+            setTobaccoProductIds(tobaccoIds)
+          })
       }
-    } catch (error) {
-      console.error("[reports] Error loading data:", error)
-    } finally {
-      setIsLoading(false)
-    }
+    }).catch(err => {
+      console.error("[reports] fetch error:", err)
+      setLoadError(err.message)
+    }).finally(() => setIsLoading(false))
+  }, [dateRange])
+
+  const loadData = () => {
+    // trigger re-fetch by resetting dateRange to same value
+    setDateRange(d => d ? { ...d } : undefined)
   }
 
   const calculateStats = () => {
@@ -405,6 +400,11 @@ export default function ReportsPage() {
     >
       {/* Mobile View */}
       <div className="md:hidden space-y-4">
+        {loadError && (
+          <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-[12px] text-red-700 font-mono break-all">
+            ❌ {loadError}
+          </div>
+        )}
         {/* Today's Performance Card */}
         <MobileCard className="p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
           <div className="flex items-center gap-2 mb-3">

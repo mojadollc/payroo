@@ -641,7 +641,8 @@ export default function POSPage() {
                               type="button"
                               className="h-9 w-9 rounded-l-xl text-red-500 font-bold text-xl flex items-center justify-center active:bg-red-100"
                               onPointerDown={(e) => {
-                                e.preventDefault()
+                                e.preventDefault();
+                                (document.activeElement as HTMLElement)?.blur()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -652,7 +653,8 @@ export default function POSPage() {
                               type="button"
                               className="h-9 w-9 rounded-r-xl text-green-600 font-bold text-xl flex items-center justify-center active:bg-green-100"
                               onPointerDown={(e) => {
-                                e.preventDefault()
+                                e.preventDefault();
+                                (document.activeElement as HTMLElement)?.blur()
                                 dropdownScrollTop.current = dropdownScrollRef.current?.scrollTop ?? 0
                                 setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) }))
                                 requestAnimationFrame(() => { if (dropdownScrollRef.current) dropdownScrollRef.current.scrollTop = dropdownScrollTop.current })
@@ -663,7 +665,8 @@ export default function POSPage() {
                             type="button"
                             className="flex-1 h-10 rounded-xl bg-yellow-400 active:bg-yellow-500 text-gray-900 font-bold text-[14px] flex items-center justify-center gap-1.5 shadow-sm"
                             onPointerDown={(e) => {
-                              e.preventDefault()
+                              e.preventDefault();
+                              (document.activeElement as HTMLElement)?.blur()
                               const addQty = dropdownQty[p.id!] ?? 1
                               for (let i = 0; i < addQty; i++) addToCart(p)
                               setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
@@ -839,15 +842,15 @@ export default function POSPage() {
                                   </div>
                                   {!outOfStock && (
                                     <div className="flex items-center gap-1 flex-shrink-0">
-                                      <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
+                                      <button type="button" className="h-6 w-6 rounded border border-red-300 text-red-500 font-bold text-sm flex items-center justify-center hover:bg-red-50" onPointerDown={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.max(1, (prev[p.id!] ?? 1) - 1) })) }}>−</button>
                                       <span className="w-6 text-center text-sm font-bold">{qty}</span>
-                                      <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onMouseDown={(e) => { e.preventDefault(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
+                                      <button type="button" className="h-6 w-6 rounded border border-green-300 text-green-600 font-bold text-sm flex items-center justify-center hover:bg-green-50" onPointerDown={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); setDropdownQty(prev => ({ ...prev, [p.id!]: Math.min(p.stock, (prev[p.id!] ?? 1) + 1) })) }}>+</button>
                                       <button
                                         type="button"
                                         className="ml-1 h-7 px-2.5 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault()
-                                          // Read qty fresh from state to avoid stale closure
+                                        onPointerDown={(e) => {
+                                          e.preventDefault();
+                                          (document.activeElement as HTMLElement)?.blur()
                                           const addQty = dropdownQty[p.id!] ?? 1
                                           for (let i = 0; i < addQty; i++) addToCart(p)
                                           setDropdownQty(prev => { const n = { ...prev }; delete n[p.id!]; return n })
@@ -989,7 +992,7 @@ export default function POSPage() {
                                   variant="outline"
                                   size="sm"
                                   className="h-9 w-9 p-0 rounded-lg border-red-300 text-red-600 hover:bg-red-50 text-lg font-bold"
-                                  onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
+                                  onPointerDown={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); updateQuantity(item.cartLineId || item.id!, item.quantity - 1) }}
                                 >
                                   −
                                 </Button>
@@ -998,7 +1001,7 @@ export default function POSPage() {
                                   variant="outline"
                                   size="sm"
                                   className="h-9 w-9 p-0 rounded-lg border-green-300 text-green-600 hover:bg-green-50 text-lg font-bold"
-                                  onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
+                                  onPointerDown={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); updateQuantity(item.cartLineId || item.id!, item.quantity + 1) }}
                                 >
                                   +
                                 </Button>
@@ -1128,7 +1131,7 @@ export default function POSPage() {
                       <div className="flex items-center bg-muted rounded-xl overflow-hidden">
                         <button
                           className="h-9 w-9 flex items-center justify-center text-red-500 font-bold text-lg active:bg-red-100 transition-colors"
-                          onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity - 1)}
+                          onPointerDown={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); updateQuantity(item.cartLineId || item.id!, item.quantity - 1) }}
                         >−</button>
                         <CartQuantityInput
                           item={item}
@@ -1138,7 +1141,7 @@ export default function POSPage() {
                         />
                         <button
                           className="h-9 w-9 flex items-center justify-center text-green-600 font-bold text-lg active:bg-green-100 transition-colors"
-                          onClick={() => updateQuantity(item.cartLineId || item.id!, item.quantity + 1)}
+                          onPointerDown={(e) => { e.preventDefault(); (document.activeElement as HTMLElement)?.blur(); updateQuantity(item.cartLineId || item.id!, item.quantity + 1) }}
                         >+</button>
                       </div>
                       <span className="text-[11px] text-muted-foreground ml-auto">{item.stock} in stock</span>

@@ -213,6 +213,7 @@ export default function ReportsPage() {
     setIsLoading(true)
     try {
       const storeId = getStoreId()
+      console.log("[reports] storeId:", storeId)
       if (!storeId) {
         setIsLoading(false)
         return
@@ -222,21 +223,25 @@ export default function ReportsPage() {
       if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
       if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
+      console.log("[reports] fetching:", `/api/sales?${params}`)
+
       const [salesRes, ewalletRes, billRes] = await Promise.all([
         fetch(`/api/sales?${params}`),
         fetch(`/api/ewallet-transactions?${params}`),
         fetch(`/api/bill-payments?${params}`),
       ])
 
-      const [{ data: salesData }, { data: ewalletData }, { data: billData }] = await Promise.all([
+      const [salesJson, ewalletJson, billJson] = await Promise.all([
         salesRes.json(),
         ewalletRes.json(),
         billRes.json(),
       ])
 
-      setSales(salesData ?? [])
-      setEWalletTransactions(ewalletData ?? [])
-      setBillPayments(billData ?? [])
+      console.log("[reports] salesRes status:", salesRes.status, "count:", salesJson?.data?.length, "raw:", JSON.stringify(salesJson).slice(0, 300))
+
+      setSales(salesJson.data ?? [])
+      setEWalletTransactions(ewalletJson.data ?? [])
+      setBillPayments(billJson.data ?? [])
 
       if (productsLoadedRef.current !== storeId) {
         const prodRes = await fetch(`/api/products?storeId=${storeId}`)

@@ -106,7 +106,7 @@ export default function SettingsPage() {
   }
 
   const handleSaveStoreAddress = async () => {
-    await saveSettings({ address: storeAddressInput })
+    await saveSettings({ address: storeAddressInput, latitude, longitude })
     setStoreAddress(storeAddressInput)
     localStorage.removeItem("pos_subscription")
     toast({ title: "Store address updated" })
@@ -349,7 +349,12 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={handleFetchLocation} disabled={fetchingLocation} className="w-full h-9 mt-1 text-[12px] gap-1.5">
             <MapPin className="h-3.5 w-3.5" /> {fetchingLocation ? "Fetching..." : "Use My Location"}
           </Button>
-          <Button onClick={handleSaveStoreAddress} disabled={!storeAddressInput.trim() || storeAddressInput === storeAddress} className="w-full h-10 mt-1 text-[13px]">Save</Button>
+          {latitude && longitude && (
+            <div className="text-[11px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+              📍 {latitude.toFixed(6)}, {longitude.toFixed(6)}
+            </div>
+          )}
+          <Button onClick={handleSaveStoreAddress} disabled={!storeAddressInput.trim()} className="w-full h-10 mt-1 text-[13px]">Save</Button>
         </DialogContent>
       </Dialog>
 

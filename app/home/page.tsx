@@ -186,7 +186,7 @@ export default function HomePage() {
   const storeName = session?.storeName || "My Store"
   const ownerName = session?.ownerName || user?.name || "there"
   const isOwner = user?.role === "owner"
-  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : "Basic"
+  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
   const fmt = (n: number) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   const dataLoaded = today !== null
 
@@ -297,7 +297,7 @@ export default function HomePage() {
                 {session?.branchName ? ` · ${session.branchName}` : ""}
                 {" · "}
                 <span className={isActive ? "font-semibold" : "font-semibold text-red-300"} style={isActive ? { color: theme.dark } : {}}>
-                  {tierLabel} {isActive ? "✓" : "⚠"}
+                  {tierLabel ?? (isActive ? "Active" : "Inactive")} {isActive ? "✓" : "⚠"}
                 </span>
               </p>
             </div>
@@ -416,7 +416,7 @@ export default function HomePage() {
 
           {/* ── Footer ── */}
           <p className="text-center text-[10px] text-muted-foreground/50 pb-2">
-            Payroo POS · {tierLabel} Plan · v2.0
+            Payroo POS · {tierLabel ? `${tierLabel} Plan` : ""} · v2.0
           </p>
         </div>
       </div>

@@ -27,11 +27,28 @@ export function MobileCard({ children, className, onClick }: { children: ReactNo
     <div
       className={cn(
         "bg-white rounded-2xl p-4 shadow-sm",
-        onClick && "active:scale-[0.98] transition-transform cursor-pointer"
+        onClick && "active:scale-[0.98] transition-transform cursor-pointer",
+        className
+
       )}
       onClick={onClick}
     >
       {children}
+    </div>
+  )
+}
+
+export function MobileSectionHeader({
+  title,
+  action,
+}: {
+  title: string
+  action?: ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide">{title}</p>
+      {action}
     </div>
   )
 }

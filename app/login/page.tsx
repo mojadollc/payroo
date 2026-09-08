@@ -3,14 +3,14 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { buildSession, setSession, clearSession } from "@/lib/pos-session"
 
 type Mode = "staff" | "owner"
-type Step = "identifier" | "pin"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,18 +18,13 @@ export default function LoginPage() {
   const { login } = useAuth()
 
   const [mode, setMode] = useState<Mode>("staff")
-  const [step, setStep] = useState<Step>("identifier")
-  const [identifier, setIdentifier] = useState("") // storeId or email
+  const [identifier, setIdentifier] = useState("")
   const [pin, setPin] = useState("")
   const [loading, setLoading] = useState(false)
-  const [activeKey, setActiveKey] = useState<string | null>(null)
+  const [step, setStep] = useState<"identifier" | "pin">("identifier")
+  const [pressedKey, setPressedKey] = useState<string | null>(null)
 
-  const switchMode = (m: Mode) => {
-    setMode(m)
-    setStep("identifier")
-    setIdentifier("")
-    setPin("")
-  }
+  const numpadKeys = ["1","2","3","4","5","6","7","8","9","","0","⌫"]
 
   const handleSubmit = async (pinValue: string) => {
     if (!identifier.trim() || pinValue.length !== 6) return
@@ -81,209 +76,185 @@ export default function LoginPage() {
   }
 
   const pressKey = (key: string) => {
-    setActiveKey(key)
-    setTimeout(() => setActiveKey(null), 120)
+    setPressedKey(key)
+    setTimeout(() => setPressedKey(null), 100)
 
-    if (step === "identifier") {
+    if (step === "identifier" && mode === "staff") {
       if (key === "⌫") {
         setIdentifier(v => v.slice(0, -1))
-      } else if (mode === "staff" && identifier.length < 6) {
+      } else if (identifier.length < 6) {
         setIdentifier(v => v + key)
       }
-      // owner email uses keyboard input, numpad not used in identifier step for owner
-    } else {
+    } else if (step === "pin") {
       if (key === "⌫") {
         setPin(v => v.slice(0, -1))
       } else if (pin.length < 6) {
         const next = pin + key
         setPin(next)
-        if (next.length === 6) setTimeout(() => handleSubmit(next), 200)
+        if (next.length === 6) setTimeout(() => handleSubmit(next), 150)
       }
     }
   }
 
-  const numpadKeys = ["1","2","3","4","5","6","7","8","9","","0","⌫"]
-
-  const isIdentifierReady = mode === "owner"
-    ? identifier.includes("@") && identifier.length > 5
-    : identifier.length >= 4
-
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "rgb(243, 234, 214)" }}>
-      <div className="w-full max-w-[410px] min-h-screen flex flex-col px-6 pt-14 pb-8">
-
-        {/* Logo */}
-        <div className="mb-6">
-          <div className="h-12 w-12 rounded-2xl bg-amber-900/10 flex items-center justify-center mb-6">
-            <img src="/logo.svg" alt="Payroo" className="h-8 w-8 rounded-xl" />
+    <div className="min-h-screen bg-neutral-50 flex flex-col">
+      {/* Header */}
+      <div className="px-6 pt-14 pb-8">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <img src="/logo.svg" alt="Payroo" className="h-8 w-8" />
           </div>
-          <p className="text-[13px] font-semibold text-amber-900/50 uppercase tracking-widest mb-1">Payroo POS</p>
-          <h1 className="text-[28px] font-black text-amber-950 leading-tight tracking-tight">
-            {step === "identifier" ? "Kumusta! 👋" : "Enter your PIN"}
-          </h1>
-          <p className="text-[14px] text-amber-900/60 mt-1">
-            {step === "identifier"
-              ? "Sign in para simulan ang shift"
-              : mode === "owner" ? `Owner: ${identifier}` : `Store ID: ${identifier}`}
-          </p>
+          <div>
+            <p className="text-xs text-neutral-400 font-medium">Payroo POS</p>
+            <h1 className="text-xl font-bold text-neutral-900">
+              {step === "identifier" ? "Welcome back" : "Enter PIN"}
+            </h1>
+          </div>
         </div>
 
-        {/* Mode toggle */}
+        {/* Mode Toggle */}
         {step === "identifier" && (
-          <div className="flex rounded-2xl bg-amber-900/10 p-1 mb-6">
+          <div className="flex bg-neutral-100 rounded-xl p-1 mb-6">
             {(["staff", "owner"] as Mode[]).map(m => (
               <button
                 key={m}
-                type="button"
-                onClick={() => switchMode(m)}
-                className={`flex-1 py-2 rounded-xl text-[13px] font-bold transition-all capitalize ${
-                  mode === m
-                    ? "bg-amber-900 text-amber-50 shadow"
-                    : "text-amber-900/60"
+                onClick={() => { setMode(m); setIdentifier("") }}
+                className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                  mode === m ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
                 }`}
               >
-                {m === "staff" ? "Staff / Cashier" : "Owner"}
+                {m === "staff" ? "Staff" : "Owner"}
               </button>
             ))}
           </div>
         )}
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className={`h-1.5 rounded-full flex-1 transition-all ${step === "identifier" ? "bg-amber-900" : "bg-amber-900/30"}`} />
-          <div className={`h-1.5 rounded-full flex-1 transition-all ${step === "pin" ? "bg-amber-900" : "bg-amber-900/20"}`} />
-        </div>
-
-        {/* Input display */}
-        <div className="mb-6">
-          {step === "identifier" ? (
-            <div>
-              <p className="text-[11px] font-bold text-amber-900/50 uppercase tracking-widest mb-3">
-                {mode === "owner" ? "Email Address" : "Store ID"}
-              </p>
-
-              {mode === "owner" ? (
-                <input
+        {/* Identifier Input */}
+        {step === "identifier" && (
+          <>
+            {mode === "owner" ? (
+              <div>
+                <p className="text-xs font-medium text-neutral-500 mb-2">Email address</p>
+                <Input
                   type="email"
                   autoFocus
                   value={identifier}
                   onChange={e => setIdentifier(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full h-14 rounded-2xl bg-white/60 border border-amber-900/20 px-4 text-[16px] font-semibold text-amber-950 placeholder:text-amber-900/30 focus:outline-none focus:border-amber-900/50 focus:bg-white/80"
+                  className="h-12 text-base rounded-xl border-neutral-200"
                 />
-              ) : (
-                <div className="flex items-center gap-3">
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-medium text-neutral-500 mb-2">Store ID</p>
+                <div className="flex gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
-                      className={`flex-1 h-12 rounded-xl flex items-center justify-center text-[22px] font-black transition-all ${
+                      className={`flex-1 h-12 rounded-xl flex items-center justify-center text-lg font-bold transition-all ${
                         i < identifier.length
-                          ? "bg-amber-900 text-amber-50 shadow-md"
+                          ? "bg-primary text-primary-foreground"
                           : i === identifier.length
-                          ? "bg-amber-900/15 border-2 border-amber-900/40"
-                          : "bg-amber-900/8 border border-amber-900/15"
+                          ? "bg-primary/10 border-2 border-primary"
+                          : "bg-neutral-100 border border-neutral-200"
                       }`}
                     >
-                      {identifier[i] ?? ""}
+                      {identifier[i] || ""}
                     </div>
                   ))}
                 </div>
-              )}
-              {mode === "staff" && (
-                <p className="text-[11px] text-amber-900/40 mt-2">4 to 6 digit store identifier</p>
-              )}
-            </div>
-          ) : (
-            <div>
-              <p className="text-[11px] font-bold text-amber-900/50 uppercase tracking-widest mb-3">6-Digit PIN</p>
-              <div className="flex items-center justify-center gap-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-full transition-all duration-150 ${
-                      i < pin.length
-                        ? "h-4 w-4 bg-amber-900 shadow-md"
-                        : i === pin.length
-                        ? "h-3.5 w-3.5 bg-amber-900/20 border-2 border-amber-900/50"
-                        : "h-3 w-3 bg-amber-900/15"
-                    }`}
-                  />
-                ))}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </>
+        )}
 
-        {/* Numpad — only for staff identifier step or PIN step */}
-        {(step === "pin" || (step === "identifier" && mode === "staff")) && (
-          <div className="grid grid-cols-3 gap-3 mb-6">
+        {/* PIN Input */}
+        {step === "pin" && (
+          <div>
+            <p className="text-xs font-medium text-neutral-500 mb-2">6-digit PIN</p>
+            <div className="flex justify-center gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-10 h-10 rounded-full transition-all ${
+                    i < pin.length ? "bg-primary" : i === pin.length ? "bg-primary/20 border-2 border-primary" : "bg-neutral-200"
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-center text-sm text-neutral-400 mt-3">
+              {mode === "owner" ? identifier : `Store #${identifier}`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Numpad */}
+      {(step === "pin" || (step === "identifier" && mode === "staff")) && (
+        <div className="px-6">
+          <div className="grid grid-cols-3 gap-3">
             {numpadKeys.map((key, i) => (
-              key === "" ? (
-                <div key={i} />
-              ) : (
+              key === "" ? <div key={i} /> : (
                 <button
                   key={i}
-                  type="button"
-                  disabled={loading}
-                  onPointerDown={() => pressKey(key)}
-                  className={`h-16 rounded-2xl text-[22px] font-bold transition-all duration-100 select-none active:scale-95 ${
+                  onClick={() => pressKey(key)}
+                  className={`h-14 rounded-xl text-xl font-semibold transition-all active:scale-95 ${
                     key === "⌫"
-                      ? "bg-amber-900/10 text-amber-900/60 text-[18px]"
-                      : activeKey === key
-                      ? "bg-amber-900 text-amber-50 shadow-lg scale-95"
-                      : "bg-white/60 text-amber-950 shadow-sm hover:bg-white/80"
+                      ? "bg-neutral-100 text-neutral-500 text-base"
+                      : pressedKey === key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-white border border-neutral-200 text-neutral-900"
                   }`}
-                  style={{ WebkitTapHighlightColor: "transparent" }}
                 >
                   {key}
                 </button>
               )
             ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Action button */}
+      {/* Actions */}
+      <div className="px-6 mt-6">
         {step === "identifier" ? (
           <Button
             size="lg"
-            className="w-full h-14 text-[16px] font-bold rounded-2xl shadow-md bg-amber-900 hover:bg-amber-800 text-amber-50 border-0"
-            disabled={!isIdentifierReady || loading}
+            className="w-full h-12 text-base font-semibold rounded-xl"
+            disabled={
+              loading ||
+              (mode === "owner"
+                ? !identifier.includes("@") || identifier.length < 5
+                : identifier.length < 4)
+            }
             onClick={() => setStep("pin")}
           >
-            Next →
+            Continue <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         ) : (
           <Button
             size="lg"
-            className="w-full h-14 text-[16px] font-bold rounded-2xl shadow-md bg-amber-900 hover:bg-amber-800 text-amber-50 border-0"
-            disabled={pin.length !== 6 || loading}
+            className="w-full h-12 text-base font-semibold rounded-xl"
+            disabled={loading || pin.length !== 6}
             onClick={() => handleSubmit(pin)}
           >
-            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in…</> : "Sign in"}
+            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</> : "Sign in"}
           </Button>
         )}
 
-        {/* Footer links */}
-        <div className="mt-4 flex items-center justify-between">
+        <div className="flex justify-between mt-4">
           {step === "pin" ? (
-            <button
-              type="button"
-              className="text-[13px] text-amber-900/50 font-medium"
-              onClick={() => { setStep("identifier"); setPin("") }}
-            >
+            <button onClick={() => { setStep("identifier"); setPin("") }} className="text-sm text-neutral-500">
               ← Back
             </button>
           ) : (
-            <Link href="/register" className="text-[13px] text-amber-900/60 font-semibold underline underline-offset-2">
+            <Link href="/register" className="text-sm text-primary font-medium">
               New store? Register
             </Link>
           )}
-          <div className="text-right">
-            <p className="text-[12px] text-amber-900/40">Nakalimutan ang PIN?</p>
-            <p className="text-[12px] text-amber-900/60 font-semibold">Ask owner to reset</p>
-          </div>
+          <p className="text-sm text-neutral-400">
+            Forgot PIN? <span className="text-neutral-600">Ask owner</span>
+          </p>
         </div>
-
       </div>
     </div>
   )

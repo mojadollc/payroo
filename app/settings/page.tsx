@@ -3,142 +3,422 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
-  Store, MapPin, Phone, Crown, ChevronRight, Zap, Star,
-  HandCoins, Receipt, Star as Loyalty, Brain, FileText, ListChecks, Truck, Users, BarChart2,
+  Store, MapPin, Phone, ServerCrash, Building2, Globe, Brain, Crown,
+  Lock, ArrowRight, Check, X, Zap, Star, ChevronRight, Settings2,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { DEFAULT_STORE_NAME } from "@/components/navbar"
+import { BUSINESS_TYPE_OPTIONS, getBusinessConfig, type BusinessType } from "@/lib/business-config"
 import { useSubscription } from "@/hooks/use-subscription"
+import { BranchManager } from "@/components/branch-manager"
 import { getStoreId } from "@/lib/store-id"
-import { useAuth } from "@/hooks/use-auth"
 
-const QUICK_SETTINGS = [
-  { href: "/utang",         label: "Utang",         icon: HandCoins,  desc: "Credit tracking" },
-  { href: "/loyalty",       label: "Loyalty",       icon: Loyalty,    desc: "Customer rewards" },
-  { href: "/restock",       label: "AI Restock",    icon: Brain,      desc: "Smart ordering" },
-  { href: "/elista",        label: "e-Lista",       icon: FileText,   desc: "Customer list" },
-  { href: "/checklist",     label: "Checklist",     icon: ListChecks, desc: "Daily tasks" },
-  { href: "/delivery-manage", label: "Delivery",    icon: Truck,      desc: "Online orders" },
-  { href: "/bills",         label: "Pay Bills",     icon: Receipt,    desc: "Bill payments" },
-  { href: "/market-intelligence", label: "Market Intel", icon: BarChart2, desc: "Trends" },
-  { href: "/users",         label: "Users",         icon: Users,      desc: "Staff & roles" },
+import type { SubscriptionFeatures } from "@/lib/firebase/types"
+
+const PH_REGIONS = [
+  "NCR", "CAR", "Region I", "Region II", "Region III", "Region IV-A",
+  "MIMAROPA", "Region V", "Region VI", "Region VII", "Region VIII",
+  "Region IX", "Region X", "Region XI", "Region XII", "Region XIII", "BARMM",
 ]
+
+const FEATURE_INFO: Record<keyof SubscriptionFeatures, { label: string }> = {
+  pos: { label: "POS System" },
+  inventory: { label: "Inventory" },
+  ewallet: { label: "E-Wallet" },
+  reports: { label: "Reports" },
+  loyalty: { label: "Loyalty" },
+  utang: { label: "Utang" },
+  aiRestock: { label: "AI Restock" },
+  multiUser: { label: "Multi-User" },
+  exportData: { label: "Export" },
+  marketIntelligence: { label: "Market Intel" },
+  delivery: { label: "Delivery" },
+}
+
+const TIER_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+  basic: { icon: <Zap className="h-4 w-4" />, color: "text-slate-600", bg: "bg-slate-100" },
+  gold: { icon: <Star className="h-4 w-4" />, color: "text-yellow-600", bg: "bg-yellow-100" },
+  enterprise: { icon: <Crown className="h-4 w-4" />, color: "text-purple-600", bg: "bg-purple-100" },
+}
 
 export default function SettingsPage() {
   const { toast } = useToast()
-  const { tier, isActive, endDate, features } = useSubscription()
-  const { user } = useAuth()
-  const [storeName, setStoreName] = useState("My Store")
+  const { tier, features, isActive, endDate, storeName: subStoreName, ownerName } = useSubscription()
+
+  const [storeName, setStoreName] = useState(DEFAULT_STORE_NAME)
+  const [storeNameInput, setStoreNameInput] = useState(DEFAULT_STORE_NAME)
+  const [storeAddress, setStoreAddress] = useState("")
+  const [storeAddressInput, setStoreAddressInput] = useState("")
+  const [storePhone, setStorePhone] = useState("")
+  const [storePhoneInput, setStorePhoneInput] = useState("")
+  const [businessType, setBusinessType] = useState<BusinessType>("retail")
+  const [fetchingLocation, setFetchingLocation] = useState(false)
+  const [region, setRegion] = useState("")
+  const [province, setProvince] = useState("")
+  const [city, setCity] = useState("")
+  const [barangay, setBarangay] = useState("")
+  const [locationSaved, setLocationSaved] = useState(false)
+
+  // Dialog states
+  const [editField, setEditField] = useState<"name" | "address" | "phone" | "type" | "location" | null>(null)
 
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
     fetch(`/api/store-settings?storeId=${storeId}`)
       .then(r => r.json())
-      .then(({ data }) => {
-        if (data?.name) setStoreName(data.name)
+      .then(({ data: s }) => {
+        if (s?.name) { setStoreName(s.name); setStoreNameInput(s.name) }
+        if (s?.address) { setStoreAddress(s.address); setStoreAddressInput(s.address) }
+        if (s?.phone) { setStorePhone(s.phone); setStorePhoneInput(s.phone) }
+        if (s?.businessType) setBusinessType(s.businessType as BusinessType)
+        if (s?.region) setRegion(s.region)
+        if (s?.province) setProvince(s.province)
+        if (s?.city) setCity(s.city)
+        if (s?.barangay) setBarangay(s.barangay)
       })
   }, [])
 
-  const daysLeft = endDate
-    ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : null
+  const saveSettings = (data: object) =>
+    fetch("/api/store-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storeId: getStoreId(), ...data }),
+    })
 
-  const isOwner = user?.role === "owner"
+  const handleSaveStoreName = async () => {
+    await saveSettings({ name: storeNameInput })
+    setStoreName(storeNameInput)
+    localStorage.setItem("storeName", storeNameInput)
+    localStorage.removeItem("pos_subscription")
+    window.dispatchEvent(new Event("storename"))
+    toast({ title: "Store name updated" })
+    setEditField(null)
+  }
 
-  const visibleSettings = QUICK_SETTINGS.filter(item => {
-    if (!isOwner) return false
-    if (item.href === "/loyalty" && !features.loyalty) return false
-    if (item.href === "/restock" && !features.aiRestock) return false
-    if (item.href === "/market-intelligence" && !features.marketIntelligence) return false
-    if (item.href === "/delivery-manage" && !features.delivery) return false
-    if (item.href === "/utang" && !features.utang) return false
-    if (item.href === "/users" && !features.multiUser) return false
-    return true
-  })
+  const handleSaveStoreAddress = async () => {
+    await saveSettings({ address: storeAddressInput })
+    setStoreAddress(storeAddressInput)
+    localStorage.removeItem("pos_subscription")
+    toast({ title: "Store address updated" })
+    setEditField(null)
+  }
+
+  const handleSaveStorePhone = async () => {
+    await saveSettings({ phone: storePhoneInput })
+    setStorePhone(storePhoneInput)
+    localStorage.removeItem("pos_subscription")
+    toast({ title: "Store phone updated" })
+    setEditField(null)
+  }
+
+  const handleSaveBusinessType = async (type: BusinessType) => {
+    setBusinessType(type)
+    await saveSettings({ businessType: type })
+    localStorage.setItem("businessType", type)
+    localStorage.removeItem("pos_subscription")
+    window.dispatchEvent(new Event("businesstype"))
+    toast({ title: `Business type set to ${getBusinessConfig(type).label}` })
+    setEditField(null)
+  }
+
+  const handleSaveLocation = async () => {
+    if (!region || !city) {
+      toast({ title: "Region and City are required", variant: "destructive" })
+      return
+    }
+    await saveSettings({ region, province, city, barangay })
+    setLocationSaved(true)
+    toast({ title: "Store location saved" })
+    setEditField(null)
+  }
+
+  const handleFetchLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ title: "Geolocation not supported", variant: "destructive" })
+      return
+    }
+    setFetchingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+          )
+          const data = await res.json()
+          const addr = data.address ?? {}
+          setStoreAddressInput(data.display_name ?? `${coords.latitude}, ${coords.longitude}`)
+          if (addr.city || addr.town || addr.municipality) setCity(addr.city ?? addr.town ?? addr.municipality)
+          if (addr.state) setProvince(addr.state)
+          if (addr.suburb || addr.village || addr.neighbourhood) setBarangay(addr.suburb ?? addr.village ?? addr.neighbourhood)
+        } catch {
+          setStoreAddressInput(`${coords.latitude}, ${coords.longitude}`)
+        } finally { setFetchingLocation(false) }
+      },
+      () => { toast({ title: "Location access denied", variant: "destructive" }); setFetchingLocation(false) }
+    )
+  }
+
+  const handleClearAllData = async () => {
+    if (!window.confirm("DANGER: Delete ALL data? This cannot be undone.")) return
+    if (!window.confirm("SECOND CONFIRMATION: Are you absolutely sure?")) return
+    try {
+      const storeId = getStoreId()
+      await Promise.all([
+        fetch(`/api/products?storeId=${storeId}`).then(r => r.json()).then(({ data }) =>
+          Promise.all((data ?? []).map((p: any) => fetch(`/api/products?id=${p.id}`, { method: "DELETE" })))
+        ),
+        fetch(`/api/sales?storeId=${storeId}`).then(r => r.json()).then(({ data }) =>
+          Promise.all((data ?? []).map((s: any) => fetch(`/api/sales`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: s.id, status: "voided" }) })))
+        ),
+      ])
+      toast({ title: "All data cleared", description: "Please refresh the page." })
+    } catch {
+      toast({ title: "Error", description: "Failed to clear data.", variant: "destructive" })
+    }
+  }
+
+  const daysLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : null
+  const tierCfg = TIER_CONFIG[tier || "basic"] || TIER_CONFIG.basic
+  const enabledFeatures = Object.entries(features).filter(([, v]) => v).map(([k]) => k)
+  const disabledFeatures = Object.entries(features).filter(([, v]) => !v).map(([k]) => k)
+  const cfg = getBusinessConfig(businessType)
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-24">
-      {/* Header */}
-      <div className="bg-primary px-5 pt-14 pb-6">
-        <h1 className="text-xl font-bold text-amber-950">Settings</h1>
+    <div className="min-h-screen bg-[oklch(0.97_0.008_90)]">
+      {/* Glass header */}
+      <div className="sticky top-0 z-40 glass-header">
+        <div className="max-w-lg mx-auto px-4 py-3">
+          <h1 className="text-[17px] font-bold tracking-tight">Settings</h1>
+        </div>
       </div>
 
-      <div className="px-5 -mt-3 space-y-4">
+      <div className="max-w-lg mx-auto px-4 py-4 pb-28 space-y-6">
+
         {/* Subscription Card */}
-        <Link href="/subscription">
-          <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between active:scale-[0.98] transition-transform">
+        <div className="rounded-2xl border overflow-hidden">
+          <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                tier === "gold" ? "bg-yellow-100" : tier === "enterprise" ? "bg-purple-100" : "bg-neutral-100"
-              }`}>
-                {tier === "gold" ? (
-                  <Star className="h-5 w-5 text-yellow-600" />
-                ) : tier === "enterprise" ? (
-                  <Crown className="h-5 w-5 text-purple-600" />
-                ) : (
-                  <Zap className="h-5 w-5 text-neutral-600" />
-                )}
-              </div>
+              <div className={`p-2 rounded-xl ${tierCfg.bg} ${tierCfg.color}`}>{tierCfg.icon}</div>
               <div>
-                <p className="font-semibold text-sm text-neutral-900">
-                  {tier ? tier.charAt(0).toUpperCase() + tier.slice(1) + " Plan" : "Free Plan"}
-                </p>
-                <p className="text-xs text-neutral-500">
-                  {isActive
-                    ? daysLeft !== null ? `${daysLeft} days remaining` : "Active"
-                    : "Expired"}
-                </p>
+                <div className="text-[14px] font-bold">{tier?.toUpperCase()} Plan</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {isActive ? (daysLeft !== null ? `${daysLeft} days left` : "Active") : "Expired"}
+                </div>
               </div>
             </div>
-            <ChevronRight className="h-5 w-5 text-neutral-300" />
+            <Link href="/subscription">
+              <Button size="sm" variant="outline" className="h-8 text-[12px] rounded-lg">
+                {isActive ? "Manage" : "Renew"} <ChevronRight className="h-3 w-3 ml-0.5" />
+              </Button>
+            </Link>
           </div>
-        </Link>
-
-        {/* Store Info */}
-        <Link href="/settings/store">
-          <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between active:scale-[0.98] transition-transform">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                <Store className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-neutral-900">{storeName}</p>
-                <p className="text-xs text-neutral-500">Edit store details</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-neutral-300" />
+          <div className="px-4 py-2.5 flex flex-wrap gap-1.5 border-t">
+            {enabledFeatures.map(key => (
+              <span key={key} className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">
+                {FEATURE_INFO[key as keyof SubscriptionFeatures]?.label}
+              </span>
+            ))}
+            {disabledFeatures.map(key => (
+              <span key={key} className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 font-medium line-through">
+                {FEATURE_INFO[key as keyof SubscriptionFeatures]?.label}
+              </span>
+            ))}
           </div>
-        </Link>
+        </div>
 
-        {/* Features Grid */}
-        {isOwner && visibleSettings.length > 0 && (
+        {/* Store Info Section */}
+        <div>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Store Information</p>
+          <div className="rounded-2xl border overflow-hidden divide-y">
+
+        {/* Multi-branch */}
+        <div className="mb-4">
+          <BranchManager />
+        </div>
+
+            {/* Store Name */}
+            <button className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left" onClick={() => setEditField("name")}>
+              <div className="p-2 bg-blue-100 rounded-xl"><Store className="h-4 w-4 text-blue-600" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium">Store Name</div>
+                <div className="text-[12px] text-muted-foreground truncate">{storeName}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            </button>
+
+            {/* Address */}
+            <button className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left" onClick={() => setEditField("address")}>
+              <div className="p-2 bg-green-100 rounded-xl"><MapPin className="h-4 w-4 text-green-600" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium">Address</div>
+                <div className="text-[12px] text-muted-foreground truncate">{storeAddress || "Not set"}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            </button>
+
+            {/* Phone */}
+            <button className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left" onClick={() => setEditField("phone")}>
+              <div className="p-2 bg-purple-100 rounded-xl"><Phone className="h-4 w-4 text-purple-600" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium">Contact Number</div>
+                <div className="text-[12px] text-muted-foreground truncate">{storePhone || "Not set"}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            </button>
+
+            {/* Business Type */}
+            <button className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left" onClick={() => setEditField("type")}>
+              <div className="p-2 bg-yellow-100 rounded-xl"><Building2 className="h-4 w-4 text-yellow-600" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium">Business Type</div>
+                <div className="text-[12px] text-muted-foreground truncate">{cfg.label}</div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            </button>
+          </div>
+        </div>
+
+        {/* Market Intelligence */}
+        {features.marketIntelligence && (
           <div>
-            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wide mb-2">Features</p>
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden divide-y divide-neutral-100">
-              {visibleSettings.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <div className="flex items-center gap-3 p-3.5 active:bg-neutral-50 transition-colors">
-                      <Icon className="h-5 w-5 text-neutral-400" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-neutral-900">{item.label}</p>
-                        <p className="text-xs text-neutral-400">{item.desc}</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-neutral-300" />
-                    </div>
-                  </Link>
-                )
-              })}
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide px-1 mb-2">Market Intelligence</p>
+            <div className="rounded-2xl border overflow-hidden">
+              <button className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/50 active:bg-muted transition-colors text-left" onClick={() => setEditField("location")}>
+                <div className="p-2 bg-teal-100 rounded-xl"><Globe className="h-4 w-4 text-teal-600" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-medium">Store Location</div>
+                  <div className="text-[12px] text-muted-foreground truncate">
+                    {city && region ? `${city}, ${region}` : "Not set"}
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              </button>
             </div>
           </div>
         )}
 
-        {/* App Info */}
-        <p className="text-center text-xs text-neutral-400 pt-4">
-          Payroo POS v2.0 · Made with ❤️ in the Philippines
-        </p>
+        {/* Danger Zone */}
+        <div>
+          <p className="text-[11px] font-semibold text-destructive uppercase tracking-wide px-1 mb-2">Danger Zone</p>
+          <div className="rounded-2xl border border-destructive/20 overflow-hidden">
+            <button className="w-full flex items-center gap-3 p-3.5 hover:bg-red-50 active:bg-red-100 transition-colors text-left" onClick={handleClearAllData}>
+              <div className="p-2 bg-red-100 rounded-xl"><ServerCrash className="h-4 w-4 text-red-600" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-destructive">Clear All Data</div>
+                <div className="text-[12px] text-muted-foreground">Delete all products, sales & transactions</div>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Edit Store Name Dialog */}
+      <Dialog open={editField === "name"} onOpenChange={(o) => !o && setEditField(null)}>
+        <DialogContent className="max-w-sm p-4">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">Store Name</DialogTitle>
+            <DialogDescription className="text-[12px]">This appears in your navbar and receipts</DialogDescription>
+          </DialogHeader>
+          <Input value={storeNameInput} onChange={e => setStoreNameInput(e.target.value)} className="h-10 text-[14px] mt-2" placeholder="Enter store name" />
+          <Button onClick={handleSaveStoreName} disabled={!storeNameInput.trim() || storeNameInput === storeName} className="w-full h-10 mt-2 text-[13px]">Save</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Address Dialog */}
+      <Dialog open={editField === "address"} onOpenChange={(o) => !o && setEditField(null)}>
+        <DialogContent className="max-w-sm p-4">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">Store Address</DialogTitle>
+            <DialogDescription className="text-[12px]">Used on receipts and reports</DialogDescription>
+          </DialogHeader>
+          <Input value={storeAddressInput} onChange={e => setStoreAddressInput(e.target.value)} className="h-10 text-[14px] mt-2" placeholder="Enter address" />
+          <Button variant="outline" onClick={handleFetchLocation} disabled={fetchingLocation} className="w-full h-9 mt-1 text-[12px] gap-1.5">
+            <MapPin className="h-3.5 w-3.5" /> {fetchingLocation ? "Fetching..." : "Use My Location"}
+          </Button>
+          <Button onClick={handleSaveStoreAddress} disabled={!storeAddressInput.trim() || storeAddressInput === storeAddress} className="w-full h-10 mt-1 text-[13px]">Save</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Phone Dialog */}
+      <Dialog open={editField === "phone"} onOpenChange={(o) => !o && setEditField(null)}>
+        <DialogContent className="max-w-sm p-4">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">Contact Number</DialogTitle>
+            <DialogDescription className="text-[12px]">Printed on receipts</DialogDescription>
+          </DialogHeader>
+          <Input value={storePhoneInput} onChange={e => setStorePhoneInput(e.target.value)} className="h-10 text-[14px] mt-2" placeholder="09XX-XXX-XXXX" type="tel" />
+          <Button onClick={handleSaveStorePhone} disabled={!storePhoneInput.trim() || storePhoneInput === storePhone} className="w-full h-10 mt-2 text-[13px]">Save</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Business Type Dialog */}
+      <Dialog open={editField === "type"} onOpenChange={(o) => !o && setEditField(null)}>
+        <DialogContent className="max-w-sm p-4 max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">Business Type</DialogTitle>
+            <DialogDescription className="text-[12px]">Choose what best describes your store</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5 mt-2">
+            {BUSINESS_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => handleSaveBusinessType(opt.value as BusinessType)}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                  businessType === opt.value ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <div>
+                  <div className="text-[13px] font-medium">{opt.label}</div>
+                  <div className="text-[11px] text-muted-foreground">{opt.description}</div>
+                </div>
+                {businessType === opt.value && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Location Dialog */}
+      <Dialog open={editField === "location"} onOpenChange={(o) => !o && setEditField(null)}>
+        <DialogContent className="max-w-sm p-4">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">Store Location</DialogTitle>
+            <DialogDescription className="text-[12px]">For market intelligence data</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[11px]">Region *</Label>
+                <select value={region} onChange={e => setRegion(e.target.value)} className="w-full h-9 rounded-lg border px-2 text-[13px] mt-1">
+                  <option value="">Select</option>
+                  {PH_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-[11px]">Province</Label>
+                <Input value={province} onChange={e => setProvince(e.target.value)} className="h-9 text-[13px] mt-1" placeholder="e.g. Cebu" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[11px]">City *</Label>
+                <Input value={city} onChange={e => setCity(e.target.value)} className="h-9 text-[13px] mt-1" placeholder="e.g. Cebu City" />
+              </div>
+              <div>
+                <Label className="text-[11px]">Barangay</Label>
+                <Input value={barangay} onChange={e => setBarangay(e.target.value)} className="h-9 text-[13px] mt-1" placeholder="e.g. Lahug" />
+              </div>
+            </div>
+            <Button onClick={handleSaveLocation} disabled={!region || !city} className="w-full h-10 text-[13px]">Save Location</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

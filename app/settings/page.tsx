@@ -62,6 +62,8 @@ export default function SettingsPage() {
   const [province, setProvince] = useState("")
   const [city, setCity] = useState("")
   const [barangay, setBarangay] = useState("")
+  const [latitude, setLatitude] = useState<number | null>(null)
+  const [longitude, setLongitude] = useState<number | null>(null)
   const [locationSaved, setLocationSaved] = useState(false)
 
   // Dialog states
@@ -81,6 +83,8 @@ export default function SettingsPage() {
         if (s?.province) setProvince(s.province)
         if (s?.city) setCity(s.city)
         if (s?.barangay) setBarangay(s.barangay)
+        if (s?.latitude != null) setLatitude(s.latitude)
+        if (s?.longitude != null) setLongitude(s.longitude)
       })
   }, [])
 
@@ -132,7 +136,7 @@ export default function SettingsPage() {
       toast({ title: "Region and City are required", variant: "destructive" })
       return
     }
-    await saveSettings({ region, province, city, barangay })
+    await saveSettings({ region, province, city, barangay, latitude, longitude })
     setLocationSaved(true)
     toast({ title: "Store location saved" })
     setEditField(null)
@@ -146,6 +150,9 @@ export default function SettingsPage() {
     setFetchingLocation(true)
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
+        // Always save raw lat/lng
+        setLatitude(coords.latitude)
+        setLongitude(coords.longitude)
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
@@ -295,6 +302,7 @@ export default function SettingsPage() {
                   <div className="text-[13px] font-medium">Store Location</div>
                   <div className="text-[12px] text-muted-foreground truncate">
                     {city && region ? `${city}, ${region}` : "Not set"}
+                    {latitude && longitude ? ` · ${latitude.toFixed(4)}, ${longitude.toFixed(4)}` : ""}
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -415,6 +423,11 @@ export default function SettingsPage() {
                 <Input value={barangay} onChange={e => setBarangay(e.target.value)} className="h-9 text-[13px] mt-1" placeholder="e.g. Lahug" />
               </div>
             </div>
+            {latitude && longitude && (
+              <div className="text-[11px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                📍 {latitude.toFixed(6)}, {longitude.toFixed(6)}
+              </div>
+            )}
             <Button onClick={handleSaveLocation} disabled={!region || !city} className="w-full h-10 text-[13px]">Save Location</Button>
           </div>
         </DialogContent>

@@ -435,6 +435,8 @@ model StoreSettings {
   province     String?
   city         String?
   barangay     String?
+  latitude     Float?
+  longitude    Float?
 
   @@index([storeId])
   @@map("store_settings")

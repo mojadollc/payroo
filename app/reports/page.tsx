@@ -205,14 +205,7 @@ export default function ReportsPage() {
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
   const productsLoadedRef = useRef<string>("")
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(() => {
-    const today = new Date()
-    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    firstOfMonth.setHours(0, 0, 0, 0)
-    const endOfToday = new Date(today)
-    endOfToday.setHours(23, 59, 59, 999)
-    return { from: firstOfMonth, to: endOfToday }
-  })
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined)
 
   useEffect(() => { loadData() }, [dateRange])
 
@@ -325,7 +318,7 @@ export default function ReportsPage() {
 
   const rangeLabel = dateRange
     ? `${dateRange.from.toLocaleDateString("en-CA")}_to_${dateRange.to.toLocaleDateString("en-CA")}`
-    : new Date().toLocaleDateString("en-CA")
+    : "all-time"
 
   return (
     <MobileAppShell

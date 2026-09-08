@@ -3,16 +3,21 @@ import { prisma } from "@/lib/db/client"
 import { startOfDayPH, endOfDayPH } from "@/lib/ph-time"
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("storeId")
-  if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
-  const from = req.nextUrl.searchParams.get("from")
-  const to = req.nextUrl.searchParams.get("to")
-  const where: any = { storeId }
-  if (from && to) {
-    where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+  try {
+    const storeId = req.nextUrl.searchParams.get("storeId")
+    if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
+    const from = req.nextUrl.searchParams.get("from")
+    const to = req.nextUrl.searchParams.get("to")
+    const where: any = { storeId }
+    if (from && to) {
+      where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+    }
+    const items = await prisma.eWalletTransaction.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
+  } catch (err: any) {
+    console.error("[ewallet GET]", err.message)
+    return NextResponse.json({ error: err.message, data: [] }, { status: 500 })
   }
-  const items = await prisma.eWalletTransaction.findMany({ where, orderBy: { createdAt: "desc" } })
-  return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
 }
 
 export async function POST(req: NextRequest) {

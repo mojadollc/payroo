@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     if (to) where.createdAt.lte = endOfDayPH(to)
   }
 
-  const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" } })
+  const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 })
   return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } })
 }
 

@@ -223,21 +223,17 @@ export default function ReportsPage() {
       if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
       if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
-      console.log("[reports] fetching:", `/api/sales?${params}`)
+      const salesRes = await fetch(`/api/sales?${params}`)
+      const salesJson = await salesRes.json()
+      console.log("[reports] sales:", salesRes.status, salesJson?.data?.length, JSON.stringify(salesJson).slice(0, 200))
 
-      const [salesRes, ewalletRes, billRes] = await Promise.all([
-        fetch(`/api/sales?${params}`),
-        fetch(`/api/ewallet-transactions?${params}`),
-        fetch(`/api/bill-payments?${params}`),
-      ])
+      const ewalletRes = await fetch(`/api/ewallet-transactions?${params}`)
+      const ewalletJson = await ewalletRes.json()
+      console.log("[reports] ewallet:", ewalletRes.status, ewalletJson?.data?.length)
 
-      const [salesJson, ewalletJson, billJson] = await Promise.all([
-        salesRes.json(),
-        ewalletRes.json(),
-        billRes.json(),
-      ])
-
-      console.log("[reports] salesRes status:", salesRes.status, "count:", salesJson?.data?.length, "raw:", JSON.stringify(salesJson).slice(0, 300))
+      const billRes = await fetch(`/api/bill-payments?${params}`)
+      const billJson = await billRes.json()
+      console.log("[reports] bills:", billRes.status, billJson?.data?.length)
 
       setSales(salesJson.data ?? [])
       setEWalletTransactions(ewalletJson.data ?? [])

@@ -3,25 +3,29 @@ import { prisma } from "@/lib/db/client"
 import { startOfDayPH, endOfDayPH } from "@/lib/ph-time"
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("storeId")
-  if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
-  const from = req.nextUrl.searchParams.get("from")
-  const to = req.nextUrl.searchParams.get("to")
-  const summary = req.nextUrl.searchParams.get("summary") === "1"
-  const where: any = { storeId }
-  if (from && to) {
-    where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+  try {
+    const storeId = req.nextUrl.searchParams.get("storeId")
+    if (!storeId) return NextResponse.json({ error: "Missing storeId" }, { status: 400 })
+    const from = req.nextUrl.searchParams.get("from")
+    const to = req.nextUrl.searchParams.get("to")
+    const summary = req.nextUrl.searchParams.get("summary") === "1"
+    const where: any = { storeId }
+    if (from && to) {
+      where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+    }
+    if (summary) {
+      const rows = await prisma.sale.findMany({
+        where,
+        select: { total: true, status: true },
+      })
+      return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
+    }
+    const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, take: 500 })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
+  } catch (err: any) {
+    console.error("[sales GET]", err.message)
+    return NextResponse.json({ error: err.message, data: [] }, { status: 500 })
   }
-  // summary=1: skip items join, return only totals — much faster for dashboard
-  if (summary) {
-    const rows = await prisma.sale.findMany({
-      where,
-      select: { total: true, status: true },
-    })
-    return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
-  }
-  const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } })
-  return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
 }
 
 export async function POST(req: NextRequest) {

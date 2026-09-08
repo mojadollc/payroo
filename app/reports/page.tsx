@@ -203,9 +203,8 @@ export default function ReportsPage() {
   const [billPayments, setBillPayments] = useState<any[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
-  const [isLoading, setIsLoading] = useState(false)
-  const hasLoaded = useRef(false)
-  const productsLoadedRef = useRef(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const productsLoadedRef = useRef<string>("")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(() => {
     const today = new Date()
     const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -218,10 +217,13 @@ export default function ReportsPage() {
   useEffect(() => { loadData() }, [dateRange])
 
   const loadData = async () => {
-    if (!hasLoaded.current) setIsLoading(true)
+    setIsLoading(true)
     try {
       const storeId = getStoreId()
-      if (!storeId) return
+      if (!storeId) {
+        setIsLoading(false)
+        return
+      }
 
       const params = new URLSearchParams({ storeId })
       if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
@@ -243,11 +245,11 @@ export default function ReportsPage() {
       setEWalletTransactions(ewalletData ?? [])
       setBillPayments(billData ?? [])
 
-      if (!productsLoadedRef.current) {
+      if (productsLoadedRef.current !== storeId) {
         const prodRes = await fetch(`/api/products?storeId=${storeId}`)
         const { data: productsData } = await prodRes.json()
         setProducts(productsData ?? [])
-        productsLoadedRef.current = true
+        productsLoadedRef.current = storeId
         // Build tobacco product IDs set
         const tobaccoIds = new Set<string>(
           (productsData ?? []).filter((p: any) => {
@@ -260,7 +262,6 @@ export default function ReportsPage() {
     } catch (error) {
       console.error("[reports] Error loading data:", error)
     } finally {
-      hasLoaded.current = true
       setIsLoading(false)
     }
   }

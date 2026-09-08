@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
+import { startOfDayPH, endOfDayPH } from "@/lib/ph-time"
 
 export async function GET(req: NextRequest) {
   const storeId = req.nextUrl.searchParams.get("storeId")
@@ -8,10 +9,10 @@ export async function GET(req: NextRequest) {
   const to = req.nextUrl.searchParams.get("to")
   const where: any = { storeId }
   if (from && to) {
-    where.createdAt = { gte: new Date(from), lte: new Date(to) }
+    where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
   }
   const items = await prisma.eWalletTransaction.findMany({ where, orderBy: { createdAt: "desc" } })
-  return NextResponse.json({ data: items })
+  return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
 }
 
 export async function POST(req: NextRequest) {

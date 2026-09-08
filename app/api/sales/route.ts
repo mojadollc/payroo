@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
   }
   const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" } })
-  return NextResponse.json({ data: items })
+  return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
 }
 
 export async function POST(req: NextRequest) {

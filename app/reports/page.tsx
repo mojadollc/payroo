@@ -224,14 +224,8 @@ export default function ReportsPage() {
       if (!storeId) return
 
       const params = new URLSearchParams({ storeId })
-      if (dateRange?.from) {
-        const from = new Date(dateRange.from); from.setHours(0, 0, 0, 0)
-        params.set("from", from.toISOString())
-      }
-      if (dateRange?.to) {
-        const to = new Date(dateRange.to); to.setHours(23, 59, 59, 999)
-        params.set("to", to.toISOString())
-      }
+      if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
+      if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
       const [salesRes, ewalletRes, billRes] = await Promise.all([
         fetch(`/api/sales?${params}`),

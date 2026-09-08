@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
 import { randomUUID } from "crypto"
+import { startOfDayPH, endOfDayPH } from "@/lib/ph-time"
 
 const XENDIT_OTC_CHANNELS = ["CEBUANA", "LBC"]
 
@@ -48,12 +49,12 @@ export async function GET(req: NextRequest) {
   const where: any = { storeId }
   if (from || to) {
     where.createdAt = {}
-    if (from) where.createdAt.gte = new Date(from)
-    if (to) where.createdAt.lte = new Date(to)
+    if (from) where.createdAt.gte = startOfDayPH(from)
+    if (to) where.createdAt.lte = endOfDayPH(to)
   }
 
   const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" } })
-  return NextResponse.json({ data })
+  return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } })
 }
 
 export async function POST(req: NextRequest) {

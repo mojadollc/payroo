@@ -1,12 +1,12 @@
 "use client"
 
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Store, Package, TrendingUp, HandCoins, Star,
   Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks, Receipt, Home,
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
 import type { SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
@@ -71,9 +71,14 @@ const MORE_GROUPS: NavGroup[] = [
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, isCashier, hasFeature, hasPermission, loading: authLoading } = useAuth()
   const { features, isActive } = useSubscription()
   const [moreOpen, setMoreOpen] = useState(false)
+
+  const prefetchRoute = useCallback((href: string) => {
+    router.prefetch(href)
+  }, [router])
 
   if (!user || authLoading) return null
 
@@ -112,6 +117,8 @@ export function MobileBottomNav() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={true}
+                  onMouseEnter={() => prefetchRoute(item.href)}
                   className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] active:scale-90 transition-all duration-150 ${
                     active ? "text-primary" : "text-muted-foreground/70"
                   }`}
@@ -174,6 +181,7 @@ export function MobileBottomNav() {
                         <Link
                           key={item.href}
                           href={item.href}
+                          prefetch={true}
                           onClick={() => setMoreOpen(false)}
                           className={`flex flex-col items-center justify-center py-3.5 rounded-2xl active:scale-90 transition-all duration-150 gap-1.5 ${
                             active

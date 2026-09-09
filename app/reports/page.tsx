@@ -13,15 +13,28 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { DateRangePicker } from "@/components/reports/date-range-picker"
-import { SalesReport, ProductBreakdown } from "@/components/reports/sales-report"
-import { EWalletReport } from "@/components/reports/ewallet-report"
-import { TobaccoReport } from "@/components/reports/tobacco-report"
 import dynamic from "next/dynamic"
 // recharts pulls in a sizeable chunk of its own — split it out of the main
 // reports bundle so tapping into Reports doesn't wait on chart code to parse.
 const ProfitChart = dynamic(
   () => import("@/components/reports/profit-chart").then(m => m.ProfitChart),
   { ssr: false, loading: () => <div className="h-[300px] w-full animate-pulse bg-muted/30 rounded-lg" /> }
+)
+const SalesReport = dynamic(
+  () => import("@/components/reports/sales-report").then(m => m.SalesReport),
+  { ssr: false, loading: () => <div className="h-40 w-full animate-pulse bg-muted/30 rounded-lg" /> }
+)
+const ProductBreakdown = dynamic(
+  () => import("@/components/reports/sales-report").then(m => m.ProductBreakdown),
+  { ssr: false, loading: () => <div className="h-40 w-full animate-pulse bg-muted/30 rounded-lg" /> }
+)
+const EWalletReport = dynamic(
+  () => import("@/components/reports/ewallet-report").then(m => m.EWalletReport),
+  { ssr: false, loading: () => <div className="h-40 w-full animate-pulse bg-muted/30 rounded-lg" /> }
+)
+const TobaccoReport = dynamic(
+  () => import("@/components/reports/tobacco-report").then(m => m.TobaccoReport),
+  { ssr: false, loading: () => <div className="h-40 w-full animate-pulse bg-muted/30 rounded-lg" /> }
 )
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
 import { useAuth } from "@/hooks/use-auth"

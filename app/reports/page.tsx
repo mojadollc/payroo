@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity, Cigarette, Package } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -40,6 +39,13 @@ import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mo
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
 import { getStoreId } from "@/lib/store-id"
+import {
+  loadReports,
+  subscribeReports,
+  getMemReports,
+  invalidateReports,
+  type ReportsData,
+} from "@/lib/reports/reports-store"
 import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"
 
 // ── CSV helpers ────────────────────────────────────────────────────────────────
@@ -207,16 +213,18 @@ function exportInventorySnapshot(products: Product[], label: string) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const router = useRouter()
   const { isCashier } = useAuth()
   const { features, tier } = useSubscription()
   const canExport = features.exportData && tier !== "basic"
-  const [sales, setSales] = useState<Sale[]>([])
-  const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>([])
-  const [billPayments, setBillPayments] = useState<any[]>([])
+
+  // Seed from memory cache instantly — zero async on navigation back to Reports
+  const cached = getMemReports()
+  const [sales, setSales] = useState<Sale[]>(cached?.sales ?? [])
+  const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>(cached?.ewallet ?? [])
+  const [billPayments, setBillPayments] = useState<any[]>(cached?.bills ?? [])
   const [products, setProducts] = useState<Product[]>([])
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(!cached)
   const [loadError, setLoadError] = useState<string | null>(null)
   const productsLoadedRef = useRef<string>("")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined)
@@ -225,50 +233,33 @@ export default function ReportsPage() {
     const storeId = getStoreId()
     if (!storeId) { setIsLoading(false); return }
 
-    // Show stale cache immediately so UI is never blank
-    try {
-      const cached = sessionStorage.getItem(`reports_cache_${storeId}`)
-      if (cached) {
-        const { sales: s, ewallet: e, bills: b } = JSON.parse(cached)
-        if (s) setSales(s)
-        if (e) setEWalletTransactions(e)
-        if (b) setBillPayments(b)
-        setIsLoading(false)
-      }
-    } catch {}
-
     setLoadError(null)
 
-    const params = new URLSearchParams({ storeId })
-    if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
-    if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
-
-    // Fire all 3 fetches independently — each updates the UI as soon as it arrives
-    // instead of waiting for the slowest one
-    let salesData: any[] = [], ewalletData: any[] = [], billsData: any[] = []
-    let done = 0
-    const tryCache = () => {
-      done++
-      if (done === 3 && !dateRange) {
-        try { sessionStorage.setItem(`reports_cache_${storeId}`, JSON.stringify({ sales: salesData, ewallet: ewalletData, bills: billsData })) } catch {}
+    // Subscribe to store updates (background refresh notifies here)
+    const unsub = subscribeReports(() => {
+      const latest = getMemReports()
+      if (latest) {
+        setSales(latest.sales)
+        setEWalletTransactions(latest.ewallet)
+        setBillPayments(latest.bills)
+        setIsLoading(false)
       }
-    }
+    })
 
-    fetch(`/api/sales?${params}`)
-      .then(r => r.json())
-      .then(({ data }) => { salesData = data ?? []; setSales(salesData); setIsLoading(false); tryCache() })
-      .catch(err => { setLoadError(err.message); setIsLoading(false); tryCache() })
+    // Load: memory hit is instant, IDB hit is fast, API only on cold start
+    loadReports(storeId, dateRange)
+      .then(data => {
+        setSales(data.sales)
+        setEWalletTransactions(data.ewallet)
+        setBillPayments(data.bills)
+        setIsLoading(false)
+      })
+      .catch(err => {
+        setLoadError(err.message)
+        setIsLoading(false)
+      })
 
-    fetch(`/api/ewallet-transactions?${params}`)
-      .then(r => r.json())
-      .then(({ data }) => { ewalletData = data ?? []; setEWalletTransactions(ewalletData); tryCache() })
-      .catch(() => tryCache())
-
-    fetch(`/api/bill-payments?${params}`)
-      .then(r => r.json())
-      .then(({ data }) => { billsData = data ?? []; setBillPayments(billsData); tryCache() })
-      .catch(() => tryCache())
-
+    // Load products once per store (for inventory export + tobacco detection)
     if (productsLoadedRef.current !== storeId) {
       fetch(`/api/products?storeId=${storeId}`)
         .then(r => r.json())
@@ -283,13 +274,14 @@ export default function ReportsPage() {
           )
           setTobaccoProductIds(tobaccoIds)
         })
+        .catch(() => {})
     }
+
+    return unsub
   }, [dateRange])
 
   const loadData = () => {
-    // Bust sessionStorage cache so fresh data is always fetched
-    const storeId = getStoreId()
-    if (storeId) { try { sessionStorage.removeItem(`reports_cache_${storeId}`) } catch {} }
+    invalidateReports()
     setDateRange(d => d ? { ...d } : undefined)
   }
 

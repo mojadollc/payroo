@@ -277,6 +277,9 @@ export default function POSPage() {
     if (!storeId) return
     // Force incremental sync after a sale so stock is refreshed
     await syncProducts(storeId)
+    // Invalidate reports cache so next visit shows fresh data
+    const { invalidateReports } = await import("@/lib/reports/reports-store")
+    invalidateReports()
   }
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)

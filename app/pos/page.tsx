@@ -137,7 +137,10 @@ export default function POSPage() {
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
   const stockBlockedRef = useRef(false)
-  const productsRef = useRef<Product[]>([])
+  const productsRef = useRef<Product[]>((() => {
+    // Seed synchronously so search works on the very first keystroke
+    try { return getCachedProducts() as Product[] } catch { return [] }
+  })())
 
   // Keep latest barcode handler without stale closures
   const handleBarcodeSubmitRef = useRef<(barcode: string) => void>(() => {})
@@ -184,26 +187,19 @@ export default function POSPage() {
     })
   }, [shuffledProducts.length > 0])
 
-  // Seed products + productsRef from cache immediately on mount
-  useEffect(() => {
-    const cached = getCachedProducts() as Product[]
-    if (cached.length > 0 && productsRef.current.length === 0) {
-      setProducts(cached)
-      productsRef.current = cached
-    }
-  }, [])
-
   // Load products: show cache instantly, fetch fresh in background
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
 
-    // Step 1: Paint cache immediately so grid is never blank on refresh
-    const cached = getCachedProducts() as Product[]
-    if (cached.length > 0 && productsRef.current.length === 0) {
-      setProducts(cached)
-      setShuffledAndCache(cached)
-      productsRef.current = cached
+    // Step 1: Paint cache immediately so grid + search work before API responds
+    if (productsRef.current.length === 0) {
+      const cached = getCachedProducts() as Product[]
+      if (cached.length > 0) {
+        setProducts(cached)
+        setShuffledAndCache(cached)
+        productsRef.current = cached
+      }
     }
 
     // Step 2: Fetch fresh data in background — update silently
@@ -320,12 +316,10 @@ export default function POSPage() {
   const handleInputChange = (value: string) => {
     setBarcodeInput(value)
     const q = value.trim().toLowerCase()
-    // Don't close dropdown when input is cleared - let user type new keywords
-    // Dropdown closes only on outside click
     if (!q) return
 
-    // Always use fresh DB data — products state is only set from API, never from stale cache
-    const pool = products.length > 0 ? products : productsRef.current
+    // Always read from ref — never waits for React state, works instantly from cache
+    const pool = productsRef.current
     if (pool.length === 0) { setSearchSuggestions([]); return }
 
     const words = q.split(/\s+/).filter(Boolean)

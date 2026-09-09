@@ -102,7 +102,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#EFBF04",
+  themeColor: "#FBC02D",
 }
 
 export default function RootLayout({
@@ -114,7 +114,10 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#EFBF04" />
+        <meta name="theme-color" content="#FBC02D" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icon-dark-32x32.png" />
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
       </head>
       <body className={`${plusJakarta.variable} font-sans antialiased`}>

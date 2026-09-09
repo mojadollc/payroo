@@ -192,6 +192,16 @@ export default function POSPage() {
         setProducts(data)
         setShuffledAndCache(data)
         productsRef.current = data
+        // Purge any cart items whose productId no longer exists in the catalog
+        // (can happen when migrating from Firebase → Postgres with new IDs)
+        setCart(prev => {
+          const idSet = new Set(data.map(p => p.id))
+          const cleaned = prev.filter(item => idSet.has(item.id!))
+          if (cleaned.length !== prev.length) {
+            try { localStorage.setItem(CART_KEY, JSON.stringify(cleaned)) } catch {}
+          }
+          return cleaned
+        })
       }
     })
 

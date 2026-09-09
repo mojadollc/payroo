@@ -40,17 +40,37 @@ export async function POST(req: NextRequest) {
       : []
     const stockMap = new Map(existingProducts.map(p => [p.id, p.stock]))
 
+    // Only include items whose productId actually exists — prevents FK violation
+    // when cart was loaded from a stale localStorage/IDB cache
+    const validItems = (items ?? []).filter((item: any) => stockMap.has(item.productId))
+    const skippedItems = (items ?? []).filter((item: any) => !stockMap.has(item.productId))
+    if (skippedItems.length > 0) {
+      console.warn(`[sales POST] Skipped ${skippedItems.length} items with missing productIds:`, skippedItems.map((i: any) => i.productId))
+    }
+
+    if (validItems.length === 0) {
+      return NextResponse.json({ error: "No valid products found in cart. Please refresh the POS and try again." }, { status: 400 })
+    }
+
+    // Recalculate total from valid items only if some were skipped
+    const effectiveTotal = skippedItems.length > 0
+      ? validItems.reduce((sum: number, i: any) => sum + i.subtotal, 0)
+      : total
+    const effectiveProfit = skippedItems.length > 0
+      ? validItems.reduce((sum: number, i: any) => sum + (i.price - (i.cost ?? 0)) * i.quantity, 0)
+      : (profit ?? 0)
+
     const sale = await prisma.$transaction(async (tx) => {
       const created = await tx.sale.create({
         data: {
           id,
           storeId,
-          total,
-          profit: profit ?? 0,
+          total: effectiveTotal,
+          profit: effectiveProfit,
           paymentMethod,
           status: status ?? "completed",
           items: {
-            create: (items ?? []).map((item: any) => ({
+            create: validItems.map((item: any) => ({
               id: item.id,
               productId: item.productId,
               productName: item.productName,
@@ -66,7 +86,7 @@ export async function POST(req: NextRequest) {
 
       // Batch update all product stocks in parallel
       await Promise.all(
-        (items ?? []).map(async (item: any) => {
+        validItems.map(async (item: any) => {
           const prevStock = stockMap.get(item.productId)
           if (prevStock === undefined) return
           const newStock = prevStock - item.quantity

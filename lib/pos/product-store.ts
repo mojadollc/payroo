@@ -36,6 +36,8 @@ let syncInFlight = false
 const subscribers = new Set<() => void>()
 
 const SYNC_KEY = "pos_last_product_sync"
+// Tracks whether we've done a full reconcile this browser session
+const sessionFullSyncDone = new Set<string>()
 
 function getSyncTimestamp(storeId: string): number {
   try { return parseInt(localStorage.getItem(`${SYNC_KEY}_${storeId}`) || "0") } catch { return 0 }
@@ -140,7 +142,10 @@ export async function syncProducts(storeId: string): Promise<void> {
   syncInFlight = true
 
   try {
-    const since = getSyncTimestamp(storeId)
+    // Once per session: full reconcile to purge any stale IDB products
+    const needsFullReconcile = !sessionFullSyncDone.has(storeId)
+    const since = needsFullReconcile ? 0 : getSyncTimestamp(storeId)
+
     const res = await fetch(`/api/pos/sync?storeId=${encodeURIComponent(storeId)}&since=${since}`)
     if (!res.ok) return
 
@@ -150,8 +155,22 @@ export async function syncProducts(storeId: string): Promise<void> {
       syncTimestamp: number
     } = await res.json()
 
-    if (updated.length > 0 || deleted.length > 0) {
-      // Merge into memory cache
+    if (needsFullReconcile && updated.length > 0) {
+      // Full reconcile: replace IDB entirely with the live server set
+      const liveIds = new Set(updated.map(p => p.id!))
+      const idbProducts = await idbGetProducts(storeId)
+      const orphanIds = idbProducts.map(p => p.id!).filter(id => !liveIds.has(id))
+
+      memCache = updated
+      memCacheStoreId = storeId
+
+      await idbPutProducts(updated)
+      await idbDeleteProducts(orphanIds)
+
+      sessionFullSyncDone.add(storeId)
+      notify()
+    } else if (!needsFullReconcile && (updated.length > 0 || deleted.length > 0)) {
+      // Incremental merge
       const byId = new Map(memCache.map(p => [p.id, p]))
       for (const p of updated) byId.set(p.id!, p)
       for (const id of deleted) byId.delete(id)
@@ -162,6 +181,9 @@ export async function syncProducts(storeId: string): Promise<void> {
       await idbDeleteProducts(deleted)
 
       notify()
+    } else if (needsFullReconcile) {
+      // Server returned empty — mark done anyway
+      sessionFullSyncDone.add(storeId)
     }
 
     setSyncTimestamp(storeId, syncTimestamp)
@@ -253,4 +275,5 @@ export function invalidateProductStore() {
   memCache = []
   memCacheStoreId = ""
   loadPromise = null
+  sessionFullSyncDone.clear()
 }

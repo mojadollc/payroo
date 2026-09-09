@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { ShoppingCart, Barcode, Trash2, X, Usb, Plus, Minus, Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -313,54 +313,56 @@ export default function POSPage() {
     }
   }
 
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const handleInputChange = (value: string) => {
     setBarcodeInput(value)
     const q = value.trim().toLowerCase()
-    if (!q) return
+    if (!q) { setSearchSuggestions([]); return }
 
-    // Always read from ref — never waits for React state, works instantly from cache
-    const pool = productsRef.current
-    if (pool.length === 0) { setSearchSuggestions([]); return }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      const pool = productsRef.current
+      if (pool.length === 0) { setSearchSuggestions([]); return }
 
-    const words = q.split(/\s+/).filter(Boolean)
+      const words = q.split(/\s+/).filter(Boolean)
 
-    const results = pool
-      .map(p => {
-        const name = (p.name || "").toLowerCase()
-        const barcode = (p.barcode || "").toLowerCase()
-        const category = (p.category || "").toLowerCase()
-        const desc = (p.description || "").toLowerCase()
-        const unit = (p.unit || "").toLowerCase()
-        const haystack = `${name} ${barcode} ${category} ${desc} ${unit}`
+      const results = pool
+        .map(p => {
+          const name = (p.name || "").toLowerCase()
+          const barcode = (p.barcode || "").toLowerCase()
+          const category = (p.category || "").toLowerCase()
+          const haystack = `${name} ${barcode} ${category}`
 
-        if (barcode === q)                                    return { p, score: 100 }
-        if (name === q)                                       return { p, score: 90 }
-        if (name.startsWith(q))                              return { p, score: 80 }
-        if (barcode.startsWith(q))                           return { p, score: 75 }
-        if (category === q)                                   return { p, score: 70 }
-        if (haystack.includes(q))                            return { p, score: 60 }
-        if (words.every(w => haystack.includes(w)))          return { p, score: 50 }
-        const hits = words.filter(w => haystack.includes(w)).length
-        if (hits > 0)                                        return { p, score: hits * 10 }
-        return null
-      })
-      .filter((x): x is { p: Product; score: number } => x !== null)
-      .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+          if (barcode === q)                           return { p, score: 100 }
+          if (name === q)                              return { p, score: 90 }
+          if (name.startsWith(q))                     return { p, score: 80 }
+          if (barcode.startsWith(q))                  return { p, score: 75 }
+          if (haystack.includes(q))                   return { p, score: 60 }
+          if (words.every(w => haystack.includes(w))) return { p, score: 50 }
+          const hits = words.filter(w => haystack.includes(w)).length
+          if (hits > 0)                               return { p, score: hits * 10 }
+          return null
+        })
+        .filter((x): x is { p: Product; score: number } => x !== null)
+        .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
 
-    setSearchSuggestions(results.slice(0, 20).map(x => x.p))
+      setSearchSuggestions(results.slice(0, 20).map(x => x.p))
+    }, 80)
   }
 
   const handleBarcodeSubmit = async (barcode: string) => {
     try {
       const storeId = getStoreId()
       let product: Product | null = null
-      try {
-        const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(barcode)}`)
-        const { data } = await res.json()
-        product = data ?? null
-      } catch {
-        const cached = getCachedProducts() as Product[]
-        product = cached.find(p => p.barcode === barcode) ?? null
+      // Check local cache first — avoids network round-trip on every scan
+      product = productsRef.current.find(p => p.barcode === barcode) ?? null
+      if (!product) {
+        try {
+          const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(barcode)}`)
+          const { data } = await res.json()
+          product = data ?? null
+        } catch {}
       }
       if (product) {
         if (product.stock <= 0) {
@@ -528,13 +530,15 @@ export default function POSPage() {
     )
   }
 
-  const calculateTotal = () => {
-    return cart.reduce((sum, item) => sum + item.subtotal, 0)
-  }
+  const calculateTotal = useMemo(
+    () => cart.reduce((sum, item) => sum + item.subtotal, 0),
+    [cart]
+  )
 
-  const calculateProfit = () => {
-    return cart.reduce((sum, item) => sum + (item.price - item.cost) * item.quantity, 0)
-  }
+  const calculateProfit = useMemo(
+    () => cart.reduce((sum, item) => sum + (item.price - item.cost) * item.quantity, 0),
+    [cart]
+  )
 
   const clearCart = () => {
     setCart([])
@@ -581,7 +585,6 @@ export default function POSPage() {
               value={barcodeInput}
               onChange={(e) => handleInputChange(e.target.value)}
               className="pl-9 h-10 text-base rounded-xl border border-border/60 bg-white/80 focus:border-primary/50 focus:bg-white shadow-sm"
-              autoFocus
             />
             {searchSuggestions.length > 0 && (
               <div
@@ -1011,16 +1014,16 @@ export default function POSPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Subtotal</span>
-                          <span>₱{calculateTotal().toFixed(2)}</span>
+                          <span>₱{calculateTotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Est. Profit</span>
-                          <span className="text-teal-600 font-semibold">₱{calculateProfit().toFixed(2)}</span>
+                          <span className="text-teal-600 font-semibold">₱{calculateProfit.toFixed(2)}</span>
                         </div>
                         <Separator />
                         <div className="flex justify-between font-bold text-lg">
                           <span>Total</span>
-                          <span>₱{calculateTotal().toFixed(2)}</span>
+                          <span>₱{calculateTotal.toFixed(2)}</span>
                         </div>
                       </div>
 
@@ -1089,7 +1092,7 @@ export default function POSPage() {
         open={showCartDrawer}
         onClose={() => setShowCartDrawer(false)}
         title="Shopping Cart"
-        description={cart.length > 0 ? `${cart.reduce((s,i) => s + i.quantity, 0)} items · ₱${calculateTotal().toFixed(2)}` : "Your cart is empty"}
+        description={cart.length > 0 ? `${cart.reduce((s,i) => s + i.quantity, 0)} items · ₱${calculateTotal.toFixed(2)}` : "Your cart is empty"}
         maxHeight="92vh"
       >
         {cart.length === 0 ? (
@@ -1148,15 +1151,15 @@ export default function POSPage() {
               <div className="mt-3 pt-3 border-t space-y-1.5">
                 <div className="flex justify-between text-[13px]">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">₱{calculateTotal().toFixed(2)}</span>
+                  <span className="font-medium">₱{calculateTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[13px]">
                   <span className="text-muted-foreground">Est. Profit</span>
-                  <span className="font-medium text-teal-600">₱{calculateProfit().toFixed(2)}</span>
+                  <span className="font-medium text-teal-600">₱{calculateProfit.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-[16px] font-black pt-1">
                   <span>Total</span>
-                  <span className="text-emerald-700">₱{calculateTotal().toFixed(2)}</span>
+                  <span className="text-emerald-700">₱{calculateTotal.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -1168,7 +1171,7 @@ export default function POSPage() {
                 onClick={() => { setShowCartDrawer(false); setShowCheckout(true) }}
               >
                 <ShoppingCart className="h-5 w-5" />
-                Checkout · ₱{calculateTotal().toFixed(2)}
+                Checkout · ₱{calculateTotal.toFixed(2)}
               </button>
               <button
                 className="h-14 w-14 rounded-2xl bg-red-500 flex items-center justify-center active:scale-[0.97] transition-all shadow-md flex-shrink-0"
@@ -1194,8 +1197,8 @@ export default function POSPage() {
         {showCheckout && (
           <CheckoutDialog
             cart={cart}
-            total={calculateTotal()}
-            profit={calculateProfit()}
+            total={calculateTotal}
+            profit={calculateProfit}
             onClose={() => setShowCheckout(false)}
             onSuccess={handleCheckoutSuccess}
           />

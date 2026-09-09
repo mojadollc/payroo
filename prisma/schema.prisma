@@ -146,6 +146,7 @@ model Product {
   @@index([storeId])
   @@index([storeId, name])
   @@index([storeId, barcode])
+  @@index([storeId, updatedAt])
   @@map("products")
 }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
 import { normaliseImageUrl } from "@/lib/image-url"
+import { getProductCache, setProductCache, invalidateProductCache } from "@/lib/db/product-cache"
 
 // Strip absolute origin from stored imageUrls so they work on any host
 function fixProduct(p: any) {
@@ -35,8 +36,19 @@ export async function GET(req: NextRequest) {
 
   // No pagination param = return ALL products (POS, offline cache, etc.)
   if (!hasPagination) {
-    // pos=1: slim select — only fields POS needs, much smaller payload
     const posMode = p.get("pos") === "1"
+
+    // POS slim-select: serve from server cache if available (avoids DB hit on every page open)
+    if (posMode && !search && filter === "all") {
+      const cached = getProductCache(storeId)
+      if (cached) {
+        return NextResponse.json(
+          { data: cached },
+          { headers: { "Cache-Control": "private, max-age=0, stale-while-revalidate=300", "X-Cache": "HIT" } }
+        )
+      }
+    }
+
     const items = posMode
       ? await prisma.product.findMany({
           where,
@@ -48,9 +60,13 @@ export async function GET(req: NextRequest) {
           },
         })
       : await prisma.product.findMany({ where, orderBy: { name: "asc" } })
+
+    const result = items.map(fixProduct)
+    if (posMode && !search && filter === "all") setProductCache(storeId, result)
+
     return NextResponse.json(
-      { data: items.map(fixProduct) },
-      { headers: { "Cache-Control": "private, max-age=0, stale-while-revalidate=300" } }
+      { data: result },
+      { headers: { "Cache-Control": "private, max-age=0, stale-while-revalidate=300", "X-Cache": "MISS" } }
     )
   }
 
@@ -112,6 +128,7 @@ export async function POST(req: NextRequest) {
       update: { name, price, cost, stock, category, barcode, imageUrl, description, unit, onSale, salePrice, sku, weight, dimensions, shippingClass, variants },
       create: { id, storeId, name, price, cost: cost ?? 0, stock: stock ?? 0, category: category ?? "", barcode: barcode ?? "", imageUrl, description, unit, onSale: onSale ?? false, salePrice, sku, weight, dimensions, shippingClass, variants },
     })
+    if (storeId) invalidateProductCache(storeId)
     return NextResponse.json({ data: fixProduct(item) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -123,6 +140,7 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const { id, ...data } = body
     const item = await prisma.product.update({ where: { id }, data })
+    if (item.storeId) invalidateProductCache(item.storeId)
     return NextResponse.json({ data: fixProduct(item) })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -136,7 +154,8 @@ export async function DELETE(req: NextRequest) {
     // Delete related records first to avoid foreign key constraint errors
     await prisma.inventoryTransaction.deleteMany({ where: { productId: id } }).catch(() => {})
     await prisma.saleItem.deleteMany({ where: { productId: id } }).catch(() => {})
-    await prisma.product.delete({ where: { id } })
+    const deleted = await prisma.product.delete({ where: { id } })
+    if (deleted.storeId) invalidateProductCache(deleted.storeId)
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error("[delete product] error:", err.message)

@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { useRouter } from "next/navigation"
-import { ShoppingCart, Barcode, Trash2, X, Usb, Plus, Minus, Search } from "lucide-react"
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react"
+import { ShoppingCart, Barcode, Trash2, X, Usb, Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,8 +10,6 @@ import { BarcodeScanner } from "@/components/inventory/barcode-scanner"
 import { CheckoutDialog } from "@/components/pos/checkout-dialog"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { MobileAppShell, MobileCard, MobileSectionHeader } from "@/components/mobile-app-shell"
-import { cacheProducts, getCachedProducts, isOnline } from "@/lib/offline-sync"
-import { localPutMany, localGetByStoreId } from "@/lib/offline/store"
 import { useBusinessConfig } from "@/hooks/use-business-config"
 import { useSubscription } from "@/hooks/use-subscription"
 import { useHardwareScanner } from "@/hooks/use-hardware-scanner"
@@ -20,14 +17,23 @@ import { useToast } from "@/hooks/use-toast"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { DefaultProductImage } from "@/components/ui/default-product-image"
 import { getStoreId } from "@/lib/store-id"
+import {
+  loadProducts as storeLoadProducts,
+  syncProducts,
+  subscribeProducts,
+  searchProducts,
+  lookupBarcode,
+  getMemCache,
+  invalidateProductStore,
+  type PosProduct,
+} from "@/lib/pos/product-store"
 import type { Product } from "@/lib/firebase/types"
 import Link from "next/link"
 
-interface CartItem extends Product {
+interface CartItem extends PosProduct {
   quantity: number
   subtotal: number
-  selectedVariants?: Record<string, string> // e.g. { Color: "Red", Size: "M" }
-  /** Stable line id: productId or productId_variantKey */
+  selectedVariants?: Record<string, string>
   cartLineId?: string
 }
 
@@ -83,38 +89,15 @@ function CartQuantityInput({
   )
 }
 
-// Read cache at module load time — runs once when JS parses, before any React render.
-// Reads localStorage (survives tab close/PWA relaunch) then sessionStorage.
-function readInitialProducts(): Product[] {
-  if (typeof window === "undefined") return []
-  try {
-    // localStorage survives PWA kills — check it first
-    const cached = getCachedProducts() as Product[]
-    if (cached.length > 0) {
-      // Try to reuse already-shuffled order from sessionStorage
-      const session = sessionStorage.getItem("pos_shuffled_products")
-      if (session) {
-        const parsed = JSON.parse(session) as Product[]
-        if (parsed.length > 0) return parsed
-      }
-      const arr = [...cached]
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]
-      }
-      return arr
-    }
-  } catch {}
-  return []
-}
-const _initialProducts = readInitialProducts()
+// Seed from module-level memory cache — synchronous, zero async, instant render
+const _initialProducts = getMemCache()
 
 export default function POSPage() {
-  const router = useRouter()
   const cfg = useBusinessConfig()
   const { isActive, loading: subLoading, endDate } = useSubscription()
   const CART_KEY = "pos_cart"
-  const [products, setProducts] = useState<Product[]>(_initialProducts)
-  const [shuffledProducts, setShuffledProducts] = useState<Product[]>(_initialProducts)
+  const [products, setProducts] = useState<PosProduct[]>(_initialProducts)
+  const [shuffledProducts, setShuffledProducts] = useState<PosProduct[]>(_initialProducts)
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return []
     try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") } catch { return [] }
@@ -125,7 +108,7 @@ export default function POSPage() {
     try { localStorage.setItem(CART_KEY, JSON.stringify(cart)) } catch {}
   }, [cart])
   const [barcodeInput, setBarcodeInput] = useState("")
-  const [searchSuggestions, setSearchSuggestions] = useState<Product[]>([])
+  const [searchSuggestions, setSearchSuggestions] = useState<PosProduct[]>([])
   const [dropdownQty, setDropdownQty] = useState<Record<string, number>>({})
   const [liveQuantities, setLiveQuantities] = useState<Record<string, number>>({})
   const [showCartDrawer, setShowCartDrawer] = useState(false)
@@ -137,12 +120,12 @@ export default function POSPage() {
   const dropdownScrollTop = useRef(0)
   const dropdownTouchingRef = useRef(false)
   const dropdownLastTouchRef = useRef(0)
-  const [variantPicker, setVariantPicker] = useState<{ product: Product; selections: Record<string, string> } | null>(null)
+  const [variantPicker, setVariantPicker] = useState<{ product: PosProduct; selections: Record<string, string> } | null>(null)
   const [searchFocused, setSearchFocused] = useState(false)
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
   const stockBlockedRef = useRef(false)
-  const productsRef = useRef<Product[]>(_initialProducts)
+  const productsRef = useRef<PosProduct[]>(_initialProducts)
 
   // Keep latest barcode handler without stale closures
   const handleBarcodeSubmitRef = useRef<(barcode: string) => void>(() => {})
@@ -161,7 +144,7 @@ export default function POSPage() {
   })
 
   // Shuffle array function
-  const shuffleArray = (array: Product[]) => {
+  const shuffleArray = (array: PosProduct[]) => {
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
@@ -170,7 +153,7 @@ export default function POSPage() {
     return shuffled
   }
 
-  const setShuffledAndCache = (data: Product[]) => {
+  const setShuffledAndCache = (data: PosProduct[]) => {
     const shuffled = shuffleArray(data)
     setShuffledProducts(shuffled)
     try { sessionStorage.setItem("pos_shuffled_products", JSON.stringify(shuffled)) } catch {}
@@ -189,41 +172,37 @@ export default function POSPage() {
     })
   }, [shuffledProducts.length > 0])
 
-  // Load products: state already seeded from module-level cache, just fetch fresh in background
+  // Load products via the product store (memory → IDB → API, deduplicated)
+  // Subscribe to store updates so background sync refreshes the grid
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
 
-    // Fetch fresh data in background — update silently, no loading state needed
-    fetch(`/api/products?storeId=${storeId}&pos=1`)
-      .then(r => r.json())
-      .then(({ data }) => {
-        if (!data?.length) return
+    // Subscribe to store updates (background sync notifies here)
+    const unsub = subscribeProducts(() => {
+      const latest = getMemCache()
+      setProducts(latest)
+      setShuffledAndCache(latest)
+      productsRef.current = latest
+    })
+
+    // Load: memory hit is instant, IDB hit is fast, API only on cold start
+    storeLoadProducts(storeId).then(data => {
+      if (data.length > 0) {
         setProducts(data)
         setShuffledAndCache(data)
         productsRef.current = data
-        freshLoadedRef.current = true
-        cacheProducts(data)
-        setTimeout(() => {
-          localPutMany("products", data.map((d: Product) => ({ ...d, _createdAtMs: Date.now(), _updatedAtMs: Date.now() }))).catch(() => {})
-        }, 2000)
-      })
-      .catch(() => {
-        if (productsRef.current.length > 0) return // already showing cache
-        localGetByStoreId<Product>("products").then(idbProducts => {
-          if (idbProducts.length > 0) {
-            setProducts(idbProducts)
-            setShuffledAndCache(idbProducts)
-            productsRef.current = idbProducts
-          }
-        }).catch(() => {})
-      })
+      }
+    })
+
+    return unsub
   }, [])
 
-  // Sync cart stock ONLY after fresh DB data loads (productsRef is set)
+  // Sync cart stock after products update from background sync
   const freshLoadedRef = useRef(false)
   useEffect(() => {
-    if (!freshLoadedRef.current || products.length === 0 || cart.length === 0) return
+    if (products.length === 0 || cart.length === 0) return
+    freshLoadedRef.current = true
     let changed = false
     const updated = cart.reduce<CartItem[]>((acc, item) => {
       const liveProduct = products.find(p => p.id === item.id)
@@ -283,79 +262,32 @@ export default function POSPage() {
 
   // Real-time product listener is in the useEffect above (before conditional returns)
 
-  const loadProducts = async () => {
-    try {
-      const storeId = getStoreId()
-      if (!storeId) return
-      const res = await fetch(`/api/products?storeId=${storeId}&pos=1`)
-      const { data } = await res.json()
-      if (data?.length > 0) {
-        setProducts(data)
-        setShuffledAndCache(data)
-        productsRef.current = data
-        cacheProducts(data)
-      }
-    } catch (error) {
-      console.error("[pos] Error loading products:", error)
-      const cached = getCachedProducts()
-      if (cached.length > 0) {
-        setProducts(cached as Product[])
-        setShuffledAndCache(cached as Product[])
-      }
-    }
+  const reloadAfterCheckout = async () => {
+    const storeId = getStoreId()
+    if (!storeId) return
+    // Force incremental sync after a sale so stock is refreshed
+    await syncProducts(storeId)
   }
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleInputChange = (value: string) => {
     setBarcodeInput(value)
-    const q = value.trim().toLowerCase()
+    const q = value.trim()
     if (!q) { setSearchSuggestions([]); return }
 
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
     searchDebounceRef.current = setTimeout(() => {
-      const pool = productsRef.current
-      if (pool.length === 0) { setSearchSuggestions([]); return }
-
-      const words = q.split(/\s+/).filter(Boolean)
-
-      const results = pool
-        .map(p => {
-          const name = (p.name || "").toLowerCase()
-          const barcode = (p.barcode || "").toLowerCase()
-          const category = (p.category || "").toLowerCase()
-          const haystack = `${name} ${barcode} ${category}`
-
-          if (barcode === q)                           return { p, score: 100 }
-          if (name === q)                              return { p, score: 90 }
-          if (name.startsWith(q))                     return { p, score: 80 }
-          if (barcode.startsWith(q))                  return { p, score: 75 }
-          if (haystack.includes(q))                   return { p, score: 60 }
-          if (words.every(w => haystack.includes(w))) return { p, score: 50 }
-          const hits = words.filter(w => haystack.includes(w)).length
-          if (hits > 0)                               return { p, score: hits * 10 }
-          return null
-        })
-        .filter((x): x is { p: Product; score: number } => x !== null)
-        .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
-
-      setSearchSuggestions(results.slice(0, 20).map(x => x.p))
+      // searchProducts runs entirely in memory — no API call
+      setSearchSuggestions(searchProducts(q, 20))
     }, 80)
   }
 
   const handleBarcodeSubmit = async (barcode: string) => {
     try {
       const storeId = getStoreId()
-      let product: Product | null = null
-      // Check local cache first — avoids network round-trip on every scan
-      product = productsRef.current.find(p => p.barcode === barcode) ?? null
-      if (!product) {
-        try {
-          const res = await fetch(`/api/products?storeId=${storeId}&barcode=${encodeURIComponent(barcode)}`)
-          const { data } = await res.json()
-          product = data ?? null
-        } catch {}
-      }
+      // lookupBarcode: memory → IDB → API (only hits API if not cached)
+      const product = await lookupBarcode(storeId, barcode)
       if (product) {
         if (product.stock <= 0) {
           toast({ title: "Out of stock", description: `${product.name} is currently out of stock`, variant: "destructive" })
@@ -367,8 +299,7 @@ export default function POSPage() {
       } else {
         toast({ title: "Product not found", description: "No product found with this barcode", variant: "destructive" })
       }
-    } catch (error) {
-      console.error("[pos] Error finding product:", error)
+    } catch {
       toast({ title: "Error", description: "Failed to find product", variant: "destructive" })
     }
   }
@@ -394,10 +325,10 @@ export default function POSPage() {
     }
   }, [])
 
-  const effectivePrice = (product: Product) =>
+  const effectivePrice = (product: PosProduct) =>
     product.onSale && product.salePrice ? product.salePrice : product.price
 
-  const addToCart = (product: Product, selectedVariants?: Record<string, string>) => {
+  const addToCart = (product: PosProduct, selectedVariants?: Record<string, string>) => {
     // Use latest real-time stock from productsRef
     const liveProduct = productsRef.current.find(p => p.id === product.id) || product
     const price = effectivePrice(liveProduct)
@@ -539,7 +470,7 @@ export default function POSPage() {
 
   const handleCheckoutSuccess = () => {
     clearCart()
-    loadProducts()
+    reloadAfterCheckout()
   }
 
   return (
@@ -1188,7 +1119,7 @@ export default function POSPage() {
 
         {showCheckout && (
           <CheckoutDialog
-            cart={cart}
+            cart={cart as any}
             total={calculateTotal}
             profit={calculateProfit}
             onClose={() => setShowCheckout(false)}
@@ -1205,11 +1136,11 @@ export default function POSPage() {
         >
           {variantPicker && (
             <div className="space-y-4 pb-6">
-              {variantPicker.product.variants!.map((variant) => (
+              {(variantPicker.product.variants as any[])!.map((variant) => (
                 <div key={variant.name} className="space-y-2">
                   <p className="text-sm font-medium">{variant.name}</p>
                   <div className="flex flex-wrap gap-2">
-                    {variant.options.map((option) => {
+                    {variant.options.map((option: string) => {
                       const isSelected = variantPicker.selections[variant.name] === option
                       return (
                         <Button
@@ -1232,7 +1163,7 @@ export default function POSPage() {
               ))}
               <Button
                 className="w-full h-12 mt-4 text-[15px]"
-                disabled={variantPicker.product.variants!.some(v => !variantPicker.selections[v.name])}
+                disabled={(variantPicker.product.variants as any[])!.some((v: any) => !variantPicker.selections[v.name])}
                 onClick={() => {
                   addToCart(variantPicker.product, variantPicker.selections)
                   setVariantPicker(null)

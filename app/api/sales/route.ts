@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
     }
     const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, take: 500 })
-    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } })
   } catch (err: any) {
     console.error("[sales GET]", err.message)
     return NextResponse.json({ error: err.message, data: [] }, { status: 500 })

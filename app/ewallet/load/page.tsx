@@ -79,9 +79,45 @@ export default function ELoadPage() {
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
   const loadSkus = async (forceRefresh = false) => {
+    const storeId = getStoreId()
+    const cacheKey = `eload_skus_${storeId}`
+
+    // Show cached SKUs instantly — no spinner on revisit
+    if (!forceRefresh) {
+      try {
+        const cached = sessionStorage.getItem(cacheKey)
+        if (cached) {
+          const { products: prods, at } = JSON.parse(cached)
+          // Use cache if < 10 minutes old
+          if (prods?.length && Date.now() - at < 10 * 60 * 1000) {
+            setProducts(prods)
+            const nets = [...new Set(prods.map((p: Product) => p.network))] as string[]
+            setNetworks(nets)
+            const mobile = nets.filter((n: string) => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
+            setSelectedType("mobile")
+            setSelectedNetwork(mobile[0] || nets[0] || "")
+            setLoading(false)
+            // Refresh in background silently
+            fetch(`/api/eload?storeId=${storeId}`)
+              .then(r => r.json())
+              .then(data => {
+                const fresh: Product[] = data.products || []
+                if (fresh.length) {
+                  setProducts(fresh)
+                  const freshNets = [...new Set(fresh.map(p => p.network))] as string[]
+                  setNetworks(freshNets)
+                  try { sessionStorage.setItem(cacheKey, JSON.stringify({ products: fresh, at: Date.now() })) } catch {}
+                }
+              })
+              .catch(() => {})
+            return
+          }
+        }
+      } catch {}
+    }
+
     setLoading(true)
     setError("")
-    const storeId = getStoreId()
     const url = `/api/eload?storeId=${storeId}${forceRefresh ? "&action=refresh-skus" : ""}`
     try {
       const r = await fetch(url)
@@ -93,10 +129,10 @@ export default function ELoadPage() {
       setProducts(prods)
       const nets = [...new Set(prods.map(p => p.network))] as string[]
       setNetworks(nets)
-      // Auto-select first network in mobile category (default)
       const mobile = nets.filter(n => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
       setSelectedType("mobile")
       setSelectedNetwork(mobile[0] || nets[0] || "")
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ products: prods, at: Date.now() })) } catch {}
     } catch (err: any) {
       setError(err.message || "Failed to load products")
     } finally {

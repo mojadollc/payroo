@@ -339,13 +339,13 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
 
   const handlePrintReceipt = async () => {
     const snap = saleSnapshot!
-    const storeId = getStoreId()
     let storeName = "My Store", storeAddress = "", storePhone = ""
-    try {
-      const res = await fetch(`/api/store-settings?storeId=${storeId}`)
-      const { data } = await res.json()
-      if (data) { storeName = data.name || storeName; storeAddress = data.address || ""; storePhone = data.phone || "" }
-    } catch {}
+    // Use pre-fetched settings (already loaded when dialog opened)
+    if (storeSettingsRef.current) {
+      storeName = storeSettingsRef.current.name || storeName
+      storeAddress = storeSettingsRef.current.address || ""
+      storePhone = storeSettingsRef.current.phone || ""
+    }
     const date = new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })
 
     const itemRows = snap.cart.map(item => {

@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 })
-  return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } })
+  return NextResponse.json({ data }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } })
 }
 
 export async function POST(req: NextRequest) {

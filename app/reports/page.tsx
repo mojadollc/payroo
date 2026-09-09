@@ -211,24 +211,40 @@ export default function ReportsPage() {
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) { setIsLoading(false); return }
-    setIsLoading(true)
+
+    // Show stale cache immediately so UI is never blank
+    try {
+      const cached = sessionStorage.getItem(`reports_cache_${storeId}`)
+      if (cached) {
+        const { sales: s, ewallet: e, bills: b } = JSON.parse(cached)
+        if (s) setSales(s)
+        if (e) setEWalletTransactions(e)
+        if (b) setBillPayments(b)
+        setIsLoading(false) // show stale data right away
+      }
+    } catch {}
+
     setLoadError(null)
 
     const params = new URLSearchParams({ storeId })
     if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
     if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
-    console.log("[reports] fetching storeId:", storeId, "params:", params.toString())
-
     Promise.all([
       fetch(`/api/sales?${params}`).then(r => r.json()),
       fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
       fetch(`/api/bill-payments?${params}`).then(r => r.json()),
     ]).then(([salesJson, ewalletJson, billJson]) => {
-      console.log("[reports] sales count:", salesJson?.data?.length, "error:", salesJson?.error)
-      setSales(salesJson.data ?? [])
-      setEWalletTransactions(ewalletJson.data ?? [])
-      setBillPayments(billJson.data ?? [])
+      const s = salesJson.data ?? []
+      const e = ewalletJson.data ?? []
+      const b = billJson.data ?? []
+      setSales(s)
+      setEWalletTransactions(e)
+      setBillPayments(b)
+      // Cache for instant next load (no date filter only)
+      if (!dateRange) {
+        try { sessionStorage.setItem(`reports_cache_${storeId}`, JSON.stringify({ sales: s, ewallet: e, bills: b })) } catch {}
+      }
       if (productsLoadedRef.current !== storeId) {
         fetch(`/api/products?storeId=${storeId}`)
           .then(r => r.json())

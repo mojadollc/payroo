@@ -84,17 +84,19 @@ function CartQuantityInput({
 }
 
 // Read cache at module load time — runs once when JS parses, before any React render.
-// This means the very first useState() call already has data → zero shimmer on return visits.
+// Reads localStorage (survives tab close/PWA relaunch) then sessionStorage.
 function readInitialProducts(): Product[] {
   if (typeof window === "undefined") return []
   try {
-    const session = sessionStorage.getItem("pos_shuffled_products")
-    if (session) {
-      const parsed = JSON.parse(session) as Product[]
-      if (parsed.length > 0) return parsed
-    }
+    // localStorage survives PWA kills — check it first
     const cached = getCachedProducts() as Product[]
     if (cached.length > 0) {
+      // Try to reuse already-shuffled order from sessionStorage
+      const session = sessionStorage.getItem("pos_shuffled_products")
+      if (session) {
+        const parsed = JSON.parse(session) as Product[]
+        if (parsed.length > 0) return parsed
+      }
       const arr = [...cached]
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]

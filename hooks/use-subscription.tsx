@@ -136,9 +136,15 @@ function useSubscriptionInternal(): SubscriptionState {
 
   useEffect(() => {
     refresh()
-    const onVisible = () => { if (document.visibilityState === "visible") refresh() }
+    let lastRefresh = Date.now()
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastRefresh > 30_000) {
+        lastRefresh = Date.now()
+        refresh()
+      }
+    }
     document.addEventListener("visibilitychange", onVisible)
-    const interval = setInterval(refresh, 5 * 60 * 1000)
+    const interval = setInterval(() => { lastRefresh = Date.now(); refresh() }, 5 * 60 * 1000)
     return () => { document.removeEventListener("visibilitychange", onVisible); clearInterval(interval) }
   }, [refresh])
 

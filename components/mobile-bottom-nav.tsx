@@ -108,7 +108,7 @@ export function MobileBottomNav() {
     <>
       {/* Floating pill bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden safe-area-bottom">
-        <div className="mx-3 mb-3 rounded-[22px] bg-white/90 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/70 overflow-hidden">
+        <div className="mx-3 mb-3 rounded-[22px] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.10)] border border-gray-100 overflow-hidden">
           <div className="flex items-stretch justify-around">
             {visiblePrimary.map(item => {
               const Icon = item.icon
@@ -119,11 +119,12 @@ export function MobileBottomNav() {
                   href={item.href}
                   prefetch={true}
                   onMouseEnter={() => prefetchRoute(item.href)}
-                  className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] active:scale-90 transition-all duration-150 ${
+                  style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                  className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] ${
                     active ? "text-primary" : "text-muted-foreground/70"
                   }`}
                 >
-                  <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                  <div className={`p-1.5 rounded-xl ${
                     active ? "bg-primary/15" : ""
                   }`}>
                     <Icon className={`h-[18px] w-[18px] ${ active ? "stroke-[2.5]" : "stroke-[1.8]" }`} />
@@ -135,11 +136,12 @@ export function MobileBottomNav() {
             {hasMoreItems && (
               <button
                 onClick={() => setMoreOpen(true)}
-                className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] active:scale-90 transition-all duration-150 ${
+                style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] ${
                   visibleGroups.some(g => g.items.some(i => pathname === i.href)) ? "text-primary" : "text-muted-foreground/70"
                 }`}
               >
-                <div className={`p-1.5 rounded-xl transition-all duration-150 ${
+                <div className={`p-1.5 rounded-xl ${
                   visibleGroups.some(g => g.items.some(i => pathname === i.href)) ? "bg-primary/15" : ""
                 }`}>
                   <MoreHorizontal className="h-[18px] w-[18px] stroke-[1.8]" />
@@ -155,7 +157,7 @@ export function MobileBottomNav() {
       {moreOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl rounded-t-3xl safe-area-bottom animate-in slide-in-from-bottom duration-200 max-h-[80vh] overflow-y-auto border-t border-white/60 shadow-[0_-8px_40px_rgba(0,0,0,0.12)]">
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl safe-area-bottom animate-in slide-in-from-bottom duration-200 max-h-[80vh] overflow-y-auto border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.10)]">
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 rounded-full bg-border/60" />
@@ -183,10 +185,11 @@ export function MobileBottomNav() {
                           href={item.href}
                           prefetch={true}
                           onClick={() => setMoreOpen(false)}
-                          className={`flex flex-col items-center justify-center py-3.5 rounded-2xl active:scale-90 transition-all duration-150 gap-1.5 ${
+                          style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                          className={`flex flex-col items-center justify-center py-3.5 rounded-2xl gap-1.5 ${
                             active
                               ? "bg-primary/15 text-primary"
-                              : "bg-muted/40 text-muted-foreground hover:bg-muted/70"
+                              : "bg-muted/40 text-muted-foreground"
                           }`}
                         >
                           <Icon className={`h-5 w-5 ${ active ? "stroke-[2.5]" : "stroke-[1.8]" }`} />

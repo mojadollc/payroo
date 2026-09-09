@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
     }
     const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, take: 500 })
-    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
   } catch (err: any) {
     console.error("[sales GET]", err.message)
     return NextResponse.json({ error: err.message, data: [] }, { status: 500 })
@@ -32,6 +32,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { id, storeId, total, profit, paymentMethod, status, items } = body
+
+    // Batch-fetch all products in one query instead of N individual findUnique calls
+    const productIds: string[] = (items ?? []).map((i: any) => i.productId).filter(Boolean)
+    const existingProducts = productIds.length
+      ? await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, stock: true } })
+      : []
+    const stockMap = new Map(existingProducts.map(p => [p.id, p.stock]))
 
     const sale = await prisma.$transaction(async (tx) => {
       const created = await tx.sale.create({
@@ -57,25 +64,27 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Deduct stock and log inventory transactions
-      for (const item of items ?? []) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
-        if (!product) continue
-        const newStock = product.stock - item.quantity
-        await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } })
-        await tx.inventoryTransaction.create({
-          data: {
-            storeId,
-            productId: item.productId,
-            productName: item.productName,
-            type: "sale",
-            quantity: -item.quantity,
-            previousStock: product.stock,
-            newStock,
-            notes: "Sale transaction",
-          },
+      // Batch update all product stocks in parallel
+      await Promise.all(
+        (items ?? []).map(async (item: any) => {
+          const prevStock = stockMap.get(item.productId)
+          if (prevStock === undefined) return
+          const newStock = prevStock - item.quantity
+          await tx.product.update({ where: { id: item.productId }, data: { stock: newStock } })
+          await tx.inventoryTransaction.create({
+            data: {
+              storeId,
+              productId: item.productId,
+              productName: item.productName,
+              type: "sale",
+              quantity: -item.quantity,
+              previousStock: prevStock,
+              newStock,
+              notes: "Sale transaction",
+            },
+          })
         })
-      }
+      )
 
       return created
     })

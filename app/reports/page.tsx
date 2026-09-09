@@ -233,7 +233,7 @@ export default function ReportsPage() {
         if (s) setSales(s)
         if (e) setEWalletTransactions(e)
         if (b) setBillPayments(b)
-        setIsLoading(false) // show stale data right away
+        setIsLoading(false)
       }
     } catch {}
 
@@ -243,44 +243,53 @@ export default function ReportsPage() {
     if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
     if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
-    Promise.all([
-      fetch(`/api/sales?${params}`).then(r => r.json()),
-      fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
-      fetch(`/api/bill-payments?${params}`).then(r => r.json()),
-    ]).then(([salesJson, ewalletJson, billJson]) => {
-      const s = salesJson.data ?? []
-      const e = ewalletJson.data ?? []
-      const b = billJson.data ?? []
-      setSales(s)
-      setEWalletTransactions(e)
-      setBillPayments(b)
-      // Cache for instant next load (no date filter only)
-      if (!dateRange) {
-        try { sessionStorage.setItem(`reports_cache_${storeId}`, JSON.stringify({ sales: s, ewallet: e, bills: b })) } catch {}
+    // Fire all 3 fetches independently — each updates the UI as soon as it arrives
+    // instead of waiting for the slowest one
+    let salesData: any[] = [], ewalletData: any[] = [], billsData: any[] = []
+    let done = 0
+    const tryCache = () => {
+      done++
+      if (done === 3 && !dateRange) {
+        try { sessionStorage.setItem(`reports_cache_${storeId}`, JSON.stringify({ sales: salesData, ewallet: ewalletData, bills: billsData })) } catch {}
       }
-      if (productsLoadedRef.current !== storeId) {
-        fetch(`/api/products?storeId=${storeId}`)
-          .then(r => r.json())
-          .then(({ data: productsData }) => {
-            setProducts(productsData ?? [])
-            productsLoadedRef.current = storeId
-            const tobaccoIds = new Set<string>(
-              (productsData ?? []).filter((p: any) => {
-                const c = (p.category || "").trim().toLowerCase()
-                return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
-              }).map((p: any) => p.id)
-            )
-            setTobaccoProductIds(tobaccoIds)
-          })
-      }
-    }).catch(err => {
-      console.error("[reports] fetch error:", err)
-      setLoadError(err.message)
-    }).finally(() => setIsLoading(false))
+    }
+
+    fetch(`/api/sales?${params}`)
+      .then(r => r.json())
+      .then(({ data }) => { salesData = data ?? []; setSales(salesData); setIsLoading(false); tryCache() })
+      .catch(err => { setLoadError(err.message); setIsLoading(false); tryCache() })
+
+    fetch(`/api/ewallet-transactions?${params}`)
+      .then(r => r.json())
+      .then(({ data }) => { ewalletData = data ?? []; setEWalletTransactions(ewalletData); tryCache() })
+      .catch(() => tryCache())
+
+    fetch(`/api/bill-payments?${params}`)
+      .then(r => r.json())
+      .then(({ data }) => { billsData = data ?? []; setBillPayments(billsData); tryCache() })
+      .catch(() => tryCache())
+
+    if (productsLoadedRef.current !== storeId) {
+      fetch(`/api/products?storeId=${storeId}`)
+        .then(r => r.json())
+        .then(({ data: productsData }) => {
+          setProducts(productsData ?? [])
+          productsLoadedRef.current = storeId
+          const tobaccoIds = new Set<string>(
+            (productsData ?? []).filter((p: any) => {
+              const c = (p.category || "").trim().toLowerCase()
+              return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+            }).map((p: any) => p.id)
+          )
+          setTobaccoProductIds(tobaccoIds)
+        })
+    }
   }, [dateRange])
 
   const loadData = () => {
-    // trigger re-fetch by resetting dateRange to same value
+    // Bust sessionStorage cache so fresh data is always fetched
+    const storeId = getStoreId()
+    if (storeId) { try { sessionStorage.removeItem(`reports_cache_${storeId}`) } catch {} }
     setDateRange(d => d ? { ...d } : undefined)
   }
 

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
     }
     const items = await prisma.eWalletTransaction.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 })
-    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
   } catch (err: any) {
     console.error("[ewallet GET]", err.message)
     return NextResponse.json({ error: err.message, data: [] }, { status: 500 })

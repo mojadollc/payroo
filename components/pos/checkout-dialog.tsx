@@ -40,6 +40,14 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
   const [saleComplete, setSaleComplete] = useState(false)
   const [saleSnapshot, setSaleSnapshot] = useState<{ cart: CartItem[]; total: number; change: number; paymentMethod: string } | null>(null)
   const [utangCustomer, setUtangCustomer] = useState("")
+
+  // Bust reports cache so the new sale appears immediately when user visits Reports
+  const bustReportsCache = () => {
+    try {
+      const storeId = typeof window !== "undefined" ? localStorage.getItem("pos_ext_id") : null
+      if (storeId) sessionStorage.removeItem(`reports_cache_${storeId}`)
+    } catch {}
+  }
   const [utangWarnings, setUtangWarnings] = useState<UtangRecord[]>([])
   const [utangChecked, setUtangChecked] = useState(false)
   // Loyalty
@@ -111,7 +119,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           })
           toast({ title: "📴 Utang saved offline", description: "Will sync when internet returns" })
           setSaleSnapshot({ cart: [...cart], total, change: 0, paymentMethod: "utang" })
-          onSuccess()
+          bustReportsCache(); onSuccess()
           setSaleComplete(true)
           return
         }
@@ -139,7 +147,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
           status: "active" as const,
         }
         setSaleSnapshot({ cart: [...cart], total, change: 0, paymentMethod: "utang" })
-        onSuccess()
+        bustReportsCache(); onSuccess()
         setSaleComplete(true)
         setIsProcessing(false)
 
@@ -170,7 +178,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
         })
         toast({ title: "📴 Sale saved offline", description: "Will sync when internet returns" })
         setSaleSnapshot({ cart: [...cart], total, change, paymentMethod })
-        onSuccess()
+        bustReportsCache(); onSuccess()
         setSaleComplete(true)
         setLoyaltyStep(false) // skip loyalty when offline
         return
@@ -231,7 +239,7 @@ export function CheckoutDialog({ cart, total, profit, onClose, onSuccess }: Chec
       }
 
       setSaleSnapshot(snap)
-      onSuccess()
+      bustReportsCache(); onSuccess()
       setSaleComplete(true)
       setLoyaltyStep(true)
       setIsProcessing(false)

@@ -773,6 +773,19 @@ model KioskSettings {
   @@map("kiosk_settings")
 }
 
+// ─── Deleted Products Log (for incremental sync) ────────────────────────────
+// Tracks product deletions so PWA clients can remove them from IDB cache.
+// Records are kept for 30 days then can be pruned.
+
+model DeletedProduct {
+  id        String   @id // same id as the deleted product
+  storeId   String
+  deletedAt DateTime @default(now())
+
+  @@index([storeId, deletedAt])
+  @@map("deleted_products")
+}
+
 // ─── PIN Resets ───────────────────────────────────────────────────────────────
 // Was a TODO in reset-owner-pin/route.ts — now properly implemented
 

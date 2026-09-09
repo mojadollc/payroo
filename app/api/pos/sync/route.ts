@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
 import { normaliseImageUrl } from "@/lib/image-url"
-import { getProductCache, setProductCache } from "@/lib/db/product-cache"
+import { getProductCache, setProductCache, invalidateProductCache } from "@/lib/db/product-cache"
 
 const POS_SELECT = {
   id: true, name: true, barcode: true, category: true,
@@ -49,31 +49,24 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Incremental (since > 0) ────────────────────────────────────────────────
-  // Updated/created products
-  const updated = await prisma.product.findMany({
-    where: { storeId, updatedAt: { gt: sinceDate } },
-    orderBy: { updatedAt: "asc" },
-    select: POS_SELECT,
-  })
+  const [updated, deletedRows] = await Promise.all([
+    // Products updated/created since last sync
+    prisma.product.findMany({
+      where: { storeId, updatedAt: { gt: sinceDate } },
+      orderBy: { updatedAt: "asc" },
+      select: POS_SELECT,
+    }),
+    // Products deleted since last sync — from the deletion log
+    prisma.deletedProduct.findMany({
+      where: { storeId, deletedAt: { gt: sinceDate } },
+      select: { id: true },
+    }),
+  ])
 
-  // Deleted products: we track deletions via a soft-delete pattern would be
-  // ideal, but since we don't have that, we diff the full ID set cheaply.
-  // Only fetch IDs — very small payload.
-  const allIds = await prisma.product.findMany({
-    where: { storeId },
-    select: { id: true },
-  })
-  const liveIdSet = new Set(allIds.map(r => r.id))
-
-  // We can only know deletions if the client tells us what it had.
-  // Without a deletions log, return empty deleted array for incremental —
-  // the client will detect orphans on the next full sync (since=0).
-  // This is safe: stale products just show in search until next full sync.
-  const deleted: string[] = []
+  const deleted = deletedRows.map(r => r.id)
 
   // Invalidate server cache if anything changed
-  if (updated.length > 0) {
-    const { invalidateProductCache } = await import("@/lib/db/product-cache")
+  if (updated.length > 0 || deleted.length > 0) {
     invalidateProductCache(storeId)
   }
 

@@ -155,7 +155,13 @@ export async function DELETE(req: NextRequest) {
     await prisma.inventoryTransaction.deleteMany({ where: { productId: id } }).catch(() => {})
     await prisma.saleItem.deleteMany({ where: { productId: id } }).catch(() => {})
     const deleted = await prisma.product.delete({ where: { id } })
-    if (deleted.storeId) invalidateProductCache(deleted.storeId)
+    if (deleted.storeId) {
+      invalidateProductCache(deleted.storeId)
+      // Log deletion so PWA incremental sync can remove it from IDB
+      await prisma.deletedProduct.create({
+        data: { id, storeId: deleted.storeId }
+      }).catch(() => {})
+    }
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error("[delete product] error:", err.message)

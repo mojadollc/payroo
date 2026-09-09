@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Plus_Jakarta_Sans } from "next/font/google"
 import Script from "next/script"
 import "./globals.css"
 import { LayoutShell } from "@/components/layout-shell"
@@ -8,8 +8,11 @@ import { VisitorTracker } from "@/components/visitor-tracker"
 import { PWAUpdateManager } from "@/components/pwa-update-manager"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://payroo.xyz"),
@@ -114,7 +117,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#EFBF04" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
       </head>
-      <body className="font-sans antialiased">
+      <body className={`${plusJakarta.variable} font-sans antialiased`}>
         <Script id="json-ld" type="application/ld+json" strategy="lazyOnload">{`
           {
             "@context": "https://schema.org",

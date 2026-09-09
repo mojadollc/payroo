@@ -83,33 +83,36 @@ function CartQuantityInput({
   )
 }
 
+// Read cache at module load time — runs once when JS parses, before any React render.
+// This means the very first useState() call already has data → zero shimmer on return visits.
+function readInitialProducts(): Product[] {
+  if (typeof window === "undefined") return []
+  try {
+    const session = sessionStorage.getItem("pos_shuffled_products")
+    if (session) {
+      const parsed = JSON.parse(session) as Product[]
+      if (parsed.length > 0) return parsed
+    }
+    const cached = getCachedProducts() as Product[]
+    if (cached.length > 0) {
+      const arr = [...cached]
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]
+      }
+      return arr
+    }
+  } catch {}
+  return []
+}
+const _initialProducts = readInitialProducts()
+
 export default function POSPage() {
   const router = useRouter()
   const cfg = useBusinessConfig()
   const { isActive, loading: subLoading, endDate } = useSubscription()
   const CART_KEY = "pos_cart"
-  const [products, setProducts] = useState<Product[]>([])
-  const [shuffledProducts, setShuffledProducts] = useState<Product[]>(() => {
-    if (typeof window === "undefined") return []
-    try {
-      // 1st priority: sessionStorage (survives nav away/back, instant)
-      const session = sessionStorage.getItem("pos_shuffled_products")
-      if (session) {
-        const parsed = JSON.parse(session) as Product[]
-        if (parsed.length > 0) return parsed
-      }
-      // 2nd priority: localStorage cache
-      const cached = getCachedProducts() as Product[]
-      if (cached.length > 0) {
-        const arr = [...cached]
-        for (let i = arr.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));[arr[i], arr[j]] = [arr[j], arr[i]]
-        }
-        return arr
-      }
-    } catch {}
-    return []
-  })
+  const [products, setProducts] = useState<Product[]>(_initialProducts)
+  const [shuffledProducts, setShuffledProducts] = useState<Product[]>(_initialProducts)
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (typeof window === "undefined") return []
     try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") } catch { return [] }
@@ -137,10 +140,7 @@ export default function POSPage() {
   const { toast } = useToast()
   const [lastHwScan, setLastHwScan] = useState<string | null>(null)
   const stockBlockedRef = useRef(false)
-  const productsRef = useRef<Product[]>((() => {
-    // Seed synchronously so search works on the very first keystroke
-    try { return getCachedProducts() as Product[] } catch { return [] }
-  })())
+  const productsRef = useRef<Product[]>(_initialProducts)
 
   // Keep latest barcode handler without stale closures
   const handleBarcodeSubmitRef = useRef<(barcode: string) => void>(() => {})
@@ -187,22 +187,12 @@ export default function POSPage() {
     })
   }, [shuffledProducts.length > 0])
 
-  // Load products: show cache instantly, fetch fresh in background
+  // Load products: state already seeded from module-level cache, just fetch fresh in background
   useEffect(() => {
     const storeId = getStoreId()
     if (!storeId) return
 
-    // Step 1: Paint cache immediately so grid + search work before API responds
-    if (productsRef.current.length === 0) {
-      const cached = getCachedProducts() as Product[]
-      if (cached.length > 0) {
-        setProducts(cached)
-        setShuffledAndCache(cached)
-        productsRef.current = cached
-      }
-    }
-
-    // Step 2: Fetch fresh data in background — update silently
+    // Fetch fresh data in background — update silently, no loading state needed
     fetch(`/api/products?storeId=${storeId}&pos=1`)
       .then(r => r.json())
       .then(({ data }) => {

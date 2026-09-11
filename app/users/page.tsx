@@ -161,7 +161,8 @@ function UsersPageContent() {
       toast({ title: "Only the owner can add Sub-Admins", variant: "destructive" })
       return
     }
-    if (form.role === "owner") {
+    // Block creating a NEW owner — editing the existing owner is fine
+    if (!editing && form.role === "owner") {
       toast({ title: "Cannot create another owner account", variant: "destructive" })
       return
     }
@@ -640,6 +641,7 @@ function UserForm({ form, setForm, showPin, setShowPin, saving, editing, planFea
         >
           <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
           <SelectContent>
+            {editing?.role === "owner" && <SelectItem value="owner">Owner — full access</SelectItem>}
             {canOwner && <SelectItem value="subadmin">Sub-Admin — manage inventory & features</SelectItem>}
             <SelectItem value="cashier">Cashier — POS only</SelectItem>
           </SelectContent>

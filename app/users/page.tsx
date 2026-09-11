@@ -2,6 +2,7 @@
 
 import { FeatureGate } from "@/components/feature-gate"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Users, Plus, Pencil, Trash2, Eye, EyeOff, ShieldCheck, UserCog, User, RefreshCw, ChevronDown, Key, Settings2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -79,8 +80,9 @@ export default function UsersPage() {
 
 function UsersPageContent() {
   const { toast } = useToast()
-  const { user: currentUser, can } = useAuth()
+  const { user: currentUser, can, logout } = useAuth()
   const { features: planFeatures } = useSubscription()
+  const router = useRouter()
 
   const [users, setUsers] = useState<StoreUser[]>([])
   const [loading, setLoading] = useState(false)
@@ -178,6 +180,14 @@ function UsersPageContent() {
       
       if (editing?.id) {
         await fetch("/api/store-users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editing.id, ...payload }) })
+        // If the user just changed their own PIN, force re-login with the new PIN
+        if (editing.id === currentUser?.id) {
+          toast({ title: "PIN changed", description: "Please log in again with your new PIN." })
+          setDialogOpen(false)
+          logout()
+          router.push("/login")
+          return
+        }
         toast({ title: "User updated" })
       } else {
         await fetch("/api/store-users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, externalId }) })

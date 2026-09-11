@@ -44,6 +44,7 @@ import {
   subscribeReports,
   getMemReports,
   invalidateReports,
+  preloadFromIDB,
   type ReportsData,
 } from "@/lib/reports/reports-store"
 import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"
@@ -224,10 +225,16 @@ export default function ReportsPage() {
   const [billPayments, setBillPayments] = useState<any[]>(cached?.bills ?? [])
   const [products, setProducts] = useState<Product[]>([])
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
-  const [isLoading, setIsLoading] = useState(!cached)
+  const [isLoading, setIsLoading] = useState(!cached) // instant render if cache exists
   const [loadError, setLoadError] = useState<string | null>(null)
   const productsLoadedRef = useRef<string>("")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined)
+  // Track which tabs have been activated — only fetch detail data on demand
+  const [activatedTabs, setActivatedTabs] = useState<Set<string>>(new Set(["sales"]))
+  // Summary stats from fast aggregation endpoint (shown immediately)
+  const [summary, setSummary] = useState<{ grossSales: number; netProfit: number; txCount: number; itemsSold: number } | null>(
+    cached ? null : null
+  )
 
   useEffect(() => {
     const storeId = getStoreId()
@@ -246,18 +253,30 @@ export default function ReportsPage() {
       }
     })
 
-    // Load: memory hit is instant, IDB hit is fast, API only on cold start
-    loadReports(storeId, dateRange)
-      .then(data => {
-        setSales(data.sales)
-        setEWalletTransactions(data.ewallet)
-        setBillPayments(data.bills)
+    // Preload IDB into memCache first so loadReports returns instantly
+    preloadFromIDB(storeId).then(() => {
+      // After IDB preload, seed state if memCache is now warm
+      const warm = getMemReports()
+      if (warm && warm.storeId === storeId) {
+        setSales(warm.sales)
+        setEWalletTransactions(warm.ewallet)
+        setBillPayments(warm.bills)
         setIsLoading(false)
-      })
-      .catch(err => {
-        setLoadError(err.message)
-        setIsLoading(false)
-      })
+      }
+
+      // Then load (will be instant memory hit or background refresh)
+      loadReports(storeId, dateRange)
+        .then(data => {
+          setSales(data.sales)
+          setEWalletTransactions(data.ewallet)
+          setBillPayments(data.bills)
+          setIsLoading(false)
+        })
+        .catch(err => {
+          setLoadError(err.message)
+          setIsLoading(false)
+        })
+    })
 
     // Load products once per store (for inventory export + tobacco detection)
     if (productsLoadedRef.current !== storeId) {

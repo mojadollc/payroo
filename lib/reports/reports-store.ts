@@ -35,7 +35,7 @@ let fetchPromise: Promise<ReportsData> | null = null
 const subscribers = new Set<() => void>()
 
 const IDB_KEY = "reports_cache"
-const STALE_MS = 60 * 1000 // 1 minute — reports refresh in background after this
+const STALE_MS = 2 * 60 * 1000 // 2 minutes — refresh in background after this
 
 // ── Subscribers ───────────────────────────────────────────────────────────────
 
@@ -85,7 +85,6 @@ export async function loadReports(
   if (isDefaultRange && memCache && memCache.storeId === storeId) {
     const isStale = Date.now() - memCache.fetchedAt > STALE_MS
     if (isStale) {
-      // Serve stale immediately, refresh in background
       fetchReports(storeId, undefined).catch(() => {})
     }
     return memCache
@@ -117,6 +116,18 @@ export async function loadReports(
   }
 
   return doLoad()
+}
+
+// ── Preload IDB into memCache synchronously (call before component mounts) ────
+// Allows the reports page to render instantly from IDB without waiting for API.
+
+export async function preloadFromIDB(storeId: string): Promise<void> {
+  if (memCache && memCache.storeId === storeId) return // already warm
+  const cached = await idbGet(storeId)
+  if (cached && cached.storeId === storeId) {
+    memCache = cached
+    notify()
+  }
 }
 
 // ── Fetch from API (parallel, non-blocking) ───────────────────────────────────

@@ -57,68 +57,76 @@ const GAME_NETWORKS = ["GAME CLUB", "RAZER GOLD", "ROBLOX", "RIOT", "STEAM", "GA
 const CABLE_NETWORKS = ["CIGNAL", "CIGNAL TV", "SKY", "SKY CABLE", "VIVA", "VIVAMAX", "VIVA ONE", "VIVA GAMES", "SATELLITE", "SATLIT", "VIU", "GSAT", "G-SAT"]
 
 
+// Read sessionStorage synchronously so first render is instant on revisit
+function readSkuCache(storeId: string): { products: Product[]; networks: string[] } | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = sessionStorage.getItem(`eload_skus_${storeId}`)
+    if (!raw) return null
+    const { products: prods, at } = JSON.parse(raw)
+    if (!prods?.length || Date.now() - at > 10 * 60 * 1000) return null
+    const nets = [...new Set(prods.map((p: Product) => p.network))] as string[]
+    return { products: prods, networks: nets }
+  } catch {
+    return null
+  }
+}
+
 export default function ELoadPage() {
   const router = useRouter()
+  const storeId = typeof window !== "undefined" ? getStoreId() : ""
+  const _initial = readSkuCache(storeId)
+  const _initialMobile = _initial
+    ? _initial.networks.filter(n => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
+    : []
+
   const [step, setStep] = useState<Step>("browse")
-  const [products, setProducts] = useState<Product[]>([])
-  const [networks, setNetworks] = useState<string[]>([])
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("")
+  const [products, setProducts] = useState<Product[]>(_initial?.products ?? [])
+  const [networks, setNetworks] = useState<string[]>(_initial?.networks ?? [])
+  const [selectedNetwork, setSelectedNetwork] = useState<string>(_initialMobile[0] ?? _initial?.networks[0] ?? "")
   const [selectedType, setSelectedType] = useState<string>("mobile")
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [phone, setPhone] = useState("")
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!_initial) // false if cache hit — no spinner
   const [processing, setProcessing] = useState(false)
   const [txnId, setTxnId] = useState("")
   const [error, setError] = useState("")
   const [commSettings, setCommSettings] = useState<CommissionSettings | null>(null)
-  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [walletBalance, setWalletBalance] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null
+    const v = localStorage.getItem("gbits_balance")
+    return v ? parseFloat(v) : null
+  })
   const [pressedKey, setPressedKey] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storeName = typeof window !== "undefined" ? localStorage.getItem("storeName") || "Payroo POS" : ""
 
   const loadSkus = async (forceRefresh = false) => {
-    const storeId = getStoreId()
-    const cacheKey = `eload_skus_${storeId}`
+    const sid = getStoreId()
+    const cacheKey = `eload_skus_${sid}`
 
-    // Show cached SKUs instantly — no spinner on revisit
-    if (!forceRefresh) {
-      try {
-        const cached = sessionStorage.getItem(cacheKey)
-        if (cached) {
-          const { products: prods, at } = JSON.parse(cached)
-          // Use cache if < 10 minutes old
-          if (prods?.length && Date.now() - at < 10 * 60 * 1000) {
-            setProducts(prods)
-            const nets = [...new Set(prods.map((p: Product) => p.network))] as string[]
-            setNetworks(nets)
-            const mobile = nets.filter((n: string) => MOBILE_NETWORKS.some(m => n.toUpperCase().includes(m)))
-            setSelectedType("mobile")
-            setSelectedNetwork(mobile[0] || nets[0] || "")
-            setLoading(false)
-            // Refresh in background silently
-            fetch(`/api/eload?storeId=${storeId}`)
-              .then(r => r.json())
-              .then(data => {
-                const fresh: Product[] = data.products || []
-                if (fresh.length) {
-                  setProducts(fresh)
-                  const freshNets = [...new Set(fresh.map(p => p.network))] as string[]
-                  setNetworks(freshNets)
-                  try { sessionStorage.setItem(cacheKey, JSON.stringify({ products: fresh, at: Date.now() })) } catch {}
-                }
-              })
-              .catch(() => {})
-            return
+    // If cache already seeded state (loading=false) and not forced, just do silent background refresh
+    if (!forceRefresh && !loading) {
+      fetch(`/api/eload?storeId=${sid}`)
+        .then(r => r.json())
+        .then(data => {
+          const fresh: Product[] = data.products || []
+          if (fresh.length) {
+            setProducts(fresh)
+            const freshNets = [...new Set(fresh.map(p => p.network))] as string[]
+            setNetworks(freshNets)
+            try { sessionStorage.setItem(cacheKey, JSON.stringify({ products: fresh, at: Date.now() })) } catch {}
           }
-        }
-      } catch {}
+        })
+        .catch(() => {})
+      return
     }
 
     setLoading(true)
     setError("")
-    const url = `/api/eload?storeId=${storeId}${forceRefresh ? "&action=refresh-skus" : ""}`
+    const url = `/api/eload?storeId=${sid}${forceRefresh ? "&action=refresh-skus" : ""}`
     try {
       const r = await fetch(url)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -141,11 +149,12 @@ export default function ELoadPage() {
   }
 
   useEffect(() => {
-    const storeId = getStoreId()
+    const sid = getStoreId()
+    // If no cache, do full load; otherwise just background refresh
     loadSkus()
 
-    // Fetch balance from DB — synced across all devices
-    fetch(`/api/eload?storeId=${storeId}&action=balance`)
+    // Fetch fresh balance from DB in background (localStorage already seeded walletBalance)
+    fetch(`/api/eload?storeId=${sid}&action=balance`)
       .then(r => r.json())
       .then(data => {
         if (data.balance != null) {
@@ -155,7 +164,7 @@ export default function ELoadPage() {
       })
       .catch(() => {})
 
-    fetch(`/api/commission-settings?storeId=${storeId}`)
+    fetch(`/api/commission-settings?storeId=${sid}`)
       .then(r => r.json())
       .then(({ data }) => { if (data) setCommSettings(data) })
       .catch(() => {})

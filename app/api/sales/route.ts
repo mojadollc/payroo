@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db/client"
-import { startOfDayPH, endOfDayPH } from "@/lib/ph-time"
+import { startOfDayPH, endOfDayPH, toPHDateString } from "@/lib/ph-time"
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,8 +40,6 @@ export async function POST(req: NextRequest) {
       : []
     const stockMap = new Map(existingProducts.map(p => [p.id, p.stock]))
 
-    // Only include items whose productId actually exists — prevents FK violation
-    // when cart was loaded from a stale localStorage/IDB cache
     const validItems = (items ?? []).filter((item: any) => stockMap.has(item.productId))
     const skippedItems = (items ?? []).filter((item: any) => !stockMap.has(item.productId))
     if (skippedItems.length > 0) {
@@ -52,7 +50,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No valid products found in cart. Please refresh the POS and try again." }, { status: 400 })
     }
 
-    // Recalculate total from valid items only if some were skipped
     const effectiveTotal = skippedItems.length > 0
       ? validItems.reduce((sum: number, i: any) => sum + i.subtotal, 0)
       : total
@@ -84,7 +81,6 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Batch update all product stocks in parallel
       await Promise.all(
         validItems.map(async (item: any) => {
           const prevStock = stockMap.get(item.productId)
@@ -108,6 +104,23 @@ export async function POST(req: NextRequest) {
 
       return created
     })
+
+    // Upsert daily summary — O(1) update so reports never need a full sales scan
+    const isCompleted = (status ?? "completed") !== "voided"
+    if (isCompleted) {
+      const todayPH = toPHDateString(new Date())
+      const itemsSoldCount: number = validItems.reduce((s: number, i: any) => s + i.quantity, 0)
+      await prisma.$executeRaw`
+        INSERT INTO daily_sales_summary (id, "storeId", date, "grossSales", "netProfit", "txCount", "itemsSold", "updatedAt")
+        VALUES (gen_random_uuid()::text, ${storeId}, ${todayPH}, ${effectiveTotal}, ${effectiveProfit}, 1, ${itemsSoldCount}, now())
+        ON CONFLICT ("storeId", date) DO UPDATE SET
+          "grossSales" = daily_sales_summary."grossSales" + EXCLUDED."grossSales",
+          "netProfit"  = daily_sales_summary."netProfit"  + EXCLUDED."netProfit",
+          "txCount"    = daily_sales_summary."txCount"    + 1,
+          "itemsSold"  = daily_sales_summary."itemsSold"  + EXCLUDED."itemsSold",
+          "updatedAt"  = now()
+      `
+    }
 
     return NextResponse.json({ data: sale })
   } catch (err: any) {

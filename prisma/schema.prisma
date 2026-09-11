@@ -786,6 +786,25 @@ model DeletedProduct {
   @@map("deleted_products")
 }
 
+// ─── Daily Sales Summary (aggregation table for fast report queries) ──────────
+// Populated/updated by the sales POST handler.
+// Avoids full table scans on sales + sale_items for dashboard stats.
+
+model DailySalesSummary {
+  id          String   @id @default(uuid())
+  storeId     String
+  date        String   // YYYY-MM-DD in PH time
+  grossSales  Float    @default(0)
+  netProfit   Float    @default(0)
+  txCount     Int      @default(0)
+  itemsSold   Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([storeId, date])
+  @@index([storeId, date])
+  @@map("daily_sales_summary")
+}
+
 // ─── PIN Resets ───────────────────────────────────────────────────────────────
 // Was a TODO in reset-owner-pin/route.ts — now properly implemented
 

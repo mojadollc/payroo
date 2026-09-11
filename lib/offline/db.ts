@@ -1,7 +1,8 @@
 import { openDB, type IDBPDatabase } from "idb"
 
 const DB_NAME = "payroo_offline"
-const DB_VERSION = 1
+// v2: adds barcode index on products for O(1) barcode lookup
+const DB_VERSION = 2
 
 export interface SyncMeta {
   collection: string
@@ -19,7 +20,7 @@ export interface PendingWrite {
 }
 
 export type PayrooDB = IDBPDatabase<{
-  products: { key: string; value: any; indexes: { storeId: string } }
+  products: { key: string; value: any; indexes: { storeId: string; barcode: string } }
   categories: { key: string; value: any; indexes: { storeId: string } }
   sales: { key: string; value: any; indexes: { storeId: string; createdAt: string } }
   elistas: { key: string; value: any; indexes: { userId: string } }
@@ -36,11 +37,18 @@ export async function getDB(): Promise<PayrooDB> {
   if (dbInstance) return dbInstance
 
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion, _newVersion, tx) {
       // Products
       if (!db.objectStoreNames.contains("products")) {
         const store = db.createObjectStore("products", { keyPath: "id" })
         store.createIndex("storeId", "storeId")
+        store.createIndex("barcode", "barcode")
+      } else if (oldVersion < 2) {
+        // Migration: add barcode index to existing store
+        const store = tx.objectStore("products")
+        if (!store.indexNames.contains("barcode")) {
+          store.createIndex("barcode", "barcode")
+        }
       }
       // Categories
       if (!db.objectStoreNames.contains("categories")) {

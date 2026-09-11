@@ -27,6 +27,7 @@ import {
   invalidateProductStore,
   type PosProduct,
 } from "@/lib/pos/product-store"
+import { VirtualProductGrid } from "@/components/pos/virtual-product-grid"
 import type { Product } from "@/lib/firebase/types"
 import Link from "next/link"
 
@@ -634,82 +635,7 @@ export default function POSPage() {
         {/* Product Grid */}
         <div className="pt-1">
           <MobileSectionHeader title="Products" />
-          {shuffledProducts.length === 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="rounded-2xl overflow-hidden border border-border/40 bg-white">
-                  <div className="aspect-square relative overflow-hidden bg-gray-100">
-                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <div className="h-3 rounded w-3/4 relative overflow-hidden bg-gray-100">
-                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                    </div>
-                    <div className="h-3 rounded w-1/2 relative overflow-hidden bg-gray-100">
-                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite_0.2s] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                    </div>
-                    <div className="h-4 rounded w-2/3 relative overflow-hidden bg-gray-100">
-                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite_0.1s] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-            {shuffledProducts.slice(0, 20).map((product, idx) => (
-              <MobileCard
-                key={product.id}
-                onClick={() => product.stock > 0 && addToCart(product)}
-                className={product.stock <= 0 ? "opacity-50" : ""}
-              >
-                <div className="relative aspect-square bg-muted/40">
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                      loading={idx < 8 ? "eager" : "lazy"}
-                      decoding={idx < 8 ? "sync" : "async"}
-                      fetchPriority={idx < 4 ? "high" : "auto"}
-                      width={200}
-                      height={200}
-                    />
-                  ) : (
-                    <DefaultProductImage />
-                  )}
-                  {product.stock <= 0 && (
-                    <div className="absolute inset-0 bg-background/90 flex items-center justify-center">
-                      <span className="text-xs font-bold text-destructive">Out of Stock</span>
-                    </div>
-                  )}
-                  {product.onSale && product.salePrice && product.stock > 0 && (
-                    <div className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                      SALE
-                    </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  <div className="font-semibold text-[13px] truncate mb-0.5 tracking-tight" title={product.name}>
-                    {product.name}
-                  </div>
-                  {product.variants && product.variants.length > 0 && (
-                    <p className="text-[10px] text-primary font-medium mb-0.5">{product.variants.map(v => v.name).join(", ")}</p>
-                  )}
-                  {product.onSale && product.salePrice ? (
-                    <div className="flex items-center gap-1.5">
-                      <div className="text-[15px] font-bold text-orange-500">₱{product.salePrice.toFixed(2)}</div>
-                      <div className="text-[11px] line-through text-muted-foreground">₱{product.price.toFixed(2)}</div>
-                    </div>
-                  ) : (
-                    <div className="text-[15px] font-bold text-primary">₱{product.price.toFixed(2)}</div>
-                  )}
-                  <div className="text-[10px] text-muted-foreground mt-1 font-medium">{product.stock} in stock</div>
-                </div>
-              </MobileCard>
-            ))}
-            </div>
-          )}
+          <VirtualProductGrid products={shuffledProducts} onAdd={addToCart} />
         </div>
       </div>
 

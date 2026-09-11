@@ -8,7 +8,9 @@
     "lint": "eslint .",
     "start": "next start",
     "deploy": "node scripts/update-sw-version.js && npm run build && firebase deploy",
-    "migrate": "npx tsx scripts/migrate-firebase-to-postgres.ts"
+    "migrate": "npx tsx scripts/migrate-firebase-to-postgres.ts",
+    "measure": "node scripts/measure-queries.mjs",
+    "db:optimize": "psql $DATABASE_URL -f prisma/migrations/local_first_optimizations.sql"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1105.0",

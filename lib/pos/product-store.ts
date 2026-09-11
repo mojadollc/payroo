@@ -25,7 +25,7 @@ export type PosProduct = Pick<
   Product,
   "id" | "name" | "barcode" | "category" | "price" | "cost" |
   "stock" | "imageUrl" | "unit" | "onSale" | "salePrice" | "variants"
->
+> & { storeId?: string }
 
 // ── Module-level state (survives React unmount) ───────────────────────────────
 
@@ -207,7 +207,7 @@ async function fetchFull(storeId: string): Promise<PosProduct[]> {
   }
 }
 
-// ── Barcode lookup (memory → IDB → API) ──────────────────────────────────────
+// ── Barcode lookup (memory → IDB barcode index → API) ────────────────────────
 
 export function findByBarcodeSync(barcode: string): PosProduct | undefined {
   return memCache.find(p => p.barcode === barcode)
@@ -217,11 +217,11 @@ export async function lookupBarcode(storeId: string, barcode: string): Promise<P
   const local = findByBarcodeSync(barcode)
   if (local) return local
 
+  // Use the barcode index — O(1) IDB lookup, no full table scan
   try {
     const db = await getDB()
-    const all = await db.getAllFromIndex("products", "storeId", storeId) as PosProduct[]
-    const found = all.find(p => p.barcode === barcode)
-    if (found) return found
+    const found = await db.getFromIndex("products", "barcode", barcode) as PosProduct | undefined
+    if (found && found.storeId === storeId) return found
   } catch {}
 
   try {

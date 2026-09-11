@@ -52,3 +52,8 @@ export function endOfDayPH(date: Date | string): Date {
 export function formatPH(date: Date | string, opts?: Intl.DateTimeFormatOptions): string {
   return new Date(date).toLocaleString("en-PH", { timeZone: TZ, ...opts })
 }
+
+/** Return YYYY-MM-DD string in PH time for a given Date (defaults to now). */
+export function toPHDateString(date: Date = new Date()): string {
+  return date.toLocaleDateString("en-CA", { timeZone: TZ })
+}

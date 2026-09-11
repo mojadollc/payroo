@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     if (!user) return NextResponse.json({ error: "Invalid Store ID or PIN." }, { status: 401 })
 
-    return NextResponse.json({ user })
+    return NextResponse.json({ user: { ...user, updatedAt: user.updatedAt.toISOString() } })
   } catch (err) {
     console.error("staff login error:", err)
     return NextResponse.json({ error: "Login failed. Please try again." }, { status: 500 })

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     if (!owner) return NextResponse.json({ error: "Incorrect PIN. Please try again." }, { status: 401 })
 
-    return NextResponse.json({ user: owner, subscription: { ...sub, endDate: sub.endDate?.toISOString() ?? null, startDate: sub.startDate?.toISOString() ?? null, createdAt: sub.createdAt?.toISOString() ?? null, updatedAt: sub.updatedAt?.toISOString() ?? null } })
+    return NextResponse.json({ user: { ...owner, updatedAt: owner.updatedAt.toISOString() }, subscription: { ...sub, endDate: sub.endDate?.toISOString() ?? null, startDate: sub.startDate?.toISOString() ?? null, createdAt: sub.createdAt?.toISOString() ?? null, updatedAt: sub.updatedAt?.toISOString() ?? null } })
   } catch (err) {
     console.error("owner login error:", err)
     return NextResponse.json({ error: "Login failed. Please try again." }, { status: 500 })

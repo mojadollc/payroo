@@ -72,6 +72,7 @@ export default function LoginPage() {
       }
 
       login(user)
+      if (user.updatedAt) localStorage.setItem("pos_auth_ts", String(new Date(user.updatedAt).getTime()))
       router.push("/home")
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" })

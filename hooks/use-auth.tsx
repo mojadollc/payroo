@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 import type { StoreUser, UserRole, SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
 
 interface AuthState {
@@ -17,6 +18,7 @@ interface AuthState {
 }
 
 const AUTH_KEY = "pos_current_user"
+const AUTH_TS_KEY = "pos_auth_ts"
 
 const AuthContext = createContext<AuthState>({
   user: null, loading: true,
@@ -28,6 +30,7 @@ const AuthContext = createContext<AuthState>({
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
   const [user, setUser] = useState<StoreUser | null>(() => {
     if (typeof window === "undefined") return null
     try {
@@ -37,8 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const [loading] = useState(false)
 
-  useEffect(() => {}, [])
-
   const login = useCallback((u: StoreUser) => {
     setUser(u)
     localStorage.setItem(AUTH_KEY, JSON.stringify(u))
@@ -47,32 +48,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setUser(null)
     localStorage.removeItem(AUTH_KEY)
+    localStorage.removeItem(AUTH_TS_KEY)
   }, [])
+
+  // Poll /api/auth/verify every 30s and on visibilitychange.
+  // If updatedAt changed (PIN was reset) or user is deactivated → force logout.
+  useEffect(() => {
+    if (!user?.id) return
+
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/auth/verify?id=${user.id}`, { cache: "no-store" })
+        if (!res.ok) return
+        const { valid, ts } = await res.json()
+        if (!valid) {
+          logout()
+          router.replace("/login")
+          return
+        }
+        const storedTs = localStorage.getItem(AUTH_TS_KEY)
+        if (storedTs && ts && String(ts) !== storedTs) {
+          // PIN or account was changed — invalidate this session
+          logout()
+          router.replace("/login")
+        }
+      } catch { /* network error — stay logged in */ }
+    }
+
+    check()
+    const interval = setInterval(check, 30_000)
+    const onVisible = () => { if (document.visibilityState === "visible") check() }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", onVisible) }
+  }, [user?.id, logout, router])
+
+  useEffect(() => {}, [])
 
   const isOwner = user?.role === "owner"
   const isSubAdmin = user?.role === "subadmin"
   const isCashier = user?.role === "cashier"
 
-  // owner > subadmin > cashier
   const can = useCallback((minRole: UserRole): boolean => {
     if (!user) return false
     const hierarchy: UserRole[] = ["cashier", "subadmin", "owner"]
     return hierarchy.indexOf(user.role) >= hierarchy.indexOf(minRole)
   }, [user])
 
-  // Check if current user can access a specific feature
-  // Owner: always true. Subadmin: only if in their allowedFeatures. Cashier: POS + reports (view-only).
   const hasFeature = useCallback((feature: keyof SubscriptionFeatures): boolean => {
     if (!user) return false
     if (user.role === "owner") return true
     if (user.role === "cashier") return feature === "pos" || feature === "reports"
-    // subadmin — check allowedFeatures
-    if (feature === "pos") return true // POS always allowed
+    if (feature === "pos") return true
     return user.allowedFeatures?.[feature] === true
   }, [user])
 
-  // Check if current user can access a management page (Users / Settings)
-  // Owner: always true. Subadmin: only if owner granted the permission.
   const hasPermission = useCallback((perm: keyof SubadminPermissions): boolean => {
     if (!user) return false
     if (user.role === "owner") return true

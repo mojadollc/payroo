@@ -11,9 +11,13 @@ export async function GET(req: NextRequest) {
     const where: any = { storeId }
     if (from && to) {
       where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+    } else if (!from && !to) {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      where.createdAt = { gte: thirtyDaysAgo }
     }
-    const items = await prisma.eWalletTransaction.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 })
-    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
+    const items = await prisma.eWalletTransaction.findMany({ where, orderBy: { createdAt: "desc" }, take: 1000 })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } })
   } catch (err: any) {
     console.error("[ewallet GET]", err.message)
     return NextResponse.json({ error: err.message, data: [] }, { status: 500 })

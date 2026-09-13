@@ -51,9 +51,13 @@ export async function GET(req: NextRequest) {
     where.createdAt = {}
     if (from) where.createdAt.gte = startOfDayPH(from)
     if (to) where.createdAt.lte = endOfDayPH(to)
+  } else {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    where.createdAt = { gte: thirtyDaysAgo }
   }
 
-  const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" }, take: 500 })
+  const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" }, take: 1000 })
   return NextResponse.json({ data }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=120" } })
 }
 

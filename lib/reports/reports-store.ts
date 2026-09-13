@@ -118,11 +118,10 @@ export async function loadReports(
   return doLoad()
 }
 
-// ── Preload IDB into memCache synchronously (call before component mounts) ────
-// Allows the reports page to render instantly from IDB without waiting for API.
-
+// ── Preload IDB into memCache (now called internally by loadReports) ──────────
+// Kept for backward compatibility but loadReports handles this automatically.
 export async function preloadFromIDB(storeId: string): Promise<void> {
-  if (memCache && memCache.storeId === storeId) return // already warm
+  if (memCache && memCache.storeId === storeId) return
   const cached = await idbGet(storeId)
   if (cached && cached.storeId === storeId) {
     memCache = cached

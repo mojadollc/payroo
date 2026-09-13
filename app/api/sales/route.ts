@@ -20,8 +20,14 @@ export async function GET(req: NextRequest) {
       })
       return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
     }
-    const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, take: 500 })
-    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "no-store" } })
+    // Default to last 30 days if no date range given — prevents full table scan
+    if (!from && !to) {
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      where.createdAt = { gte: thirtyDaysAgo }
+    }
+    const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, take: 1000 })
+    return NextResponse.json({ data: items }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } })
   } catch (err: any) {
     console.error("[sales GET]", err.message)
     return NextResponse.json({ error: err.message, data: [] }, { status: 500 })

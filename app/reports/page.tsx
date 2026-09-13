@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { TrendingUp, ShoppingCart, Wallet, Download, CalendarDays, Receipt, BadgeDollarSign, CircleDollarSign, ChevronDown, ArrowUpRight, Activity, Cigarette, Package } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -44,9 +44,9 @@ import {
   subscribeReports,
   getMemReports,
   invalidateReports,
-  preloadFromIDB,
   type ReportsData,
 } from "@/lib/reports/reports-store"
+import { getMemCache as getPosMemCache } from "@/lib/pos/product-store"
 import type { Sale, EWalletTransaction, Product } from "@/lib/firebase/types"
 
 // ── CSV helpers ────────────────────────────────────────────────────────────────
@@ -223,18 +223,19 @@ export default function ReportsPage() {
   const [sales, setSales] = useState<Sale[]>(cached?.sales ?? [])
   const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>(cached?.ewallet ?? [])
   const [billPayments, setBillPayments] = useState<any[]>(cached?.bills ?? [])
-  const [products, setProducts] = useState<Product[]>([])
-  const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(new Set())
-  const [isLoading, setIsLoading] = useState(!cached) // instant render if cache exists
+  // Seed products from POS memory cache instantly — no extra fetch needed
+  const [products, setProducts] = useState<Product[]>(() => getPosMemCache() as unknown as Product[])
+  const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(() => {
+    const posCache = getPosMemCache()
+    return new Set(posCache.filter(p => {
+      const c = (p.category || "").trim().toLowerCase()
+      return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+    }).map(p => p.id!))
+  })
+  const [isLoading, setIsLoading] = useState(!cached)
   const [loadError, setLoadError] = useState<string | null>(null)
   const productsLoadedRef = useRef<string>("")
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined)
-  // Track which tabs have been activated — only fetch detail data on demand
-  const [activatedTabs, setActivatedTabs] = useState<Set<string>>(new Set(["sales"]))
-  // Summary stats from fast aggregation endpoint (shown immediately)
-  const [summary, setSummary] = useState<{ grossSales: number; netProfit: number; txCount: number; itemsSold: number } | null>(
-    cached ? null : null
-  )
 
   useEffect(() => {
     const storeId = getStoreId()
@@ -242,7 +243,6 @@ export default function ReportsPage() {
 
     setLoadError(null)
 
-    // Subscribe to store updates (background refresh notifies here)
     const unsub = subscribeReports(() => {
       const latest = getMemReports()
       if (latest) {
@@ -253,47 +253,32 @@ export default function ReportsPage() {
       }
     })
 
-    // Preload IDB into memCache first so loadReports returns instantly
-    preloadFromIDB(storeId).then(() => {
-      // After IDB preload, seed state if memCache is now warm
-      const warm = getMemReports()
-      if (warm && warm.storeId === storeId) {
-        setSales(warm.sales)
-        setEWalletTransactions(warm.ewallet)
-        setBillPayments(warm.bills)
+    // Load immediately — memory hit is instant, IDB hit is fast, API is background
+    loadReports(storeId, dateRange)
+      .then(data => {
+        setSales(data.sales)
+        setEWalletTransactions(data.ewallet)
+        setBillPayments(data.bills)
         setIsLoading(false)
-      }
+      })
+      .catch(err => {
+        setLoadError(err.message)
+        setIsLoading(false)
+      })
 
-      // Then load (will be instant memory hit or background refresh)
-      loadReports(storeId, dateRange)
-        .then(data => {
-          setSales(data.sales)
-          setEWalletTransactions(data.ewallet)
-          setBillPayments(data.bills)
-          setIsLoading(false)
-        })
-        .catch(err => {
-          setLoadError(err.message)
-          setIsLoading(false)
-        })
-    })
-
-    // Load products once per store (for inventory export + tobacco detection)
+    // Refresh products from POS cache if it has loaded since mount
     if (productsLoadedRef.current !== storeId) {
-      fetch(`/api/products?storeId=${storeId}`)
-        .then(r => r.json())
-        .then(({ data: productsData }) => {
-          setProducts(productsData ?? [])
-          productsLoadedRef.current = storeId
-          const tobaccoIds = new Set<string>(
-            (productsData ?? []).filter((p: any) => {
-              const c = (p.category || "").trim().toLowerCase()
-              return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
-            }).map((p: any) => p.id)
-          )
-          setTobaccoProductIds(tobaccoIds)
-        })
-        .catch(() => {})
+      const posCache = getPosMemCache()
+      if (posCache.length > 0) {
+        setProducts(posCache as unknown as Product[])
+        setTobaccoProductIds(new Set(
+          posCache.filter(p => {
+            const c = (p.category || "").trim().toLowerCase()
+            return c === "tobacco" || c === "cigarette" || c === "cigarettes" || c.includes("tobacco") || c.includes("cigarette")
+          }).map(p => p.id!)
+        ))
+        productsLoadedRef.current = storeId
+      }
     }
 
     return unsub
@@ -304,7 +289,7 @@ export default function ReportsPage() {
     setDateRange(d => d ? { ...d } : undefined)
   }
 
-  const calculateStats = () => {
+  const stats = useMemo(() => {
     const activeSales = sales.filter(s => s.status !== "voided")
     const salesGross = activeSales.reduce((sum, s) => sum + s.total, 0)
     const salesProfit = activeSales.reduce((sum, s) =>
@@ -323,19 +308,16 @@ export default function ReportsPage() {
       totalEWalletTransactions: ewalletTransactions.length,
       totalBillPayments: billPayments.length,
     }
-  }
+  }, [sales, ewalletTransactions, billPayments])
 
-  const calculateToday = () => {
+  const today = useMemo(() => {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
     const activeTodaySales = sales.filter(s => {
       if (s.status === "voided") return false
       const d = new Date(s.createdAt)
       return d >= todayStart
     })
-    const todayEwallet = ewalletTransactions.filter(t => {
-      const d = new Date(t.createdAt)
-      return d >= todayStart
-    })
+    const todayEwallet = ewalletTransactions.filter(t => new Date(t.createdAt) >= todayStart)
     const gross = activeTodaySales.reduce((sum, s) => sum + s.total, 0)
     const profit = activeTodaySales.reduce((sum, s) =>
       sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
@@ -343,7 +325,6 @@ export default function ReportsPage() {
     const itemsSold = activeTodaySales.reduce((sum, s) => sum + s.items.reduce((n, i) => n + i.quantity, 0), 0)
     const eGross = todayEwallet.reduce((sum, t) => sum + t.amount, 0)
     const eProfit = todayEwallet.reduce((sum, t) => sum + Math.abs(t.profit), 0)
-    // Tobacco today — from same sales array, tobacco products only
     const tobaccoGross  = activeTodaySales.reduce((sum, s) => sum + s.items.filter(i => tobaccoProductIds.has(i.productId)).reduce((p, i) => p + i.subtotal, 0), 0)
     const tobaccoProfit = activeTodaySales.reduce((sum, s) => sum + s.items.filter(i => tobaccoProductIds.has(i.productId)).reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
     const topItems = Object.values(
@@ -355,10 +336,7 @@ export default function ReportsPage() {
       }, {} as Record<string, { name: string; qty: number; revenue: number }>)
     ).sort((a, b) => b.qty - a.qty).slice(0, 5)
     return { gross, profit, txCount, itemsSold, eGross, eProfit, tobaccoGross, tobaccoProfit, topItems }
-  }
-
-  const stats = calculateStats()
-  const today = calculateToday()
+  }, [sales, ewalletTransactions, tobaccoProductIds])
   const todayFormatted = new Date().toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
 
   const rangeLabel = dateRange

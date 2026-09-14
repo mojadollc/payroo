@@ -8,17 +8,18 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface DateRangePickerProps {
-  dateRange: { from: Date; to: Date } | undefined
-  setDateRange: (range: { from: Date; to: Date } | undefined) => void
+  dateRange: { from: Date; to: Date }
+  setDateRange: (range: { from: Date; to: Date }) => void
 }
 
 const currentYear = new Date().getFullYear()
 const YEARS = [2025, 2026]
 
 function yearRange(year: number) {
-  const start = startOfYear(new Date(year, 0, 1))
-  const end = year === currentYear ? new Date() : endOfYear(new Date(year, 0, 1))
-  return { from: start, to: end }
+  return {
+    from: startOfYear(new Date(year, 0, 1)),
+    to: year === currentYear ? new Date() : endOfYear(new Date(year, 0, 1)),
+  }
 }
 
 const PRESETS = [
@@ -32,8 +33,7 @@ const PRESETS = [
   { label: "All Time",   range: () => ({ from: new Date(2020, 0, 1), to: new Date() }) },
 ]
 
-function getLabel(dr: { from: Date; to: Date } | undefined): string {
-  if (!dr) return "Filter"
+function getLabel(dr: { from: Date; to: Date }): string {
   const { from, to } = dr
   const fy = from.getFullYear(), ty = to.getFullYear()
   if (fy === ty) {
@@ -45,8 +45,7 @@ function getLabel(dr: { from: Date; to: Date } | undefined): string {
   return `${format(from,"MMM d, yy")} – ${format(to,"MMM d, yy")}`
 }
 
-function isActivePreset(label: string, dr: { from: Date; to: Date } | undefined): boolean {
-  if (!dr) return false
+function isActivePreset(label: string, dr: { from: Date; to: Date }): boolean {
   const r = PRESETS.find(p => p.label === label)?.range()
   if (!r) return false
   return Math.abs(r.from.getTime() - dr.from.getTime()) < 60000 &&
@@ -69,12 +68,10 @@ export function DateRangePicker({ dateRange, setDateRange }: DateRangePickerProp
     setOpen(false)
   }
 
-  const activeYear = dateRange
-    ? YEARS.find(y => {
-        const r = yearRange(y)
-        return Math.abs(r.from.getTime() - dateRange.from.getTime()) < 60000
-      })
-    : undefined
+  const activeYear = YEARS.find(y => {
+    const r = yearRange(y)
+    return Math.abs(r.from.getTime() - dateRange.from.getTime()) < 60000
+  })
 
   const pickerContent = (
     <div className={cn("flex flex-col", isMobile ? "w-full" : "w-[300px]")}>
@@ -126,8 +123,8 @@ export function DateRangePicker({ dateRange, setDateRange }: DateRangePickerProp
         <Calendar
           initialFocus
           mode="range"
-          defaultMonth={dateRange?.from ?? new Date()}
-          selected={{ from: dateRange?.from, to: dateRange?.to }}
+          defaultMonth={dateRange.from}
+          selected={{ from: dateRange.from, to: dateRange.to }}
           onSelect={(range) => {
             if (range?.from && range?.to) apply({ from: range.from, to: range.to })
             else if (range?.from) setDateRange({ from: range.from, to: range.from })
@@ -138,17 +135,15 @@ export function DateRangePicker({ dateRange, setDateRange }: DateRangePickerProp
         />
       </div>
 
-      {/* Clear */}
-      {dateRange && (
-        <div className="p-2 pt-0">
-          <button
-            onClick={() => { setDateRange(undefined); setOpen(false) }}
-            className="w-full h-9 rounded-xl text-xs font-semibold text-muted-foreground bg-muted/40 hover:bg-muted transition-colors"
-          >
-            Clear — show last 30 days
-          </button>
-        </div>
-      )}
+      {/* Reset */}
+      <div className="p-2 pt-0">
+        <button
+          onClick={() => apply(PRESETS[2].range())}
+          className="w-full h-9 rounded-xl text-xs font-semibold text-muted-foreground bg-muted/40 hover:bg-muted transition-colors"
+        >
+          Reset to 7 Days
+        </button>
+      </div>
     </div>
   )
 
@@ -158,21 +153,17 @@ export function DateRangePicker({ dateRange, setDateRange }: DateRangePickerProp
       <>
         <button
           onClick={() => setOpen(true)}
-          className={cn(
-            "flex items-center gap-1.5 h-9 px-3 rounded-xl border text-xs font-semibold transition-colors",
-            dateRange ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border"
-          )}
+          className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
         >
           <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
           <span>{getLabel(dateRange)}</span>
-          <ChevronDown className="h-3 w-3 opacity-60" />
+          <ChevronDown className="h-3 w-3 opacity-70" />
         </button>
 
         {open && (
           <div className="fixed inset-0 z-[70]">
             <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-            <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200 max-h-[90vh] overflow-y-auto">
-              {/* Handle + header */}
+            <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-200 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-border" />
               </div>
@@ -183,8 +174,7 @@ export function DateRangePicker({ dateRange, setDateRange }: DateRangePickerProp
                 </button>
               </div>
               {pickerContent}
-              {/* Safe area spacer */}
-              <div className="h-6" />
+              <div className="h-8" />
             </div>
           </div>
         )}
@@ -196,17 +186,12 @@ export function DateRangePicker({ dateRange, setDateRange }: DateRangePickerProp
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn(
-            "h-9 text-xs gap-1.5",
-            dateRange ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground" : "text-muted-foreground"
-          )}
+        <Button variant="outline" size="sm"
+          className="h-9 text-xs gap-1.5 bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground"
         >
           <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
           <span>{getLabel(dateRange)}</span>
-          <ChevronDown className="h-3 w-3 opacity-60" />
+          <ChevronDown className="h-3 w-3 opacity-70" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">

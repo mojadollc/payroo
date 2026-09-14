@@ -213,17 +213,21 @@ function exportInventorySnapshot(products: Product[], label: string) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
+// Default 7-day range — computed once at module level, stable reference
+const DEFAULT_RANGE = {
+  from: (() => { const d = new Date(); d.setDate(d.getDate() - 6); d.setHours(0,0,0,0); return d })()
+  , to: new Date()
+}
+
 export default function ReportsPage() {
   const { isCashier } = useAuth()
   const { features, tier } = useSubscription()
   const canExport = features.exportData && tier !== "basic"
 
-  // Seed from memory cache instantly — zero async on navigation back to Reports
   const cached = getMemReports()
   const [sales, setSales] = useState<Sale[]>(cached?.sales ?? [])
   const [ewalletTransactions, setEWalletTransactions] = useState<EWalletTransaction[]>(cached?.ewallet ?? [])
   const [billPayments, setBillPayments] = useState<any[]>(cached?.bills ?? [])
-  // Seed products from POS memory cache instantly — no extra fetch needed
   const [products, setProducts] = useState<Product[]>(() => getPosMemCache() as unknown as Product[])
   const [tobaccoProductIds, setTobaccoProductIds] = useState<Set<string>>(() => {
     const posCache = getPosMemCache()
@@ -235,7 +239,8 @@ export default function ReportsPage() {
   const [isLoading, setIsLoading] = useState(!cached)
   const [loadError, setLoadError] = useState<string | null>(null)
   const productsLoadedRef = useRef<string>("")
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>(undefined)
+  // Default to last 7 days
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(DEFAULT_RANGE)
 
   useEffect(() => {
     const storeId = getStoreId()
@@ -286,7 +291,7 @@ export default function ReportsPage() {
 
   const loadData = () => {
     invalidateReports()
-    setDateRange(d => d ? { ...d } : undefined)
+    setDateRange(d => ({ ...d }))
   }
 
   const stats = useMemo(() => {
@@ -339,9 +344,7 @@ export default function ReportsPage() {
   }, [sales, ewalletTransactions, tobaccoProductIds])
   const todayFormatted = new Date().toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
 
-  const rangeLabel = dateRange
-    ? `${dateRange.from.toLocaleDateString("en-CA")}_to_${dateRange.to.toLocaleDateString("en-CA")}`
-    : "all-time"
+  const rangeLabel = `${dateRange.from.toLocaleDateString("en-CA")}_to_${dateRange.to.toLocaleDateString("en-CA")}`
 
   return (
     <MobileAppShell

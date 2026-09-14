@@ -31,11 +31,17 @@ export interface ReportsData {
 // ── Module-level state ────────────────────────────────────────────────────────
 
 let memCache: ReportsData | null = null
+let memCacheKey = "" // tracks which range is cached
 let fetchPromise: Promise<ReportsData> | null = null
 const subscribers = new Set<() => void>()
 
 const IDB_KEY = "reports_cache"
-const STALE_MS = 2 * 60 * 1000 // 2 minutes — refresh in background after this
+const STALE_MS = 2 * 60 * 1000
+
+function rangeKey(dateRange?: { from: Date; to: Date }): string {
+  if (!dateRange) return "default"
+  return `${dateRange.from.toLocaleDateString("en-CA")}_${dateRange.to.toLocaleDateString("en-CA")}`
+}
 
 // ── Subscribers ───────────────────────────────────────────────────────────────
 
@@ -50,11 +56,10 @@ function notify() {
 
 // ── IDB helpers ───────────────────────────────────────────────────────────────
 
-async function idbGet(storeId: string): Promise<ReportsData | null> {
+async function idbGet(storeId: string, key: string): Promise<ReportsData | null> {
   try {
     const db = await getDB()
-    // Use syncMeta store to persist the reports cache blob
-    const entry = await (db as any).get("syncMeta", `${IDB_KEY}_${storeId}`)
+    const entry = await (db as any).get("syncMeta", `${IDB_KEY}_${storeId}_${key}`)
     if (!entry?.data) return null
     return entry.data as ReportsData
   } catch {
@@ -62,11 +67,11 @@ async function idbGet(storeId: string): Promise<ReportsData | null> {
   }
 }
 
-async function idbSet(data: ReportsData): Promise<void> {
+async function idbSet(data: ReportsData, key: string): Promise<void> {
   try {
     const db = await getDB()
     await (db as any).put("syncMeta", {
-      collection: `${IDB_KEY}_${data.storeId}`,
+      collection: `${IDB_KEY}_${data.storeId}_${key}`,
       data,
       lastSyncedAt: data.fetchedAt,
     })
@@ -79,50 +84,42 @@ export async function loadReports(
   storeId: string,
   dateRange?: { from: Date; to: Date }
 ): Promise<ReportsData> {
-  const isDefaultRange = !dateRange
+  const key = rangeKey(dateRange)
 
-  // 1. Memory hit for default range — instant
-  if (isDefaultRange && memCache && memCache.storeId === storeId) {
-    const isStale = Date.now() - memCache.fetchedAt > STALE_MS
-    if (isStale) {
-      fetchReports(storeId, undefined).catch(() => {})
+  // 1. Memory hit — instant
+  if (memCache && memCache.storeId === storeId && memCacheKey === key) {
+    if (Date.now() - memCache.fetchedAt > STALE_MS) {
+      fetchReports(storeId, dateRange).catch(() => {})
     }
     return memCache
   }
 
-  // 2. Deduplicate concurrent calls for default range
-  if (isDefaultRange && fetchPromise) return fetchPromise
+  // 2. Deduplicate concurrent calls for same key
+  if (fetchPromise && memCacheKey === key) return fetchPromise
 
   const doLoad = async (): Promise<ReportsData> => {
-    // 3. IDB hit for default range
-    if (isDefaultRange) {
-      const cached = await idbGet(storeId)
-      if (cached && cached.storeId === storeId) {
-        memCache = cached
-        notify()
-        // Background refresh
-        fetchReports(storeId, undefined).catch(() => {})
-        return cached
-      }
+    // 3. IDB hit
+    const cached = await idbGet(storeId, key)
+    if (cached && cached.storeId === storeId) {
+      memCache = cached
+      memCacheKey = key
+      notify()
+      fetchReports(storeId, dateRange).catch(() => {})
+      return cached
     }
-
     // 4. Fetch from API
     return fetchReports(storeId, dateRange)
   }
 
-  if (isDefaultRange) {
-    fetchPromise = doLoad().finally(() => { fetchPromise = null })
-    return fetchPromise
-  }
-
-  return doLoad()
+  fetchPromise = doLoad().finally(() => { fetchPromise = null })
+  return fetchPromise
 }
 
 // ── Preload IDB into memCache (now called internally by loadReports) ──────────
 // Kept for backward compatibility but loadReports handles this automatically.
 export async function preloadFromIDB(storeId: string): Promise<void> {
   if (memCache && memCache.storeId === storeId) return
-  const cached = await idbGet(storeId)
+  const cached = await idbGet(storeId, memCacheKey || "default")
   if (cached && cached.storeId === storeId) {
     memCache = cached
     notify()
@@ -135,11 +132,11 @@ async function fetchReports(
   storeId: string,
   dateRange?: { from: Date; to: Date }
 ): Promise<ReportsData> {
+  const key = rangeKey(dateRange)
   const params = new URLSearchParams({ storeId })
   if (dateRange?.from) params.set("from", dateRange.from.toLocaleDateString("en-CA"))
   if (dateRange?.to) params.set("to", dateRange.to.toLocaleDateString("en-CA"))
 
-  // Fire all 3 fetches in parallel — don't wait for the slowest one
   const [salesRes, ewalletRes, billsRes] = await Promise.allSettled([
     fetch(`/api/sales?${params}`).then(r => r.json()),
     fetch(`/api/ewallet-transactions?${params}`).then(r => r.json()),
@@ -154,12 +151,10 @@ async function fetchReports(
     storeId,
   }
 
-  // Only persist default-range data to IDB
-  if (!dateRange) {
-    memCache = data
-    await idbSet(data)
-    notify()
-  }
+  memCache = data
+  memCacheKey = key
+  await idbSet(data, key)
+  notify()
 
   return data
 }
@@ -174,8 +169,8 @@ export function getMemReports(): ReportsData | null {
 
 export function invalidateReports() {
   memCache = null
+  memCacheKey = ""
   fetchPromise = null
-  // Trigger a fresh background fetch if there are subscribers
   if (subscribers.size > 0) {
     const storeId = getStoreId()
     if (storeId) fetchReports(storeId, undefined).catch(() => {})

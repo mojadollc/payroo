@@ -20,13 +20,14 @@ export async function GET(req: NextRequest) {
       })
       return NextResponse.json({ data: rows }, { headers: { "Cache-Control": "private, max-age=60" } })
     }
-    // Default to last 30 days if no date range given — prevents full table scan
-    if (!from && !to) {
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      where.createdAt = { gte: thirtyDaysAgo }
+    if (from && to) {
+      where.createdAt = { gte: startOfDayPH(from), lte: endOfDayPH(to) }
+    } else {
+      // fallback: last 7 days
+      const d = new Date(); d.setDate(d.getDate() - 6); d.setHours(0,0,0,0)
+      where.createdAt = { gte: d }
     }
-    const limit = (from && to) ? 5000 : 1000
+    const limit = (from && to) ? 5000 : 500
     const items = await prisma.sale.findMany({ where, include: { items: true }, orderBy: { createdAt: "desc" }, take: limit })
     return NextResponse.json({ data: items }, { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } })
   } catch (err: any) {

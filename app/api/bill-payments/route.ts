@@ -52,9 +52,8 @@ export async function GET(req: NextRequest) {
     if (from) where.createdAt.gte = startOfDayPH(from)
     if (to) where.createdAt.lte = endOfDayPH(to)
   } else {
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    where.createdAt = { gte: thirtyDaysAgo }
+    const d = new Date(); d.setDate(d.getDate() - 6); d.setHours(0,0,0,0)
+    where.createdAt = { gte: d }
   }
 
   const data = await prisma.billPayment.findMany({ where, orderBy: { createdAt: "desc" }, take: 1000 })

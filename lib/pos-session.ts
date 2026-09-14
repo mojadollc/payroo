@@ -71,7 +71,7 @@ export function clearSession() {
   localStorage.removeItem("pos_branches_cache")
   localStorage.removeItem("pos_cart")
   localStorage.removeItem("pos_current_user")
-  // pos_subscription intentionally kept — overwritten on next login to avoid expired flash
+  localStorage.removeItem("pos_subscription")
 }
 
 /** Build a session from a subscription API response */

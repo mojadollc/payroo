@@ -83,6 +83,9 @@ export function useSubscription(): SubscriptionState {
 function useSubscriptionInternal(): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>(() => {
     if (typeof window === "undefined") return EMPTY_STATE
+    // Only use cache if there's an active session (pos_ext_id set)
+    const hasSession = !!localStorage.getItem("pos_ext_id")
+    if (!hasSession) return { ...EMPTY_STATE, loading: false }
     return readCache() ?? EMPTY_STATE
   })
 

@@ -4,11 +4,12 @@ import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Store, Package, TrendingUp, HandCoins, Star,
-  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks, Receipt,
+  Brain, BarChart2, Users, Settings, MoreHorizontal, X, Truck, FileText, Smartphone, ListChecks, Receipt, LogOut,
 } from "lucide-react"
 import { useState, useCallback } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { useSubscription } from "@/hooks/use-subscription"
+import { clearSession } from "@/lib/pos-session"
 import type { SubscriptionFeatures, SubadminPermissions } from "@/lib/firebase/types"
 import { APP_VERSION } from "@/lib/version"
 
@@ -82,9 +83,15 @@ const MORE_GROUPS: NavGroup[] = [
 export function MobileBottomNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, isCashier, hasFeature, hasPermission, loading: authLoading } = useAuth()
+  const { user, logout, isCashier, hasFeature, hasPermission, loading: authLoading } = useAuth()
   const { features, isActive } = useSubscription()
   const [moreOpen, setMoreOpen] = useState(false)
+
+  const handleLogout = () => {
+    clearSession()
+    logout()
+    router.push("/login")
+  }
 
   const prefetchRoute = useCallback((href: string) => {
     router.prefetch(href)
@@ -211,6 +218,17 @@ export function MobileBottomNav() {
                   </div>
                 </div>
               ))}
+              {/* Logout */}
+              <div className="mt-5 border-t border-border/40 pt-4">
+                <button
+                  onClick={() => { setMoreOpen(false); handleLogout() }}
+                  style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-50 text-red-600 font-semibold text-[13px] active:bg-red-100 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+              </div>
             </div>
           </div>
         </div>

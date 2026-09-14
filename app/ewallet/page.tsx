@@ -117,7 +117,7 @@ const SendPayoutSheet = memo(function SendPayoutSheet({
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Send Payout" description="Select a channel and fill in the details">
+    <BottomSheet open={open} onClose={onClose} title="Send to Any e-wallets" description="Select a channel and fill in the details">
       <div className="space-y-5 pt-2">
         <div>
           <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Select Channel</p>
@@ -161,16 +161,28 @@ const SendPayoutSheet = memo(function SendPayoutSheet({
 
         <div>
           <label className="text-[12px] font-bold text-foreground mb-1.5 block">
-            {selectedType === "wallet" ? "Mobile Number" : "Account Number"}
+            {selectedType === "wallet" ? "📱 Mobile Number" : "🏦 Account Number"}
           </label>
-          <input type="tel" inputMode="numeric" value={account} onChange={e => setAccount(e.target.value)}
-            placeholder={selectedType === "wallet" ? "09171234567" : "Account number"}
-            className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white" />
+          <input
+            type={selectedType === "wallet" ? "tel" : "text"}
+            inputMode="numeric"
+            value={account}
+            onChange={e => setAccount(e.target.value)}
+            placeholder={selectedType === "wallet" ? "09XXXXXXXXX" : "Enter account number"}
+            maxLength={selectedType === "wallet" ? 11 : undefined}
+            className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white"
+          />
+          {selectedType === "wallet" && account.length > 0 && account.length < 11 && (
+            <p className="text-[11px] text-muted-foreground mt-1 ml-1">{account.length}/11 digits</p>
+          )}
         </div>
 
         <div>
-          <label className="text-[12px] font-bold text-foreground mb-1.5 block">Account Name</label>
-          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Customer name"
+          <label className="text-[12px] font-bold text-foreground mb-1.5 block">
+            {selectedType === "wallet" ? "👤 Account Name (optional)" : "👤 Account Name"}
+          </label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            placeholder={selectedType === "wallet" ? "Customer name" : "Full name on account"}
             className="w-full h-12 rounded-2xl border border-border bg-muted/30 px-4 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white" />
         </div>
 
@@ -192,7 +204,9 @@ const SendPayoutSheet = memo(function SendPayoutSheet({
           </div>
         )}
 
-        <button onClick={handleSend} disabled={loading || !account || !amount || !channel}
+        <button
+          onClick={handleSend}
+          disabled={loading || !account || !amount || !channel || (selectedType === "wallet" && account.length !== 11) || (selectedType === "bank" && !name)}
           className="w-full h-14 rounded-2xl bg-rose-500 text-white font-black text-[16px] flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-rose-500/30">
           {loading ? <span className="animate-pulse">Sending...</span> : <><Send className="h-5 w-5" /> Send ₱{amount || "0"}</>}
         </button>

@@ -431,17 +431,7 @@ export default function EWalletPage() {
         <span className="text-[10px] opacity-75">Record</span>
       </button>
 
-      {/* Kiosk */}
-      <button
-        onClick={() => router.push("/ewallet/cashin")}
-        className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white py-4 px-2 shadow-lg shadow-emerald-500/25 active:scale-[0.97] transition-all hover:from-emerald-600 hover:to-teal-700"
-      >
-        <div className="p-2.5 bg-white/20 rounded-xl">
-          <Wallet className="h-6 w-6" />
-        </div>
-        <span className="text-[13px] font-bold">Kiosk</span>
-        <span className="text-[10px] opacity-75">Self-service</span>
-      </button>
+      {/* Kiosk — hidden, coming soon */}
 
       {/* HitPay Send Payout */}
       <button
@@ -514,7 +504,7 @@ export default function EWalletPage() {
             </div>
           )}
 
-          {/* HitPay Payout wallet card — exclusive to store 8807 */}
+          {/* Kiosk wallet card — hidden, coming soon */}
           {canUseHitpay ? (
             <button
               onClick={() => setActiveSheet("hitpay")}
@@ -548,18 +538,7 @@ export default function EWalletPage() {
                 <p className="text-white/40 text-[10px] mt-2">Powered by Xendit</p>
               </div>
             </button>
-          ) : (
-            <button onClick={() => setActiveSheet("cashin")} className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white px-4 pt-4 pb-4 text-left">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-white" />
-                </div>
-              </div>
-              <p className="text-white/60 text-[9px] font-semibold uppercase tracking-widest mb-0.5">Self-Service</p>
-              <p className="text-white text-[16px] font-black">Kiosk</p>
-              <p className="text-white/40 text-[10px] mt-2">Tap to open</p>
-            </button>
-          )}
+          ) : null}
         </div>
 
         {/* ── Action buttons row — visible to all stores ── */}
@@ -590,12 +569,7 @@ export default function EWalletPage() {
               </button>
             )}
 
-            <button onClick={() => router.push("/ewallet/cashin")} className="flex flex-col items-center gap-1.5 active:scale-90 transition-transform">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-md shadow-emerald-500/30">
-                <Wallet className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-[10px] font-semibold text-foreground text-center">Kiosk</span>
-            </button>
+            {/* Kiosk action button — hidden, coming soon */}
           </div>
         </div>
 

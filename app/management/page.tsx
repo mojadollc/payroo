@@ -585,7 +585,7 @@ export default function ManagementPage() {
           <TabsTrigger value="affiliates"><TrendingUp className="h-4 w-4 mr-1" /> Affiliates</TabsTrigger>
           <TabsTrigger value="stores"><Store className="h-4 w-4 mr-1" /> Store Data</TabsTrigger>
           <TabsTrigger value="visitors"><Globe className="h-4 w-4 mr-1" /> Visitors</TabsTrigger>
-          <TabsTrigger value="kiosk"><Wallet className="h-4 w-4 mr-1" /> Kiosk</TabsTrigger>
+          {/* Kiosk tab — hidden, coming soon */}
           <TabsTrigger value="expenses"><Receipt className="h-4 w-4 mr-1" /> Expenses</TabsTrigger>
           <TabsTrigger value="delivery"><Truck className="h-4 w-4 mr-1" /> Delivery</TabsTrigger>
         </TabsList>
@@ -1102,10 +1102,7 @@ export default function ManagementPage() {
           <VisitorsTab visits={visits} loading={visitsLoading} onRefresh={loadVisits} />
         </TabsContent>
 
-        {/* ── Kiosk Tab ── */}
-        <TabsContent value="kiosk">
-          <KioskManagement />
-        </TabsContent>
+        {/* Kiosk tab content — hidden, coming soon */}
 
         <TabsContent value="expenses">
           <ExpensesManagement />

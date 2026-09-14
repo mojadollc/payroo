@@ -76,7 +76,7 @@ export function ProfitChart({ sales, ewalletTransactions, isLoading, tobaccoProd
       const ts = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
       const entry = map.get(date) || { date, ts, sales: 0, ewallet: 0, tobacco: 0, total: 0 }
 
-      const saleProfit = sale.items.reduce((s, i) => s + (i.price - i.cost) * i.quantity, 0)
+      const saleProfit = sale.profit
       const tobaccoProfit = sale.items
         .filter(i => tobaccoProductIds.has(i.productId))
         .reduce((s, i) => s + (i.price - i.cost) * i.quantity, 0)

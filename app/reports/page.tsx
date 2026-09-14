@@ -297,8 +297,7 @@ export default function ReportsPage() {
   const stats = useMemo(() => {
     const activeSales = sales.filter(s => s.status !== "voided")
     const salesGross = activeSales.reduce((sum, s) => sum + s.total, 0)
-    const salesProfit = activeSales.reduce((sum, s) =>
-      sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
+    const salesProfit = activeSales.reduce((sum, s) => sum + s.profit, 0)
     const ewalletGross = ewalletTransactions.reduce((sum, t) => sum + t.amount, 0)
     const ewalletProfit = ewalletTransactions.reduce((sum, t) => sum + Math.abs(t.profit), 0)
     const billsRevenue = billPayments.reduce((sum, t) => sum + t.totalAmount, 0)
@@ -324,8 +323,7 @@ export default function ReportsPage() {
     })
     const todayEwallet = ewalletTransactions.filter(t => new Date(t.createdAt) >= todayStart)
     const gross = activeTodaySales.reduce((sum, s) => sum + s.total, 0)
-    const profit = activeTodaySales.reduce((sum, s) =>
-      sum + s.items.reduce((p, i) => p + (i.price - i.cost) * i.quantity, 0), 0)
+    const profit = activeTodaySales.reduce((sum, s) => sum + s.profit, 0)
     const txCount = activeTodaySales.length
     const itemsSold = activeTodaySales.reduce((sum, s) => sum + s.items.reduce((n, i) => n + i.quantity, 0), 0)
     const eGross = todayEwallet.reduce((sum, t) => sum + t.amount, 0)
@@ -487,7 +485,7 @@ export default function ReportsPage() {
             <div className="bg-background rounded-xl p-3 border col-span-2">
               <div className="flex items-center gap-1 mb-1">
                 <Cigarette className="h-3 w-3 text-amber-600" />
-                <span className="text-[11px] text-muted-foreground">Tobacco Sales Today</span>
+                <span className="text-[11px] text-muted-foreground">Tobacco (incl. in totals)</span>
               </div>
               <div className="flex items-center gap-4">
                 <div>
@@ -659,7 +657,7 @@ export default function ReportsPage() {
                 <p className="text-xs text-muted-foreground">Sales profit + E-Wallet comm.</p>
               </div>
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><Cigarette className="h-3 w-3 text-amber-600" /> Tobacco Only</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1"><Cigarette className="h-3 w-3 text-amber-600" /> Tobacco (incl. in totals)</p>
                 <p className="text-xl font-bold text-amber-600">₱{today.tobaccoGross.toFixed(2)}</p>
                 <p className="text-xs text-green-600 font-medium">Net: ₱{today.tobaccoProfit.toFixed(2)}</p>
               </div>

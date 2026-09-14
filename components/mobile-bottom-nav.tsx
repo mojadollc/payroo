@@ -34,6 +34,17 @@ const PRIMARY_TABS: NavItem[] = [
   { href: "/reports", label: "Reports", icon: TrendingUp, feature: "reports" },
 ]
 
+// Preload reports data on touch so it's ready before navigation completes
+function preloadReports() {
+  try {
+    const storeId = localStorage.getItem("pos_ext_id") || ""
+    if (!storeId) return
+    import("@/lib/reports/reports-store").then(({ loadReports }) => {
+      loadReports(storeId).catch(() => {})
+    }).catch(() => {})
+  } catch {}
+}
+
 // Grouped items (in "More" sheet)
 const MORE_GROUPS: NavGroup[] = [
   {
@@ -118,6 +129,7 @@ export function MobileBottomNav() {
                   href={item.href}
                   prefetch={true}
                   onMouseEnter={() => prefetchRoute(item.href)}
+                  onTouchStart={() => { prefetchRoute(item.href); if (item.href === "/reports") preloadReports() }}
                   style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
                   className={`flex flex-col items-center justify-center flex-1 py-2.5 gap-1 min-h-[54px] ${
                     active ? "text-primary" : "text-muted-foreground/70"
